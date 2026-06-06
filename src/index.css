@@ -1,0 +1,362 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 97%;
+    --foreground: 220 10% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 10% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 10% 10%;
+
+    --primary: 263 100% 63%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 160 82% 51%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 10% 92%;
+    --muted-foreground: 220 10% 40%;
+
+    --accent: 323 74% 65%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220 10% 85%;
+    --input: 220 10% 85%;
+    --ring: 263 100% 63%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 263 100% 98%;
+    --sidebar-foreground: 263 40% 40%;
+    --sidebar-primary: 263 100% 63%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 263 100% 95%;
+    --sidebar-accent-foreground: 263 100% 63%;
+    --sidebar-border: 263 100% 90%;
+    --sidebar-ring: 263 100% 63%;
+  }
+
+  .dark {
+    --background: 220 10% 4%;
+    --foreground: 220 10% 98%;
+
+    --card: 220 10% 6%;
+    --card-foreground: 220 10% 98%;
+
+    --popover: 220 10% 6%;
+    --popover-foreground: 220 10% 98%;
+
+    --primary: 263 100% 63%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 160 82% 51%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 10% 10%;
+    --muted-foreground: 220 10% 70%;
+
+    --accent: 323 74% 65%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 240 5% 15%;
+    --input: 240 5% 15%;
+    --ring: 263 100% 63%;
+
+    --sidebar-background: 263 100% 30%;
+    --sidebar-foreground: 263 20% 95%;
+    --sidebar-primary: 263 100% 70%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 263 100% 35%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 263 100% 35%;
+    --sidebar-ring: 263 100% 63%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground dark;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Grid background pattern for canvas */
+.grid-pattern {
+  background-size: 30px 30px;
+  background-image: 
+    linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px), 
+    linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+}
+
+.node {
+  @apply bg-muted rounded-lg border-[1px] min-w-[120px] shadow-md;
+  transition: all 0.2s ease;
+}
+
+.node:hover {
+  @apply border-primary/50;
+  filter: drop-shadow(0 0 6px rgba(153, 69, 255, 0.4));
+}
+
+.node.selected {
+  @apply border-primary;
+  filter: drop-shadow(0 0 8px rgba(153, 69, 255, 0.6));
+}
+
+.connection-line {
+  @apply stroke-white/50;
+  stroke-width: 2px;
+}
+
+.connection-line.active {
+  @apply stroke-primary;
+  animation: flow 3s linear infinite;
+  stroke-width: 3px;
+}
+
+.sidebar-item {
+  @apply flex items-center gap-2 p-2 rounded-md text-sm transition-all duration-200;
+}
+
+.sidebar-item:hover {
+  @apply bg-sidebar-accent text-sidebar-accent-foreground;
+}
+
+.sidebar-item.active {
+  @apply bg-sidebar-accent text-sidebar-accent-foreground font-medium relative;
+}
+
+.sidebar-item.active::before {
+  content: '';
+  @apply absolute left-0 top-0 h-full w-1 bg-gradient-purple-cyan rounded-full;
+}
+
+.gradient-text {
+  @apply bg-gradient-purple-cyan bg-clip-text text-transparent;
+}
+
+.ai-button {
+  @apply bg-gradient-purple-cyan text-white px-4 py-2 rounded-full font-medium shadow-md hover:shadow-lg transition-shadow duration-300;
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.ai-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #9945FF 0%, #14F195 100%, #9945FF 200%);
+  background-size: 200% 100%;
+  z-index: -1;
+  transition: background-position 0.5s ease-out;
+  animation: gradient-x 3s ease infinite;
+}
+
+/* Animated background orbs for Landing Page */
+.landing-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.15;
+  z-index: 0;
+  pointer-events: none;
+}
+.landing-orb-1 {
+  width: 400px;
+  height: 400px;
+  background: #9945FF;
+  top: -100px;
+  right: -50px;
+  animation: float-slow 15s ease-in-out infinite alternate;
+}
+.landing-orb-2 {
+  width: 500px;
+  height: 500px;
+  background: #14F195;
+  bottom: -150px;
+  left: -100px;
+  animation: float-slow 20s ease-in-out infinite alternate-reverse;
+}
+.landing-orb-3 {
+  width: 300px;
+  height: 300px;
+  background: #f59e0b;
+  top: 40%;
+  left: 30%;
+  animation: float-slow 18s ease-in-out infinite alternate;
+}
+
+@keyframes float-slow {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(20px, -40px) scale(1.1); }
+  100% { transform: translate(-20px, 20px) scale(0.9); }
+}
+
+/* Glassmorphism containers */
+.landing-glass {
+  background: rgba(10, 10, 12, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+/* Dotted connections and animations */
+.dotted-connection {
+  stroke: rgba(255, 255, 255, 0.15);
+  stroke-width: 3;
+  stroke-dasharray: 8 6;
+  animation: dash-flow 30s linear infinite;
+  transition: stroke 0.3s;
+}
+
+.dotted-connection:hover {
+  stroke: #9945FF;
+}
+
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -1000;
+  }
+}
+
+/* Node styles */
+.node-draggable {
+  cursor: grab;
+  transition: transform 0.1s ease-out;
+}
+
+.node-draggable:active {
+  cursor: grabbing;
+}
+
+.node-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.node-circle:hover {
+  transform: scale(1.05);
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 8px 25px rgba(153, 69, 255, 0.5);
+}
+
+/* Add step buttons between nodes (Make.com style) */
+.add-between-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #18181b;
+  border: 2px solid #27272a;
+  color: #a1a1aa;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  transition: all 0.2s ease;
+}
+
+.add-between-btn:hover {
+  transform: scale(1.15);
+  background: #9945FF;
+  border-color: #9945FF;
+  color: white;
+  box-shadow: 0 0 10px rgba(153, 69, 255, 0.6);
+}
+
+.add-end-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: transparent;
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.add-end-btn:hover {
+  transform: scale(1.1);
+  border-color: #14F195;
+  color: #14F195;
+  box-shadow: 0 0 10px rgba(20, 241, 149, 0.4);
+}
+
+/* ── Node Editor Float Styling ───────────────── */
+.node-editor-panel {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  bottom: 1rem;
+  width: 320px;
+  background-color: rgba(18, 18, 22, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Simulation Glow and Trace Animations ────── */
+@keyframes node-pulse-glow {
+  0% {
+    box-shadow: 0 0 15px 4px rgba(153, 69, 255, 0.6);
+    transform: scale(1);
+    border-color: rgba(153, 69, 255, 0.8);
+  }
+  50% {
+    box-shadow: 0 0 30px 10px rgba(20, 241, 149, 0.9);
+    transform: scale(1.08);
+    border-color: rgba(20, 241, 149, 1);
+  }
+  100% {
+    box-shadow: 0 0 15px 4px rgba(153, 69, 255, 0.6);
+    transform: scale(1);
+    border-color: rgba(153, 69, 255, 0.8);
+  }
+}
+
+.node-circle.node-active {
+  animation: node-pulse-glow 1.5s infinite ease-in-out;
+  border-color: #14F195 !important;
+}
+
+.dotted-connection.active-path {
+  stroke: #14F195 !important;
+  stroke-width: 4px;
+  animation: dash-flow 4s linear infinite;
+  filter: drop-shadow(0 0 4px #14F195);
+}
+

@@ -1,0 +1,4 @@
+ALTER TABLE public.workflows
+  ADD COLUMN IF NOT EXISTS cid TEXT,
+  ADD COLUMN IF NOT EXISTS onchain_signature TEXT,
+  ADD COLUMN IF NOT EXISTS owner_wallet TEXT;
