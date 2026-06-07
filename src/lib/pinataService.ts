@@ -1,5 +1,4 @@
-const PINATA_JWT = import.meta.env.PINATA_JWT
-
+const PINATA_JWT = import.meta.env.VITE_PINATA_JWT;
 /**
  * Pins a JSON object to Pinata (IPFS).
  * Returns the CID of the pinned file.

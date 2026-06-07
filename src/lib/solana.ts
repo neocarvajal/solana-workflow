@@ -14,6 +14,7 @@ const MEMO_PROGRAM_ID = new PublicKey(
   "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
 );
 
+// Mantenemos este tipo por compatibilidad hacia atrás
 export type Phantom = {
   isPhantom?: boolean;
   publicKey: PublicKey | null;
@@ -23,6 +24,15 @@ export type Phantom = {
   signTransaction: (tx: Transaction) => Promise<Transaction>;
   on: (event: string, cb: (...a: any[]) => void) => void;
 };
+
+// Interfaz para el nuevo estándar multi-wallet
+export interface WalletTools {
+  sendTransaction: (
+    transaction: Transaction,
+    connection: Connection
+  ) => Promise<string>;
+  publicKey: PublicKey | null;
+}
 
 export function getPhantom(): Phantom | null {
   const w = window as any;
@@ -45,24 +55,37 @@ export type OnchainEntry = {
   payload: { v: number; name: string; cid: string; version?: number };
 };
 
+/**
+ * Publica un flujo de trabajo on-chain usando cualquier Wallet del Wallet Standard
+ */
 export async function publishWorkflowMemo(
-  phantom: Phantom,
+  walletTools: WalletTools, // <- Ahora acepta el adaptador agnóstico
   payload: { name: string; cid: string; version: number }
 ): Promise<{ signature: string }> {
-  if (!phantom.publicKey) throw new Error("Wallet not connected");
+  const { publicKey, sendTransaction } = walletTools;
+
+  if (!publicKey) throw new Error("Wallet not connected");
+
   const memo = JSON.stringify({ v: 1, app: "solflows", ...payload });
   const ix = new TransactionInstruction({
-    keys: [{ pubkey: phantom.publicKey, isSigner: true, isWritable: true }],
+    keys: [{ pubkey: publicKey, isSigner: true, isWritable: true }],
     programId: MEMO_PROGRAM_ID,
     data: new TextEncoder().encode(memo) as unknown as any,
   });
+
   const tx = new Transaction().add(ix);
-  tx.feePayer = phantom.publicKey;
+  tx.feePayer = publicKey;
+
+  // Obtenemos el blockhash más reciente usando la conexión configurada
   const { blockhash } = await connection.getLatestBlockhash();
   tx.recentBlockhash = blockhash;
-  const signed = await phantom.signTransaction(tx);
-  const sig = await connection.sendRawTransaction(signed.serialize());
+
+  // Enviamos y firmamos la transacción delegando el proceso al Adapter de la Wallet activa
+  const sig = await sendTransaction(tx, connection);
+
+  // Confirmamos la transacción
   await connection.confirmTransaction(sig, "confirmed");
+
   return { signature: sig };
 }
 
@@ -86,7 +109,7 @@ export async function listOnchainWorkflows(
       if (typeof ix.parsed === "string") raw = ix.parsed;
       else if (ix.parsed?.info) raw = ix.parsed.info;
       else if (ix.data) {
-        try { raw = new TextDecoder().decode(bs58.decode(ix.data)); } catch {}
+        try { raw = new TextDecoder().decode(bs58.decode(ix.data)); } catch { }
       }
       if (!raw) continue;
       try {
@@ -98,9 +121,10 @@ export async function listOnchainWorkflows(
             payload: p,
           });
         }
-      } catch {}
+      } catch { }
     }
   });
+
   // Deduplicate by name, keep highest version / most recent
   const byName = new Map<string, OnchainEntry>();
   for (const e of out) {

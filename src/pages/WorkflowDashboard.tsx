@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { getSavedWorkflows, deleteWorkflow, SavedWorkflow, setScenarioName, setFlowNodes } from "@/lib/workflowStore";
 import { workflowToNodes } from "@/lib/workflow";
 import { Link, useNavigate } from "react-router-dom";
+import { useWallet } from "@solana/wallet-adapter-react"; // Importamos el hook oficial
 import { Folder, Search, Trash2, Edit, Play, Calendar, Link as LinkIcon } from "lucide-react";
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
@@ -9,22 +10,15 @@ import Sidebar from "@/components/Sidebar";
 const WorkflowDashboard: React.FC = () => {
   const [workflows, setWorkflows] = useState<SavedWorkflow[]>([]);
   const [search, setSearch] = useState("");
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    import("@/lib/solana").then(({ getPhantom }) => {
-      const p = getPhantom();
-      if (!p) return;
-      if (p.publicKey) {
-        setWalletAddress(p.publicKey.toBase58());
-      }
-      p.on("connect", () => setWalletAddress(p.publicKey?.toBase58() || null));
-      p.on("disconnect", () => setWalletAddress(null));
-      p.on("accountChanged", (pk: any) => setWalletAddress(pk ? pk.toBase58() : null));
-    });
-  }, []);
+  // Obtenemos la clave pública y el estado de conexión de la wallet activa
+  const { publicKey, connected } = useWallet();
 
+  // Obtenemos la dirección en formato string si está conectado
+  const walletAddress = connected && publicKey ? publicKey.toBase58() : null;
+
+  // Reaccionamos automáticamente cada vez que cambie el estado o la dirección de la wallet
   useEffect(() => {
     if (walletAddress) {
       setWorkflows(getSavedWorkflows(walletAddress));
@@ -48,8 +42,6 @@ const WorkflowDashboard: React.FC = () => {
     }
   };
 
-
-
   const filtered = workflows.filter(
     (w) => w.name.toLowerCase().includes(search.toLowerCase()) || w.id.includes(search)
   );
@@ -59,7 +51,7 @@ const WorkflowDashboard: React.FC = () => {
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header />
-        
+
         <main className="flex-1 overflow-y-auto p-8 relative">
           <div className="max-w-5xl mx-auto">
             {/* Page Header */}
@@ -92,7 +84,6 @@ const WorkflowDashboard: React.FC = () => {
                 <p className="text-muted-foreground mb-6 max-w-md">
                   Please connect your Solana wallet to view and manage your saved workflows.
                 </p>
-                {/* Using a generic message since wallet connection happens in Header/Navbar typically */}
                 <p className="text-sm text-primary font-medium">Use the "Connect Wallet" button above.</p>
               </div>
             ) : workflows.length === 0 ? (
@@ -102,7 +93,7 @@ const WorkflowDashboard: React.FC = () => {
                 </div>
                 <h3 className="text-xl font-semibold mb-2">No workflows found</h3>
                 <p className="text-muted-foreground mb-6 max-w-md">
-                  You haven't saved any workflows yet for wallet {walletAddress.slice(0,4)}...{walletAddress.slice(-4)}. Create a new flow from the editor and save it to see it here.
+                  You haven't saved any workflows yet for wallet {walletAddress.slice(0, 4)}...{walletAddress.slice(-4)}. Create a new flow from the editor and save it to see it here.
                 </p>
                 <Link
                   to="/dashboard"
@@ -133,9 +124,9 @@ const WorkflowDashboard: React.FC = () => {
                         </button>
                       </div>
                     </div>
-                    
+
                     <h3 className="text-lg font-bold mb-1 truncate">{wf.name}</h3>
-                    
+
                     <div className="flex items-center gap-4 text-xs text-muted-foreground mb-6">
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3.5 w-3.5" />
@@ -175,7 +166,7 @@ const WorkflowDashboard: React.FC = () => {
                     </div>
                   </div>
                 ))}
-                
+
                 {filtered.length === 0 && (
                   <div className="col-span-full py-12 text-center text-muted-foreground">
                     No workflows match your search.

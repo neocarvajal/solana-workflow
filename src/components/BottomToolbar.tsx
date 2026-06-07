@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Play, Settings, ZoomIn, ZoomOut, Clock, Upload, Loader2 } from 'lucide-react';
-import { getPhantom, publishWorkflowMemo, solscanUrl } from '@/lib/solana';
+import { useWallet } from '@solana/wallet-adapter-react'; // Hook oficial de Solana
+import { Connection } from '@solana/web3.js'; // Necesario para inicializar el envío de transacciones
+import { publishWorkflowMemo, solscanUrl } from '@/lib/solana';
 import {
   getWorkflow, getOnchainMeta, setOnchainMeta,
   getFlowNodes, getCanvasScale, setCanvasScale, subscribeScale,
@@ -15,20 +17,23 @@ const BottomToolbar: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [scale, setScale] = useState(getCanvasScale());
 
+  // Extraemos las herramientas necesarias de la wallet global conectada
+  const { publicKey, connected, sendTransaction } = useWallet();
+
   useEffect(() => {
     const unsub = subscribeScale((s) => setScale(s));
     return () => { unsub(); };
   }, []);
 
   const handleSave = async () => {
-    const p = getPhantom();
-    if (!p || !p.publicKey) {
+    // Verificamos si la wallet está lista y conectada globalmente
+    if (!connected || !publicKey) {
       toast.error("Wallet required", {
         description: "Please connect your wallet to save workflows."
       });
       return;
     }
-    const walletAddress = p.publicKey.toBase58();
+    const walletAddress = publicKey.toBase58();
 
     const wf = getWorkflow();
     if (!wf) {
@@ -39,7 +44,7 @@ const BottomToolbar: React.FC = () => {
       toast.info("Saving workflow and pinning to IPFS...");
       const { pinJSONToIPFS } = await import("@/lib/pinataService");
       const cid = await pinJSONToIPFS(wf, wf.name);
-      
+
       const { saveWorkflow } = await import("@/lib/workflowStore");
       saveWorkflow(wf.name, wf, walletAddress, cid);
 
@@ -49,7 +54,7 @@ const BottomToolbar: React.FC = () => {
     } catch (e: any) {
       console.error(e);
       toast.error("Failed to pin to IPFS", { description: e.message });
-      
+
       // Fallback local save
       const { saveWorkflow } = await import("@/lib/workflowStore");
       saveWorkflow(wf.name, wf, walletAddress);
@@ -69,8 +74,7 @@ const BottomToolbar: React.FC = () => {
     try {
       for (let i = 0; i < nodes.length; i++) {
         const node = nodes[i];
-        
-        // Mark node i as active
+
         setRunningNodeId(node.id);
         setAnimatingLineIndex(-1);
 
@@ -97,7 +101,6 @@ const BottomToolbar: React.FC = () => {
           });
         }
 
-        // Animate trace line to the next node if available
         if (i < nodes.length - 1) {
           setRunningNodeId(null);
           setAnimatingLineIndex(i);
@@ -123,14 +126,15 @@ const BottomToolbar: React.FC = () => {
       toast.error("Build or generate a workflow first");
       return;
     }
-    const p = getPhantom();
-    if (!p) {
-      toast.error("Phantom wallet not found");
+
+    // Comprobamos si la wallet está lista en el Adapter actual
+    if (!connected || !publicKey) {
+      toast.error("Wallet not connected", {
+        description: "Please connect any Solana wallet using the top button."
+      });
       return;
     }
-    if (!p.publicKey) {
-      try { await p.connect(); } catch { return; }
-    }
+
     setPublishing(true);
     try {
       // 1. Pin to IPFS
@@ -144,22 +148,30 @@ const BottomToolbar: React.FC = () => {
       // 2. Sign + send memo on Solana
       const prev = getOnchainMeta();
       const version = (prev.version ?? 0) + 1;
-      const { signature } = await publishWorkflowMemo(p, {
-        name: wf.name,
-        cid,
-        version,
-      });
+
+      // Creamos la instancia de conexión dinámica apuntando a Devnet
+      const connection = new Connection("https://api.devnet.solana.com", "confirmed");
+
+      // Inyectamos las herramientas requeridas al helper en lugar de pasar el viejo objeto "Phantom"
+      const { signature } = await publishWorkflowMemo(
+        { sendTransaction, publicKey }, // Le pasas las herramientas de useWallet
+        {
+          name: wf.name,
+          cid,
+          version,
+        }
+      );
       setOnchainMeta({ cid, signature, version });
 
-      // 3. Persist link in Cloud (best-effort)
+      // 3. Persist link in Cloud
       await supabase.from("workflows").upsert({
         name: wf.name,
         json: wf as any,
         cid,
         onchain_signature: signature,
-        owner_wallet: p.publicKey!.toBase58(),
+        owner_wallet: publicKey.toBase58(),
         device_id: localStorage.getItem("solflows_device_id") || "anon",
-      }, { onConflict: "name" }).then(() => {}, () => {});
+      }, { onConflict: "name" }).then(() => { }, () => { });
 
       toast.success("Published on-chain", {
         description: `cid ${cid.slice(0, 8)}… · v${version}`,
@@ -207,8 +219,7 @@ const BottomToolbar: React.FC = () => {
           {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
           <span>Publish on-chain</span>
         </button>
-        
-        {/* Gear icon button wrapped in SettingsDialog */}
+
         <SettingsDialog />
       </div>
 
