@@ -11,9 +11,11 @@
   will-change: filter;
   transition: filter 300ms;
 }
+
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
+
 .logo.react:hover {
   filter: drop-shadow(0 0 2em #61dafbaa);
 }
@@ -22,6 +24,7 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -39,4 +42,21 @@
 
 .read-the-docs {
   color: #888;
+}
+
+/* Ejemplo para adaptar el modal de Solana a tu dApp */
+.wallet-adapter-modal-wrapper {
+  background-color: #0b0b0f !important;
+  /* Tu color de fondo */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1.5rem !important;
+}
+
+.wallet-adapter-button-trigger {
+  background-color: transparent !important;
+  /* Deja que tu botón use tus clases */
+}
+
+.wallet-adapter-modal-button-close {
+  background: #14151a !important;
 }
