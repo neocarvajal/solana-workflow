@@ -4,7 +4,6 @@ import { workflowToNodes } from "@/lib/workflow";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react"; // Importamos el hook oficial
 import { Folder, Search, Trash2, Edit, Play, Calendar, Link as LinkIcon } from "lucide-react";
-import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
 
 const WorkflowDashboard: React.FC = () => {
@@ -50,7 +49,7 @@ const WorkflowDashboard: React.FC = () => {
     <div className="flex h-screen bg-background text-foreground">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <Header />
+        {/* <Header /> */}
 
         <main className="flex-1 overflow-y-auto p-8 relative">
           <div className="max-w-5xl mx-auto">

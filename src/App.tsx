@@ -23,14 +23,13 @@ import Navbar from "./components/Navbar";
 import Header from "./components/Header";
 import WorkflowDashboard from "./pages/WorkflowDashboard";
 
-// 1. Solución para el error de tipos de TypeScript
 const ConnectionProvider = OriginalConnectionProvider as React.ComponentType<any>;
 const WalletProvider = OriginalWalletProvider as React.ComponentType<any>;
 
 const queryClient = new QueryClient();
 
 const App = () => {
-  // 2. Ahora sí, la lógica vive feliz dentro de las llaves del componente
+
   const network = WalletAdapterNetwork.Devnet;
   const endpoint = useMemo(() => clusterApiUrl(network), [network]);
   const wallets = useMemo(() => [], []);
