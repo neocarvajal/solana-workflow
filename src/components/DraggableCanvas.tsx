@@ -107,7 +107,6 @@ const DraggableCanvas: React.FC = () => {
 
   const addModule = (mod: ModuleDef) => {
     const current = getFlowNodes();
-    // Calculate position: place it near the insertion point
     let x = 200;
     let y = 300;
     if (current.length > 0) {
@@ -133,7 +132,6 @@ const DraggableCanvas: React.FC = () => {
     const next = [...current];
     next.splice(insertIndex, 0, newNode);
 
-    // If we inserted in the middle, push subsequent nodes right
     for (let i = insertIndex + 1; i < next.length; i++) {
       if (next[i].x <= next[i - 1].x + 100) {
         next[i] = { ...next[i], x: next[i - 1].x + 220 };
@@ -188,7 +186,7 @@ const DraggableCanvas: React.FC = () => {
   /* ── "+" buttons between nodes ─────────────── */
   const renderAddButtons = () => {
     const btns: React.ReactNode[] = [];
-    // Between nodes
+
     for (let i = 0; i < nodes.length - 1; i++) {
       const n1 = nodes[i];
       const n2 = nodes[i + 1];
@@ -211,7 +209,7 @@ const DraggableCanvas: React.FC = () => {
         </button>
       );
     }
-    // After last node
+
     if (nodes.length > 0) {
       const last = nodes[nodes.length - 1];
       btns.push(
@@ -236,7 +234,6 @@ const DraggableCanvas: React.FC = () => {
 
   return (
     <div className="flex-1 h-full overflow-hidden relative">
-      {/* Canvas */}
       <div
         ref={containerRef}
         className="w-full h-full grid-pattern cursor-grab active:cursor-grabbing"
@@ -270,7 +267,6 @@ const DraggableCanvas: React.FC = () => {
             />
           ))}
 
-          {/* Empty state */}
           {nodes.length === 0 && (
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
               <button
@@ -287,7 +283,6 @@ const DraggableCanvas: React.FC = () => {
         </div>
       </div>
 
-      {/* Settings modal */}
       {settingsNode && (
         <NodeSettingsModal
           node={settingsNode}
@@ -304,7 +299,6 @@ const DraggableCanvas: React.FC = () => {
         />
       )}
 
-      {/* App picker modal */}
       {pickerOpen && (
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"

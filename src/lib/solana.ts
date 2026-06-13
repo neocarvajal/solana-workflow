@@ -2,7 +2,6 @@ import {
   Connection, PublicKey, Transaction, TransactionInstruction, clusterApiUrl,
 } from "@solana/web3.js";
 import bs58 from "bs58";
-import type { Workflow } from "./workflow";
 
 const CLUSTER = (process.env.NEXT_PUBLIC_SOLANA_CLUSTER || "devnet") as
   "devnet" | "mainnet-beta" | "testnet";

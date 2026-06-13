@@ -7,7 +7,7 @@ import { connection, publishWorkflowMemo, solscanUrl } from '@/lib/solana';
 import { workflowToNodes, nodesToWorkflow } from "@/lib/workflow";
 import {
   getWorkflow, getOnchainMeta, setOnchainMeta, setScenarioName, setFlowNodes, updateWorkflow,
-  getFlowNodes, getCanvasScale, setCanvasScale, subscribeScale, getScenarioName,getSettings,
+  getFlowNodes, getCanvasScale, setCanvasScale, subscribeScale, getScenarioName,
   setRunningNodeId, setAnimatingLineIndex, saveWorkflow, saveLocalOnly, getSavedWorkflows,
 } from '@/lib/workflowStore';
 
@@ -25,7 +25,7 @@ const BottomToolbar: React.FC = () => {
   const [scale, setScale] = useState(getCanvasScale());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [lastTxData, setLastTxData] = useState<{ signature: string; actionType: string; blockhash?: string } | null>(null);
-  const {publicKey, connected, sendTransaction } = useWallet();
+  const { publicKey, connected, sendTransaction } = useWallet();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const router = useRouter();
@@ -76,7 +76,7 @@ const BottomToolbar: React.FC = () => {
 
     const walletAddress = publicKey.toBase58();
     const currentWorkflow = nodesToWorkflow(getScenarioName(), getFlowNodes());
-    
+
     if (currentWorkflow) {
       wf.trigger = currentWorkflow.trigger;
       wf.steps = currentWorkflow.steps;
@@ -84,10 +84,10 @@ const BottomToolbar: React.FC = () => {
     }
 
     const saved = getSavedWorkflows(walletAddress);
-    // FIX: Buscamos usando las propiedades reales del registro de almacenamiento
+    // FIX: Search using actual storage record properties
     const existing = saved.find(s => s.id === editingId || (s as any).pinata_file_id === editingId);
-    
-    // CRITICAL FIX: Pinata necesita el "pinata_file_id" real de la nube para poder actualizar el JSON
+
+    // CRITICAL FIX: Pinata requires the actual "pinata_file_id" from cloud to update the JSON
     const cloudTargetId = (existing as any)?.pinata_file_id || existing?.id || editingId;
     const oldCid = existing?.cid;
 
@@ -104,10 +104,10 @@ const BottomToolbar: React.FC = () => {
           return result;
         } else {
           const result = await saveWorkflow(
-            wf.name, 
-            wf, 
-            walletAddress, 
-            "skip", 
+            wf.name,
+            wf,
+            walletAddress,
+            "skip",
             editingId
           );
           saveLocalOnly(wf.name, wf, walletAddress);
@@ -120,7 +120,7 @@ const BottomToolbar: React.FC = () => {
         success: () => editingId ? "Workflow updated successfully" : "Workflow saved to cloud",
         error: (e) => {
           console.error("Cloud operational sync failed:", e);
-          
+
           try {
             if (editingId) {
               updateWorkflow(editingId, wf.name, wf, walletAddress);
@@ -142,7 +142,7 @@ const BottomToolbar: React.FC = () => {
       toast.error("Add at least one node to simulate the workflow");
       return;
     }
-  
+
     setIsRunning(true);
     const triggerEngine = new TriggerEngine();
     toast.info("Starting workflow simulation...");
@@ -164,15 +164,15 @@ const BottomToolbar: React.FC = () => {
           const isTriggered = await triggerEngine.validateTrigger(node);
 
           console.log(`Resultado de la validación del trigger: ${isTriggered}`);
-          
+
           if (!isTriggered) {
             toast.error(`Condition not met: ${node.module.name}`);
             return;
           }
 
           toast.success("Trigger condition met!");
-      
-        }else {
+
+        } else {
           toast.info(`Executing step ${i}: ${node.module.name}...`);
           await new Promise((r) => setTimeout(r, 1000));
 
@@ -185,7 +185,7 @@ const BottomToolbar: React.FC = () => {
               const targetAmount = params.amount || "1";
               const targetAsset = params.asset || "USDC";
               const targetTo = params.to || "11111111111111111111111111111111";
-              
+
               toast.info(`Preparing transfer of ${node.params.amount} ${node.params.asset}...`, {
                 description: "Please sign the transaction in your wallet"
               });
@@ -193,25 +193,25 @@ const BottomToolbar: React.FC = () => {
               console.log("Nodo enviado a simular:", JSON.stringify(node, null, 2));
 
               const payload = {
-                actionType: "send_transaction", 
+                actionType: "send_transaction",
                 owner: publicKey?.toBase58(),
                 params: {
-                  to: node.params.to,          
+                  to: node.params.to,
                   amount: parseFloat(node.params.amount),
                   asset: node.params.asset,
                 },
               };
-              
+
               console.log("Payload enviado al servidor:", JSON.stringify(payload, null, 2));
-              
+
               const response = await fetch("/api/workflow/simulate-tx", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  actionType: "send_transaction", 
+                  actionType: "send_transaction",
                   owner: publicKey?.toBase58(),
                   params: {
-                    to: node.params.to,          
+                    to: node.params.to,
                     amount: parseFloat(node.params.amount),
                     asset: node.params.asset,
                   },
@@ -222,7 +222,7 @@ const BottomToolbar: React.FC = () => {
               if (!response.ok) throw new Error(data.error || "Failed to simulate transaction");
 
               const transaction = Transaction.from(Buffer.from(data.serializedTx, "base64"));
-              
+
               // Manejo de la firma con captura de cancelación
               const signature = await sendTransaction(transaction, connection).catch((err) => {
                 if (err.name === 'WalletSendTransactionError' || err.message?.includes('User rejected')) {
@@ -230,7 +230,7 @@ const BottomToolbar: React.FC = () => {
                 }
                 throw err;
               });
-              
+
               toast.info("Transaction broadcasted! Waiting for confirmation...");
               await connection.confirmTransaction(signature, "confirmed");
 
@@ -247,16 +247,16 @@ const BottomToolbar: React.FC = () => {
             toast.success(`Step ${i} completed: ${node.module.name}`, { description: desc });
 
           } catch (err: any) {
-            // Si el usuario canceló, relanzamos el error especial para manejarlo en el try/catch principal
+
             if (err.message === "Canceled By User") {
-              throw err; 
+              throw err;
             }
-            // Si es un error de ejecución, lo notificamos
+
             console.error("Step execution error:", err);
             throw new Error(`Step ${i} failed: ${err.message}`);
           }
         }
-        // Animación de conexión
+
         if (i < nodes.length - 1) {
           setRunningNodeId(null);
           setAnimatingLineIndex(i);
@@ -268,7 +268,7 @@ const BottomToolbar: React.FC = () => {
       setAnimatingLineIndex(-1);
       toast.success("Workflow simulation completed successfully! 🎉");
       if (simulatedTxSnapshot) setIsModalOpen(true);
-      
+
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || "Simulation failed");
@@ -278,135 +278,6 @@ const BottomToolbar: React.FC = () => {
       setIsRunning(false);
     }
   };
-
-  // const runSimulation = async () => {
-  //   const nodes = getFlowNodes();
-  //   if (nodes.length === 0) {
-  //     toast.error("Add at least one node to simulate the workflow");
-  //     return;
-  //   }
-  
-  //   setIsRunning(true);
-  //   const triggerEngine = new TriggerEngine();
-  //   toast.info("Starting workflow simulation...");
-
-  //   let simulatedTxSnapshot = null;
-
-  //   try {
-  //     setLastTxData(null);
-  //     for (let i = 0; i < nodes.length; i++) {
-  //       const node = nodes[i] as FlowNode;
-  //       setRunningNodeId(node.id);
-  //       setAnimatingLineIndex(-1);
-
-  //       console.log(`Procesando nodo ${i}: ${node.module?.name} (Kind: ${node.module?.kind})`);
-
-  //       const params = node.params || {};
-
-  //       if (node.module?.kind === "trigger") {
-  //         toast.info(`Validating trigger: ${node.module.name}...`);
-  //         const isTriggered = await triggerEngine.validateTrigger(node);
-
-  //         console.log(`Resultado de la validación del trigger: ${isTriggered}`);
-          
-  //         if (!isTriggered) {
-  //           toast.error(`Condition not met: ${node.module.name}`);
-  //           return;
-  //         }
-
-  //         toast.success("Trigger condition met!");
-      
-  //       } else {
-  //         toast.info(`Executing step ${i}: ${node.module?.name}...`);
-  //         await new Promise((r) => setTimeout(r, 1000));
-
-  //         let desc = "Action executed successfully.";
-
-  //         console.log("PARAMS ", params.amount, params.asset, params.to);
-
-  //         try {
-  //           if (node.module?.type === "send_transaction") {
-  //             const targetAmount = params.amount || "0.1";
-  //             const targetAsset = params.asset || "SOL";
-  //             const targetTo = params.to || "11111111111111111111111111111111";
-
-  //             toast.info(`Preparing transfer of ${targetAmount} ${targetAsset}...`, {
-  //               description: "Please sign the transaction in your wallet"
-  //             });
-              
-  //             const response = await fetch("/api/workflow/simulate-tx", {
-  //               method: "POST",
-  //               headers: { "Content-Type": "application/json" },
-  //               body: JSON.stringify({
-  //                 actionType: "send_transaction", 
-  //                 owner: publicKey?.toBase58(),
-  //                 params: {
-  //                   to: targetTo,          
-  //                   amount: parseFloat(targetAmount),
-  //                   asset: targetAsset,
-  //                 },
-  //               }),
-  //             });
-
-  //             const data = await response.json();
-  //             if (!response.ok) throw new Error(data.error || "Failed to simulate transaction");
-
-  //             const transaction = Transaction.from(Buffer.from(data.serializedTx, "base64"));
-              
-  //             // Manejo de la firma con captura de cancelación
-  //             const signature = await sendTransaction(transaction, connection).catch((err) => {
-  //               if (err.name === 'WalletSendTransactionError' || err.message?.includes('User rejected')) {
-  //                 throw new Error("Canceled By User");
-  //               }
-  //               throw err;
-  //             });
-              
-  //             toast.info("Transaction broadcasted! Waiting for confirmation...");
-  //             await connection.confirmTransaction(signature, "confirmed");
-
-  //             desc = `Successfully sent ${targetAmount} ${targetAsset} to ${targetTo.slice(0, 6)}...`;
-  //             simulatedTxSnapshot = { signature, actionType: "send_transaction" };
-  //             setLastTxData(simulatedTxSnapshot);
-
-  //           } else if (node.module?.type === "send_alert") {
-  //             desc = `Alert "${params.message || 'Trigger fired!'}" sent via ${params.channel || 'app'}`;
-  //           } else if (node.module?.type === "swap") {
-  //             desc = `Swapped ${params.amount || 1} ${params.from || 'SOL'} for ${params.to || 'USDC'} via Jupiter`;
-  //           }
-
-  //           toast.success(`Step ${i} completed: ${node.module?.name}`, { description: desc });
-
-  //         } catch (err: any) {
-  //           if (err.message === "Canceled By User") {
-  //             throw err; 
-  //           }
-  //           console.error("Step execution error:", err);
-  //           throw new Error(`Step ${i} failed: ${err.message}`);
-  //         }
-  //       }
-        
-  //       // Animación de conexión
-  //       if (i < nodes.length - 1) {
-  //         setRunningNodeId(null);
-  //         setAnimatingLineIndex(i);
-  //         await new Promise((r) => setTimeout(r, 1200));
-  //       }
-  //     }
-
-  //     setRunningNodeId(null);
-  //     setAnimatingLineIndex(-1);
-  //     toast.success("Workflow simulation completed successfully! 🎉");
-  //     if (simulatedTxSnapshot) setIsModalOpen(true);
-      
-  //   } catch (err: any) {
-  //     console.error(err);
-  //     toast.error(err.message || "Simulation failed");
-  //     setRunningNodeId(null);
-  //     setAnimatingLineIndex(-1);
-  //   } finally {
-  //     setIsRunning(false);
-  //   }
-  // };
 
   const publishOnchain = async () => {
     const wf = getWorkflow();
@@ -436,12 +307,12 @@ const BottomToolbar: React.FC = () => {
       const prev = getOnchainMeta();
       const version = (prev.version ?? 0) + 1;
 
-      // Creamos la instancia de conexión dinámica apuntando a Devnet
+      // Create a dynamic connection instance pointing to Devnet
       const connection = new Connection("https://api.devnet.solana.com", "confirmed");
 
-      // Inyectamos las herramientas requeridas al helper
+      // Inject required tools into the helper
       const { signature } = await publishWorkflowMemo(
-        { sendTransaction, publicKey }, 
+        { sendTransaction, publicKey },
         {
           name: wf.name,
           cid,
@@ -459,7 +330,7 @@ const BottomToolbar: React.FC = () => {
         owner_wallet: publicKey.toBase58(),
         device_id: localStorage.getItem("solflows_device_id") || "anon",
       } as any, {
-        onConflict: "name" 
+        onConflict: "name"
       }).then(() => { }, () => { });
 
       toast.success("Published on-chain", {
@@ -543,10 +414,10 @@ const BottomToolbar: React.FC = () => {
           </button>
         </div>
       </div>
-      <TransactionSuccessModal 
-          isOpen={isModalOpen} 
-          onClose={setIsModalOpen} 
-          txData={lastTxData} 
+      <TransactionSuccessModal
+        isOpen={isModalOpen}
+        onClose={setIsModalOpen}
+        txData={lastTxData}
       />
     </>
   );

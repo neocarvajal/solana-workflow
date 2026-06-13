@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { Plus } from 'lucide-react';
-
 import OnchainWorkflowsSheet from './OnchainWorkflowsSheet';
 import SettingsDialog from './SettingsDialog';
 import { getScenarioName, setScenarioName, subscribeWorkflow, setFlowNodes } from '@/lib/workflowStore';
@@ -50,9 +49,9 @@ const Header: React.FC = () => {
           <span>New</span>
         </button>
       </div>
-      
+
       <div className="flex items-center gap-3">
-        <button 
+        <button
           onClick={() => router.push("/")}
           className="ai-button text-xs px-3.5 py-1.5 flex items-center gap-1"
         >

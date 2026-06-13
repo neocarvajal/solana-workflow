@@ -89,10 +89,6 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
     },
   ],
 
-  // webhook: [
-  //   { key: "path", label: "Webhook Path", type: "text", placeholder: "/incoming", description: "HTTP endpoint that triggers this workflow" },
-  // ],
-
   webhook: [
     { key: "path", label: "Webhook Path", type: "text", placeholder: "/solana-event" },
     {
@@ -219,10 +215,6 @@ const NodeSettingsModal: React.FC<{
     mergeParams(node.params)
   );
 
-  // useEffect(() => {
-  //   setParams(mergeParams(node.params));
-  // }, [node.id, node.params]);
-
   useEffect(() => {
     const cleanParams = mergeParams(node.params);
     setParams(cleanParams);
@@ -253,7 +245,6 @@ const NodeSettingsModal: React.FC<{
         onClick={(e) => e.stopPropagation()}
         style={{ animation: "fadeIn 0.2s ease-out" }}
       >
-        {/* Header */}
         <div className="flex items-center gap-3 p-5 border-b border-border/40">
           <div
             className="w-10 h-10 rounded-full flex items-center justify-center text-white shrink-0 shadow-md"
@@ -277,7 +268,6 @@ const NodeSettingsModal: React.FC<{
           </button>
         </div>
 
-        {/* Fields */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5">
           {fields.length === 0 ? (
             <div className="text-sm text-muted-foreground text-center py-8">
@@ -319,7 +309,6 @@ const NodeSettingsModal: React.FC<{
                           : params[field.key] ?? ""
                       }
                       onChange={(e) => {
-                        // Try to parse JSON, fallback to string
                         try {
                           const parsed = JSON.parse(e.target.value);
                           handleChange(field.key, parsed);
@@ -365,7 +354,6 @@ const NodeSettingsModal: React.FC<{
             </div>
           )}
 
-          {/* Actions */}
           <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border/30">
             {onDelete && (
               <button

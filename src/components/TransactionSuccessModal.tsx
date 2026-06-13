@@ -35,23 +35,21 @@ const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = ({ isOpe
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[460px] border-emerald-500/20 bg-background text-foreground">
-        
-        {/* Encabezado semántico con tus componentes de ui/dialog */}
+
         <DialogHeader className="flex flex-col items-center text-center">
           <div className="w-14 h-14 bg-emerald-500/10 rounded-full flex items-center justify-center mb-3 text-emerald-500 animate-pulse">
             <CheckCircle2 className="h-9 w-9" />
           </div>
-          
+
           <DialogTitle className="text-xl font-bold tracking-tight text-emerald-400">
             ¡Simulación Exitosa!
           </DialogTitle>
-          
+
           <DialogDescription className="text-sm text-muted-foreground mt-1">
             El workflow se procesó correctamente en <span className="font-semibold text-foreground">la capa de simulación.</span>
           </DialogDescription>
         </DialogHeader>
 
-        {/* Datos técnicos de la transacción */}
         <div className="space-y-3 my-2">
           <div className="bg-muted/50 p-3 rounded-lg border border-border/60 text-xs space-y-2">
             <div className="flex justify-between items-center">
@@ -70,15 +68,14 @@ const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = ({ isOpe
             )}
           </div>
 
-          {/* Payload Base64 devuelto por la API modular de Next.js */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
               <Terminal className="h-3 w-3" /> Transacción Serializada (Base64)
             </label>
             <div className="relative group bg-black/40 p-3 rounded-lg border border-border font-mono text-[11px] text-zinc-300 break-all max-h-24 overflow-y-auto">
               {txData.signature || "Sin datos de payload"}
-              
-              <button 
+
+              <button
                 onClick={() => copyToClipboard(txData.signature || "")}
                 className="absolute top-2 right-2 p-1 rounded bg-background border border-border opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
                 title="Copiar Transacción"
@@ -89,14 +86,13 @@ const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = ({ isOpe
           </div>
         </div>
 
-        {/* Botones inferiores usando DialogFooter */}
         <DialogFooter className="sm:space-x-3 gap-2 sm:gap-0 mt-2">
           <DialogClose asChild>
             <button className="flex-1 sm:flex-none px-4 py-2 text-sm bg-muted hover:bg-muted/80 text-foreground font-medium rounded-lg transition-colors border border-border">
               Cerrar
             </button>
           </DialogClose>
-          
+
           <a
             href={explorerUrl}
             target="_blank"

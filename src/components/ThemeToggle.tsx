@@ -3,36 +3,34 @@ import { useState, useEffect } from 'react';
 import { Sun, Moon } from 'lucide-react';
 
 const ThemeToggle = () => {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  // Determine initial theme: saved preference or system setting
+  const getInitialTheme = () => {
+    if (typeof window === 'undefined') return true; // default to dark on server
+    const saved = localStorage.getItem('theme');
+    if (saved) return saved === 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  };
 
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(getInitialTheme());
+
+  // Apply theme class on mount and when toggled
   useEffect(() => {
-    // Check for saved theme preference or use default dark mode
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'light') {
-      setIsDarkMode(false);
-      document.documentElement.classList.remove('dark');
-    } else {
-      setIsDarkMode(true);
-      document.documentElement.classList.add('dark');
-    }
-  }, []);
-
-  const toggleTheme = () => {
     if (isDarkMode) {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    } else {
       document.documentElement.classList.add('dark');
       localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
     }
-    setIsDarkMode(!isDarkMode);
-  };
+  }, [isDarkMode]);
+
+  const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
   return (
     <button
       onClick={toggleTheme}
       className="fixed bottom-20 right-8 p-3 rounded-full bg-muted hover:bg-muted/80 transition-all duration-300 shadow-lg hover:shadow-xl"
-      aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       {isDarkMode ? (
         <Sun className="h-5 w-5 text-yellow-400" />

@@ -34,7 +34,6 @@ const SettingsDialog: React.FC = () => {
         className="bg-card w-full max-w-md rounded-2xl border border-border/60 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border/40">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -47,7 +46,6 @@ const SettingsDialog: React.FC = () => {
           </button>
         </div>
 
-        {/* Body */}
         <div className="p-5 space-y-5">
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2 mb-2">
@@ -67,7 +65,7 @@ const SettingsDialog: React.FC = () => {
               <Bell className="h-3.5 w-3.5" />
               Alert Channel
             </label>
-            {/* Contenedor relativo para centrar el select y su flecha */}
+
             <div className="relative w-full">
               <select
                 value={alertChannel}
@@ -84,7 +82,6 @@ const SettingsDialog: React.FC = () => {
           </div>
         </div>
 
-        {/* Footer */}
         <div className="p-5 border-t border-border/40">
           <button
             onClick={handleSave}

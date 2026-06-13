@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-// Environment variables (add these to .env.local)
-const QUICKNODE_HTTP_URL = process.env.NEXT_PUBLIC_QUICKNODE_HTTP_URL; // e.g. https://ancient-white-hill.solana-devnet.quiknode.pro/0fd580fb88cbf6b8ae7aad32ea0e9da47d754714/
+const QUICKNODE_HTTP_URL = process.env.NEXT_PUBLIC_QUICKNODE_HTTP_URL;
 
 // Helper to perform a swap of 1 SOL to USDC using Jupiter via QuickNode RPC
 async function swapSolToUsdc(userPublicKey: string) {

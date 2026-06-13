@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import { toast } from 'sonner';
-import { 
-  Home, 
-  Users, 
-  FileCode, 
+import {
+  Home,
+  Users,
+  FileCode,
   FilePlus,
   Folder,
-  Link, 
-  MoreHorizontal, 
-  Book, 
-  Bell, 
-  HelpCircle, 
+  Link,
+  MoreHorizontal,
+  Book,
+  Bell,
+  HelpCircle,
   ChevronDown,
   Menu
 } from 'lucide-react';
@@ -25,16 +25,16 @@ interface NavItemProps {
   isExpanded: boolean;
 }
 
-const NavItem: React.FC<NavItemProps> = ({ 
-  icon: Icon, 
-  label, 
-  active = false, 
-  onClick, 
+const NavItem: React.FC<NavItemProps> = ({
+  icon: Icon,
+  label,
+  active = false,
+  onClick,
   hasDropdown = false,
   isExpanded
 }) => {
   return (
-    <div 
+    <div
       className={`sidebar-item ${active ? 'active' : ''} cursor-pointer flex items-center ${isExpanded ? 'gap-2 px-3 py-2 justify-start' : 'justify-center py-2.5'}`}
       onClick={onClick}
       title={!isExpanded ? label : undefined}
@@ -57,8 +57,7 @@ const Sidebar: React.FC = () => {
 
   return (
     <div className={`h-screen bg-solana-purple flex flex-col text-white transition-all duration-300 select-none ${isExpanded ? 'w-64' : 'w-16'}`}>
-      
-      {/* Top Header & Toggle Button */}
+
       {isExpanded ? (
         <div className="p-4 flex items-center justify-between border-b border-white/5">
           <div className="flex items-center gap-2">
@@ -71,8 +70,8 @@ const Sidebar: React.FC = () => {
             </div>
             <span className="font-bold text-base gradient-text whitespace-nowrap">SOLANA FLOWS</span>
           </div>
-          <button 
-            onClick={() => setIsExpanded(false)} 
+          <button
+            onClick={() => setIsExpanded(false)}
             className="p-1 hover:bg-white/10 rounded-lg transition-colors"
             title="Collapse sidebar"
           >
@@ -81,8 +80,8 @@ const Sidebar: React.FC = () => {
         </div>
       ) : (
         <div className="p-4 flex items-center justify-center border-b border-white/5">
-          <button 
-            onClick={() => setIsExpanded(true)} 
+          <button
+            onClick={() => setIsExpanded(true)}
             className="p-1.5 hover:bg-white/10 rounded-lg transition-colors flex items-center justify-center"
             title="Expand sidebar"
           >
@@ -91,32 +90,29 @@ const Sidebar: React.FC = () => {
         </div>
       )}
 
-      {/* Navigation Content */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden py-4">
-        {/* Section 1 */}
         <div className="px-3">
           {isExpanded ? (
             <div className="mb-1.5 px-2 text-[10px] uppercase tracking-wider font-semibold opacity-50">MY ORGANIZATION</div>
           ) : (
             <hr className="border-white/10 my-3" />
           )}
-          <NavItem 
-            icon={Home} 
-            label="Home" 
+          <NavItem
+            icon={Home}
+            label="Home"
             active={router.pathname === '/'}
-            isExpanded={isExpanded} 
-            onClick={() => router.push('/')} 
+            isExpanded={isExpanded}
+            onClick={() => router.push('/')}
           />
-          <NavItem 
-            icon={Folder} 
-            label="My Workflows" 
+          <NavItem
+            icon={Folder}
+            label="My Workflows"
             active={isOrgActive}
-            isExpanded={isExpanded} 
-            onClick={() => router.push('/dashboard/workflows')} 
+            isExpanded={isExpanded}
+            onClick={() => router.push('/dashboard/workflows')}
           />
         </div>
 
-        {/* Section 2 */}
         <div className="px-3 mt-4">
           {isExpanded ? (
             <div className="mb-1.5 px-2 text-[10px] uppercase tracking-wider font-semibold opacity-50">MY TEAM</div>
@@ -124,11 +120,11 @@ const Sidebar: React.FC = () => {
             <hr className="border-white/10 my-3" />
           )}
           <NavItem icon={Users} label="Team" isExpanded={isExpanded} onClick={() => toast.info('Team management coming soon!')} />
-          <NavItem 
-            icon={FilePlus} 
-            label="Scenarios" 
-            active={isScenariosActive} 
-            isExpanded={isExpanded} 
+          <NavItem
+            icon={FilePlus}
+            label="Scenarios"
+            active={isScenariosActive}
+            isExpanded={isExpanded}
             onClick={() => router.push('/dashboard')}
           />
           <NavItem icon={FileCode} label="Templates" isExpanded={isExpanded} onClick={() => toast.info('Templates coming soon!')} />
@@ -136,22 +132,20 @@ const Sidebar: React.FC = () => {
           <NavItem icon={MoreHorizontal} label="More" hasDropdown={true} isExpanded={isExpanded} />
         </div>
 
-        {/* Section 3 */}
         <div className="mt-8 px-3">
           {!isExpanded && <hr className="border-white/10 my-3" />}
-          <NavItem 
-            icon={Book} 
-            label="Documentation" 
+          <NavItem
+            icon={Book}
+            label="Documentation"
             active={isDocActive}
-            isExpanded={isExpanded} 
-            onClick={() => router.push('/documentation')} 
+            isExpanded={isExpanded}
+            onClick={() => router.push('/documentation')}
           />
           <NavItem icon={Bell} label="What's New" isExpanded={isExpanded} onClick={() => toast.info("What's new coming soon!")} />
           <NavItem icon={HelpCircle} label="Help" isExpanded={isExpanded} onClick={() => toast.info('Help center coming soon!')} />
         </div>
       </div>
 
-      {/* Footer Profile */}
       <div className={`p-3 border-t border-white/10 flex items-center ${isExpanded ? 'gap-2.5 justify-start' : 'justify-center'}`}>
         <div className="h-8 w-8 rounded-full bg-solana-cyan flex items-center justify-center text-solana-dark font-bold shrink-0">
           S

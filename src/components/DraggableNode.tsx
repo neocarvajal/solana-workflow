@@ -96,7 +96,6 @@ const DraggableNode: React.FC<Props> = ({
     >
       <div className="flex flex-col items-center">
         <div className="relative">
-          {/* Node circle */}
           <div
             className={`node-circle ${isActive ? "node-active" : ""}`}
             style={{
@@ -108,7 +107,6 @@ const DraggableNode: React.FC<Props> = ({
             <Icon className="h-10 w-10 text-white" />
           </div>
 
-          {/* Settings gear */}
           <div
             className="absolute top-1 right-1"
             onClick={(e) => {
@@ -119,14 +117,12 @@ const DraggableNode: React.FC<Props> = ({
             <Settings className="h-4 w-4 text-white/70 hover:text-white cursor-pointer" />
           </div>
 
-          {/* Trigger badge */}
           {isFirst && (
             <div className="absolute -bottom-1 -left-1 w-8 h-8 rounded-full bg-card shadow-lg border-2 border-background flex items-center justify-center">
               <Zap className="h-4 w-4 text-yellow-400 fill-yellow-400" />
             </div>
           )}
 
-          {/* Step number badge */}
           {!isFirst && (
             <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-card shadow border border-border flex items-center justify-center">
               <span className="text-[10px] font-bold text-muted-foreground">{index}</span>
@@ -134,7 +130,6 @@ const DraggableNode: React.FC<Props> = ({
           )}
         </div>
 
-        {/* Label */}
         <div className="mt-2 text-center pointer-events-none">
           <div className="text-xs font-semibold text-foreground whitespace-nowrap">
             {node.module.name}

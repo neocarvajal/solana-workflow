@@ -9,8 +9,6 @@ let current: Workflow | null = null;
 let onchainMeta: { cid?: string; signature?: string; version?: number } = {};
 const listeners = new Set<Listener>();
 
-
-
 export function getWorkflow() { return current; }
 export function getOnchainMeta() { return onchainMeta; }
 
@@ -69,7 +67,7 @@ export function getSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) return JSON.parse(raw);
-  } catch {}
+  } catch { }
   return { recipientWallet: "", alertChannel: "app" };
 }
 
@@ -167,14 +165,14 @@ export function getSavedWorkflows(walletAddress: string): SavedWorkflow[] {
 
 
 export async function saveWorkflow(
-  name: string, 
-  wf: Workflow, 
-  walletAddress: string, 
-  signature: string, 
+  name: string,
+  wf: Workflow,
+  walletAddress: string,
+  signature: string,
   existingPinataId?: string
 ) {
   try {
-    
+
     // Always pin the workflow via the 'pin-to-ipfs' function.
     const endpoint = 'pin-to-ipfs';
     const body = {
@@ -265,7 +263,7 @@ export async function saveWorkflow(
     }
 
     localStorage.setItem(SAVED_WORKFLOWS_KEY, JSON.stringify(saved));
-    
+
     return result;
   } catch (e) {
     console.error("Failed to save workflow securely", e);
@@ -297,12 +295,12 @@ export function saveLocalOnly(name: string, wf: Workflow, walletAddress: string)
     const raw = localStorage.getItem(SAVED_WORKFLOWS_KEY);
     const saved: SavedWorkflow[] = raw ? JSON.parse(raw) : [];
     const id = `wf-${Date.now()}`;
-    
+
     saved.push({ id, name, created: Date.now(), workflow: wf, ownerWallet: walletAddress, cid: undefined });
     localStorage.setItem(SAVED_WORKFLOWS_KEY, JSON.stringify(saved));
   } catch (e) {
     console.error("Failed to save workflow locally", e);
-    throw e; 
+    throw e;
   }
 }
 
@@ -313,7 +311,7 @@ export async function updateWorkflow(
   walletAddress: string // -> walletAddress
 ) {
   const SAVED_WORKFLOWS_KEY = "solflows_saved_workflows";
-  
+
   // Extraemos el JSON limpio del workflow sin capas intermedias
   const cleanWorkflowJson = updatedData.workflow ? updatedData.workflow : updatedData;
 
@@ -321,7 +319,7 @@ export async function updateWorkflow(
   const raw = localStorage.getItem(SAVED_WORKFLOWS_KEY);
   const saved = raw ? JSON.parse(raw) : [];
   const existingIndex = saved.findIndex((w: any) => w.id === id || w.pinataId === id);
-  
+
   // Capture existing Pinata file ID and CID before overwriting
   const oldPinataId = saved[existingIndex]?.pinataId;
   const oldCid = saved[existingIndex]?.cid;
@@ -390,22 +388,22 @@ export async function deleteWorkflow(id: string, pinataFileId?: string, cid?: st
     // 1. SI EXISTE EL ID DE PINATA O EL CID, LE AVISAMOS A LA EDGE FUNCTION
     if (pinataFileId || cid) {
       console.log(`[FRONTEND] Solicitando borrado en IPFS para file_id: ${pinataFileId} y cid: ${cid}`);
-      
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/delete-ipfs-file`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`  
+          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
         },
-        
-        body: JSON.stringify({ 
+
+        body: JSON.stringify({
           pinata_file_id: pinataFileId,
-          cid: cid 
+          cid: cid
         })
       });
 
       const result = response.status !== 204 ? await response.json().catch(() => ({})) : {};
-      
+
       if (!response.ok) {
         console.error("[FRONTEND] La Edge Function rechazó el borrado en IPFS:", result.error || response.statusText);
       } else {

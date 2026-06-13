@@ -20,11 +20,7 @@ const OnchainWorkflowsSheet: React.FC = () => {
       toast.error("Connect your wallet first");
       return;
     }
-    // const p = getPhantom();
-    // if (!p?.publicKey) {
-    //   toast.error("Connect your wallet first");
-    //   return;
-    // }
+
     setLoading(true);
     try {
       const list = await listOnchainWorkflows(publicKey);

@@ -1,19 +1,13 @@
 import React from "react";
 import Link from "next/link";
-import { Zap } from "lucide-react";
 
 const Documentation: React.FC = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center pt-12 px-4 md:px-8 pb-16">
       <header className="w-full max-w-5xl flex items-center gap-4 mb-10">
-        {/* <div className="w-10 h-10 rounded-xl bg-gradient-purple-cyan flex items-center justify-center">
-          <Zap className="h-6 w-6 text-white" />
-        </div> */}
         <h1 className="text-3xl font-bold gradient-text">Solana Workflow</h1>
       </header>
-
       <main className="w-full max-w-4xl space-y-8">
-        {/* Existing sections */}
         <section className="space-y-4">
           <h2 className="text-2xl font-semibold">¿Qué es?</h2>
           <p className="text-muted-foreground">
@@ -38,7 +32,6 @@ const Documentation: React.FC = () => {
           </p>
         </section>
 
-        {/* New answer section */}
         <section className="space-y-4">
           <h2 className="text-2xl font-semibold">¿Cuál es la versión mínima que vamos a terminar?</h2>
           <p className="text-muted-foreground">
@@ -52,12 +45,10 @@ const Documentation: React.FC = () => {
           </ul>
         </section>
 
-        {/* CTA */}
         <div className="text-center mt-12 mt-8">
           <Link
             href="/"
             className="inline-block px-8 py-3.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all shadow-lg shadow-primary/20"
-            // className="inline-block px-6 py-3 bg-primary text-white rounded-md hover:bg-primary/90 transition"
           >
             Empezar a usar la DApp
           </Link>
