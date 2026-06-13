@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       workflow_runs: {
@@ -53,39 +78,36 @@ export type Database = {
         Row: {
           cid: string | null
           created_at: string
-          device_id: string
           enabled: boolean
           id: string
           json: Json
           name: string
           onchain_signature: string | null
-          owner_wallet: string | null
+          owner_wallet: string
           schedule: string
           updated_at: string
         }
         Insert: {
           cid?: string | null
           created_at?: string
-          device_id: string
           enabled?: boolean
           id?: string
           json: Json
           name?: string
           onchain_signature?: string | null
-          owner_wallet?: string | null
+          owner_wallet: string
           schedule?: string
           updated_at?: string
         }
         Update: {
           cid?: string | null
           created_at?: string
-          device_id?: string
           enabled?: boolean
           id?: string
           json?: Json
           name?: string
           onchain_signature?: string | null
-          owner_wallet?: string | null
+          owner_wallet?: string
           schedule?: string
           updated_at?: string
         }
@@ -225,6 +247,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

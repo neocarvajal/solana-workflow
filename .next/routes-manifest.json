@@ -1,0 +1,93 @@
+{
+  "version": 3,
+  "pages404": true,
+  "appType": "pages",
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "priority": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [],
+  "onMatchHeaders": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/api/workflow/handlers/swapHandler",
+      "regex": "^/api/workflow/handlers/swapHandler(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/workflow/handlers/swapHandler(?:/)?$"
+    },
+    {
+      "page": "/api/workflow/handlers/transferHandler",
+      "regex": "^/api/workflow/handlers/transferHandler(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/workflow/handlers/transferHandler(?:/)?$"
+    },
+    {
+      "page": "/api/workflow/simulate-tx",
+      "regex": "^/api/workflow/simulate\\-tx(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/workflow/simulate\\-tx(?:/)?$"
+    },
+    {
+      "page": "/dashboard",
+      "regex": "^/dashboard(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard(?:/)?$"
+    },
+    {
+      "page": "/dashboard/workflows",
+      "regex": "^/dashboard/workflows(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/workflows(?:/)?$"
+    },
+    {
+      "page": "/documentation",
+      "regex": "^/documentation(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/documentation(?:/)?$"
+    },
+    {
+      "page": "/NotFound",
+      "regex": "^/NotFound(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/NotFound(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments",
+    "clientParamParsing": false,
+    "dynamicRSCPrerender": false
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}

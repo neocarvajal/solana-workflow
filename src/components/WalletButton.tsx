@@ -1,20 +1,19 @@
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Wallet } from "lucide-react";
-import { shortAddr } from "@/lib/solana"; // Mantienes tu función de formateo
+import { shortAddr } from "@/lib/solana";
 
 const WalletButton = () => {
   const { publicKey, disconnect, connecting } = useWallet();
   const { setVisible } = useWalletModal();
 
-  // Obtenemos la dirección en formato string si la wallet está conectada
   const address = publicKey ? publicKey.toBase58() : null;
 
   const handleClick = () => {
     if (address) {
       disconnect();
     } else {
-      setVisible(true); // Abre el modal oficial con todas las wallets disponibles
+      setVisible(true);
     }
   };
 

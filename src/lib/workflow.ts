@@ -3,6 +3,8 @@ import {
   Sparkles, Webhook, ArrowLeftRight, type LucideIcon,
 } from "lucide-react";
 
+import { getSettings } from "@/lib/workflowStore";
+
 export type TriggerType = "price_monitor" | "schedule" | "webhook" | "dexscreener_pair";
 export type StepType =
   | "send_transaction" | "send_alert" | "http_request"
@@ -37,7 +39,7 @@ export const TRIGGER_MODULES: ModuleDef[] = [
 
 export const STEP_MODULES: ModuleDef[] = [
   { type: "send_transaction", kind: "step", name: "Wallet Transfer", description: "Send SOL / SPL", color: "#9945FF", icon: Send,
-    defaultParams: { to: "", amount: 0.1, asset: "SOL" } },
+    defaultParams: { to: "", amount: 1, asset: "USDC" } },
   { type: "send_alert", kind: "step", name: "Alert", description: "Notify user", color: "#F59E0B", icon: Bell,
     defaultParams: { channel: "app", message: "Trigger fired!" } },
   { type: "swap", kind: "step", name: "Jupiter Swap", description: "Token swap", color: "#22D3EE", icon: ArrowLeftRight,
@@ -69,15 +71,48 @@ const START_X = 200;
 const START_Y = 300;
 
 export function workflowToNodes(wf: Workflow): FlowNode[] {
+  console.log('[workflowToNodes] Received workflow:', JSON.stringify(wf, null, 2));
   const nodes: FlowNode[] = [];
+  
   let idx = 0;
+
+  const settings = getSettings();
+  const globalWallet = settings?.recipientWallet || ""; 
+
+  const normalize = (module: ModuleDef, params: any) => {
+    const defaults = module.defaultParams || {};
+    const allowedKeys = Object.keys(defaults); 
+    
+    const cleanParams: any = { ...defaults };
+    
+    if (params) {
+      allowedKeys.forEach(key => {
+        if (params[key] !== undefined) {
+          cleanParams[key] = params[key];
+        }
+      });
+    }
+
+    if (params?.fromAsset && !cleanParams.asset) {
+      cleanParams.asset = params.fromAsset;
+    }
+
+    return cleanParams;
+  };
+
   const t = moduleFor(wf.trigger.type);
+
   if (t) {
     const pos = wf.trigger.params?._pos;
+    console.log('[workflowToNodes] Added Trigger node', {
+      id: `n-${Date.now()}-trig`,
+      type: t.type,
+      params: normalize(t, wf.trigger.params)
+    });
     nodes.push({
       id: `n-${Date.now()}-trig`,
       module: t,
-      params: { ...wf.trigger.params },
+      params: normalize(t, wf.trigger.params),
       x: pos?.x ?? START_X + idx * NODE_SPACING_X,
       y: pos?.y ?? START_Y,
     });
@@ -90,9 +125,14 @@ export function workflowToNodes(wf: Workflow): FlowNode[] {
       nodes.push({
         id: `n-${Date.now()}-${i}`,
         module: m,
-        params: { ...s.params },
+        params: normalize(m, s.params),
         x: pos?.x ?? START_X + idx * NODE_SPACING_X,
         y: pos?.y ?? START_Y,
+      });
+      console.log('[workflowToNodes] Added Step node', {
+        id: `n-${Date.now()}-${i}`,
+        type: m.type,
+        params: normalize(m, s.params)
       });
       idx++;
     }

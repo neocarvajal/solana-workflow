@@ -1,0 +1,26 @@
+{
+  "devFiles": [],
+  "ampDevFiles": [],
+  "polyfillFiles": [],
+  "lowPriorityFiles": [],
+  "rootMainFiles": [],
+  "pages": {
+    "/dashboard/workflows": [
+      "static/chunks/[root-of-the-server]__0gez98z._.js",
+      "static/chunks/node_modules_next_dist_compiled_1n82w36._.js",
+      "static/chunks/node_modules_next_dist_shared_lib_0e4mbnw._.js",
+      "static/chunks/node_modules_next_dist_client_01nfwoe._.js",
+      "static/chunks/node_modules_next_dist_0zk-zb1._.js",
+      "static/chunks/node_modules_next_12v18sk._.js",
+      "static/chunks/node_modules_react_1upe4-7._.js",
+      "static/chunks/node_modules_react-dom_cjs_react-dom_development_0d3scg3.js",
+      "static/chunks/node_modules_react-dom_13voigl._.js",
+      "static/chunks/node_modules_@supabase_postgrest-js_dist_index_mjs_1a_gfit._.js",
+      "static/chunks/node_modules_@supabase_auth-js_dist_module_1truu-x._.js",
+      "static/chunks/node_modules_1ydr_zz._.js",
+      "static/chunks/src_pages_dashboard_workflows_tsx_0du2_q-._.js",
+      "static/chunks/turbopack-src_pages_dashboard_workflows_tsx_0jxj9ww._.js"
+    ]
+  },
+  "ampFirstPages": []
+}

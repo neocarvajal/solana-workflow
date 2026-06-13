@@ -1,0 +1,8 @@
+{
+  "/": "pages/index.js",
+  "/_app": "pages/_app.js",
+  "/_document": "pages/_document.js",
+  "/api/webhook": "pages/api/webhook.js",
+  "/dashboard": "pages/dashboard.js",
+  "/dashboard/workflows": "pages/dashboard/workflows.js"
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { Plus } from 'lucide-react';
 
 import OnchainWorkflowsSheet from './OnchainWorkflowsSheet';
@@ -8,9 +8,10 @@ import { getScenarioName, setScenarioName, subscribeWorkflow, setFlowNodes } fro
 
 const Header: React.FC = () => {
   const [name, setName] = useState(getScenarioName());
-  const navigate = useNavigate();
+  const router = useRouter();
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     return subscribeWorkflow((wf) => {
       if (wf) {
         setName(wf.name);
@@ -27,7 +28,7 @@ const Header: React.FC = () => {
   const handleNew = () => {
     setFlowNodes([]);
     setScenarioName("New Scenario");
-    navigate("/");
+    router.push("/dashboard");
   };
 
   return (
@@ -52,7 +53,7 @@ const Header: React.FC = () => {
       
       <div className="flex items-center gap-3">
         <button 
-          onClick={() => navigate("/")}
+          onClick={() => router.push("/")}
           className="ai-button text-xs px-3.5 py-1.5 flex items-center gap-1"
         >
           <span>AI Builder</span>

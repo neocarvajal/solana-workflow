@@ -1,0 +1,5 @@
+{
+  "/dashboard/workflows": [
+    "static/chunks/pages/dashboard/workflows.js"
+  ]
+}

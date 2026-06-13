@@ -83,6 +83,46 @@
     --sidebar-border: 263 100% 35%;
     --sidebar-ring: 263 100% 63%;
   }
+  .light {
+    --background: 220 20% 98%;        /* Blanco grisáceo muy limpio */
+    --foreground: 220 10% 4%;          /* Texto principal casi negro */
+
+    --card: 0 0% 100%;                 /* Tarjetas y contenedores en blanco puro */
+    --card-foreground: 220 10% 4%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 10% 4%;
+
+    --primary: 263 90% 55%;            /* El morado del nodo Wallet Transfer (ligeramente más vivo) */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 160 82% 40%;          /* El verde del Price Monitor (un toque más oscuro para contraste) */
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 15% 92%;              /* Gris claro para fondos secundarios o deshabilitados */
+    --muted-foreground: 220 10% 40%;   /* Texto secundario (ej. "Send SOL / SPL") */
+
+    --accent: 323 74% 55%;             /* Tono rosa/fucsia de acento, adaptado a modo claro */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220 15% 88%;             /* Bordes suaves y visibles en fondo claro */
+    --input: 220 15% 88%;
+    --ring: 263 90% 55%;
+
+    /* Variables específicas para esa barra lateral morada de la izquierda */
+    --sidebar-background: 263 85% 95%; /* Un morado pastel muy suave y estético */
+    --sidebar-foreground: 263 70% 25%; /* Texto e iconos en morado oscuro para contraste */
+    --sidebar-primary: 263 90% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 263 70% 88%;     /* Color de fondo al hacer hover en la barra lateral */
+    --sidebar-accent-foreground: 263 70% 20%;
+    --sidebar-border: 263 50% 85%;
+    --sidebar-ring: 263 90% 55%;
+  }
+  
 }
 
 @layer base {

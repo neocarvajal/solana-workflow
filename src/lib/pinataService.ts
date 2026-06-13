@@ -1,47 +1,35 @@
-const PINATA_JWT = import.meta.env.VITE_PINATA_JWT;
-/**
- * Pins a JSON object to Pinata (IPFS).
- * Returns the CID of the pinned file.
- */
+import { supabase } from "@/integrations/supabase/client.ts";
+
 export async function pinJSONToIPFS(jsonBody: any, name: string): Promise<string> {
-  const url = "https://api.pinata.cloud/pinning/pinJSONToIPFS";
 
-  const body = {
-    pinataContent: jsonBody,
-    pinataMetadata: {
-      name: name,
-    },
-  };
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${PINATA_JWT}`,
-    },
-    body: JSON.stringify(body),
+  const { data, error } = await supabase.functions.invoke('pin-to-ipfs', {
+    body: { json: jsonBody, name }
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to pin to IPFS: ${response.status} ${response.statusText} - ${errorText}`);
-  }
-
-  const data = await response.json();
-  return data.IpfsHash;
+  if (error) throw error;
+  return data.cid;
 }
 
 /**
- * Fetches JSON from an IPFS gateway using the CID.
+ * Fetches a JSON object from IPFS using the Edge Function.
+ * This approach centralizes the request, providing failover across multiple gateways.
  */
 export async function fetchJSONFromIPFS(cid: string): Promise<any> {
-  // Using a public gateway. For production, consider using a dedicated Pinata gateway.
-  const url = `https://gateway.pinata.cloud/ipfs/${cid}`;
+  try {
+    // Invoke the 'fetch-ipfs' Edge Function
+    const { data, error } = await supabase.functions.invoke('fetch-ipfs', {
+      body: { cid }
+    });
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch from IPFS: ${response.status} ${response.statusText}`);
+    if (error) {
+      throw new Error(`Error calling Edge Function: ${error.message}`);
+    }
+
+    // Return the JSON content extracted from the response
+    return data.json;
+    
+  } catch (err) {
+    console.error("Failed to retrieve workflow from IPFS:", err);
+    throw err;
   }
-
-  return await response.json();
 }

@@ -15,55 +15,68 @@ interface FieldDef {
 const MODULE_FIELDS: Record<string, FieldDef[]> = {
   /* ── Triggers ──────────────────────────── */
   price_monitor: [
-    { key: "asset", label: "Asset", type: "select", description: "Token to monitor",
+    {
+      key: "asset", label: "Asset", type: "select", description: "Token to monitor",
       options: [
         { value: "SOL", label: "SOL" },
         { value: "BONK", label: "BONK" },
         { value: "JUP", label: "JUP" },
         { value: "RAY", label: "RAY" },
         { value: "WIF", label: "WIF" },
-      ] },
-    { key: "condition", label: "Condition", type: "select", description: "When to fire",
+      ]
+    },
+    {
+      key: "condition", label: "Condition", type: "select", description: "When to fire",
       options: [
         { value: "above", label: "Price goes above" },
         { value: "below", label: "Price goes below" },
         { value: "change_pct", label: "% change exceeds" },
-      ] },
+      ]
+    },
     { key: "value", label: "Threshold Value", type: "number", placeholder: "e.g. 150", description: "USD value or percentage" },
-    { key: "interval", label: "Check Interval", type: "select", description: "How often to poll",
+    {
+      key: "interval", label: "Check Interval", type: "select", description: "How often to poll",
       options: [
         { value: "30s", label: "Every 30 seconds" },
         { value: "1m", label: "Every minute" },
         { value: "5m", label: "Every 5 minutes" },
         { value: "15m", label: "Every 15 minutes" },
-      ] },
+      ]
+    },
   ],
 
   dexscreener_pair: [
     { key: "pairAddress", label: "Pair Address", type: "text", placeholder: "Enter DexScreener pair address", description: "The address of the pair to watch" },
-    { key: "apiType", label: "API Type", type: "select", description: "DexScreener endpoint to use",
+    {
+      key: "apiType", label: "API Type", type: "select", description: "DexScreener endpoint to use",
       options: [
         { value: "pairs", label: "Pairs — /dex/pairs/:chainId/:pairAddresses" },
         { value: "tokens", label: "Tokens — /dex/tokens/:tokenAddresses" },
         { value: "search", label: "Search — /dex/search/?q=:query" },
-      ] },
-    { key: "metric", label: "Metric", type: "select", description: "What to watch",
+      ]
+    },
+    {
+      key: "metric", label: "Metric", type: "select", description: "What to watch",
       options: [
         { value: "price", label: "Price (USD)" },
         { value: "volume", label: "Volume (24h)" },
         { value: "liquidity", label: "Liquidity" },
         { value: "priceChange", label: "Price Change %" },
-      ] },
-    { key: "condition", label: "Condition", type: "select",
+      ]
+    },
+    {
+      key: "condition", label: "Condition", type: "select",
       options: [
         { value: "above", label: "Goes above" },
         { value: "below", label: "Goes below" },
-      ] },
+      ]
+    },
     { key: "value", label: "Threshold", type: "number", placeholder: "0" },
   ],
 
   schedule: [
-    { key: "every", label: "Run Every", type: "select", description: "How often the workflow runs",
+    {
+      key: "every", label: "Run Every", type: "select", description: "How often the workflow runs",
       options: [
         { value: "1m", label: "Every minute" },
         { value: "5m", label: "Every 5 minutes" },
@@ -72,65 +85,90 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
         { value: "1h", label: "Every hour" },
         { value: "6h", label: "Every 6 hours" },
         { value: "24h", label: "Every day" },
-      ] },
+      ]
+    },
   ],
 
+  // webhook: [
+  //   { key: "path", label: "Webhook Path", type: "text", placeholder: "/incoming", description: "HTTP endpoint that triggers this workflow" },
+  // ],
+
   webhook: [
-    { key: "path", label: "Webhook Path", type: "text", placeholder: "/incoming", description: "HTTP endpoint that triggers this workflow" },
+    { key: "path", label: "Webhook Path", type: "text", placeholder: "/solana-event" },
+    {
+      key: "eventType", label: "Event Type", type: "select", description: "Filter specific blockchain events",
+      options: [
+        { value: "all", label: "All Activity" },
+        { value: "transfer", label: "Only Transfers" },
+        { value: "swap", label: "Only Swaps" },
+        { value: "nft_mint", label: "NFT Mints" },
+      ]
+    },
+    { key: "account", label: "Monitored Account", type: "text", placeholder: "Wallet address to watch" }
   ],
 
   /* ── Steps ──────────────────────────── */
   send_transaction: [
     { key: "to", label: "Recipient Wallet", type: "text", placeholder: "Enter wallet address…", description: "Solana address to send to" },
     { key: "amount", label: "Amount", type: "number", placeholder: "0.1", description: "How much to send" },
-    { key: "asset", label: "Token", type: "select", description: "Which token to transfer",
+    {
+      key: "asset", label: "Token", type: "select", description: "Which token to transfer",
       options: [
         { value: "SOL", label: "SOL" },
         { value: "USDC", label: "USDC" },
         { value: "BONK", label: "BONK" },
         { value: "JUP", label: "JUP" },
-      ] },
+      ]
+    },
   ],
 
   send_alert: [
-    { key: "channel", label: "Alert Channel", type: "select", description: "Where to send the alert",
+    {
+      key: "channel", label: "Alert Channel", type: "select", description: "Where to send the alert",
       options: [
         { value: "app", label: "In-App Notification" },
         { value: "telegram", label: "Telegram" },
         { value: "discord", label: "Discord Webhook" },
         { value: "email", label: "Email" },
-      ] },
+      ]
+    },
     { key: "message", label: "Message", type: "textarea", placeholder: "Trigger fired! SOL hit $200…", description: "Alert message content" },
   ],
 
   swap: [
-    { key: "from", label: "From Token", type: "select", description: "Token to swap from",
+    {
+      key: "from", label: "From Token", type: "select", description: "Token to swap from",
       options: [
         { value: "SOL", label: "SOL" },
         { value: "USDC", label: "USDC" },
         { value: "BONK", label: "BONK" },
         { value: "JUP", label: "JUP" },
         { value: "RAY", label: "RAY" },
-      ] },
-    { key: "to", label: "To Token", type: "select", description: "Token to swap into",
+      ]
+    },
+    {
+      key: "to", label: "To Token", type: "select", description: "Token to swap into",
       options: [
         { value: "USDC", label: "USDC" },
         { value: "SOL", label: "SOL" },
         { value: "BONK", label: "BONK" },
         { value: "JUP", label: "JUP" },
-      ] },
+      ]
+    },
     { key: "amount", label: "Amount", type: "number", placeholder: "1", description: "Amount of the source token to swap" },
     { key: "slippage", label: "Max Slippage %", type: "number", placeholder: "1", description: "Maximum slippage tolerance" },
   ],
 
   http_request: [
-    { key: "method", label: "Method", type: "select",
+    {
+      key: "method", label: "Method", type: "select",
       options: [
         { value: "GET", label: "GET" },
         { value: "POST", label: "POST" },
         { value: "PUT", label: "PUT" },
         { value: "DELETE", label: "DELETE" },
-      ] },
+      ]
+    },
     { key: "url", label: "URL", type: "text", placeholder: "https://api.example.com/data" },
     { key: "body", label: "Body (JSON)", type: "textarea", placeholder: '{ "key": "value" }', description: "Request body for POST/PUT" },
   ],
@@ -141,12 +179,14 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
 
   dexscreener_lookup: [
     { key: "pairAddress", label: "Pair Address", type: "text", placeholder: "Enter pair address…", description: "DexScreener pair to look up" },
-    { key: "apiType", label: "API Endpoint", type: "select", description: "Which DexScreener API endpoint to call",
+    {
+      key: "apiType", label: "API Endpoint", type: "select", description: "Which DexScreener API endpoint to call",
       options: [
         { value: "pairs", label: "Pairs — /dex/pairs/:chainId/:pairAddresses" },
         { value: "tokens", label: "Tokens — /dex/tokens/:tokenAddresses" },
         { value: "search", label: "Search — /dex/search/?q=:query" },
-      ] },
+      ]
+    },
   ],
 };
 
@@ -157,12 +197,36 @@ const NodeSettingsModal: React.FC<{
   onClose: () => void;
   onDelete?: (id: string) => void;
 }> = ({ node, onSave, onClose, onDelete }) => {
-  const [params, setParams] = useState<Record<string, any>>({ ...node.params });
 
-  // Reset params when node changes
+  const mergeParams = (nodeParams: any) => {
+    const defaults = node.module.defaultParams || {};
+    const incoming = nodeParams || {};
+
+    let merged = { ...defaults, ...incoming };
+
+    if (merged.fromAsset) {
+      merged.asset = merged.fromAsset;
+      delete merged.fromAsset;
+    }
+
+    if (merged.to === undefined || merged.to === null) {
+      merged.to = "";
+    }
+    return merged;
+  };
+
+  const [params, setParams] = useState<Record<string, any>>(() =>
+    mergeParams(node.params)
+  );
+
+  // useEffect(() => {
+  //   setParams(mergeParams(node.params));
+  // }, [node.id, node.params]);
+
   useEffect(() => {
-    setParams({ ...node.params });
-  }, [node.id]);
+    const cleanParams = mergeParams(node.params);
+    setParams(cleanParams);
+  }, [node.id, JSON.stringify(node.params)]);
 
   const fields = MODULE_FIELDS[node.module.type] ?? [];
 
@@ -172,7 +236,9 @@ const NodeSettingsModal: React.FC<{
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({ ...node, params });
+    const finalParams = mergeParams(params);
+    console.log("Saving node with final params:", finalParams);
+    onSave({ ...node, params: finalParams });
   };
 
   const Icon = node.module.icon;
@@ -270,14 +336,12 @@ const NodeSettingsModal: React.FC<{
                       type="button"
                       id={`field-${field.key}`}
                       onClick={() => handleChange(field.key, !params[field.key])}
-                      className={`relative w-11 h-6 rounded-full transition-colors ${
-                        params[field.key] ? "bg-primary" : "bg-muted"
-                      }`}
+                      className={`relative w-11 h-6 rounded-full transition-colors ${params[field.key] ? "bg-primary" : "bg-muted"
+                        }`}
                     >
                       <span
-                        className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                          params[field.key] ? "translate-x-5" : "translate-x-0"
-                        }`}
+                        className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${params[field.key] ? "translate-x-5" : "translate-x-0"
+                          }`}
                       />
                     </button>
                   ) : (

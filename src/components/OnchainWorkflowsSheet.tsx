@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Database, ExternalLink, Loader2, Download, RefreshCw } from "lucide-react";
 import { getPhantom, listOnchainWorkflows, solscanUrl, shortAddr, type OnchainEntry } from "@/lib/solana";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { supabase } from "@/integrations/supabase/client";
 import { setWorkflow, setOnchainMeta } from "@/lib/workflowStore";
 import type { Workflow } from "@/lib/workflow";
@@ -12,16 +13,21 @@ const OnchainWorkflowsSheet: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [entries, setEntries] = useState<OnchainEntry[]>([]);
   const [loadingCid, setLoadingCid] = useState<string | null>(null);
+  const { publicKey } = useWallet();
 
   const load = async () => {
-    const p = getPhantom();
-    if (!p?.publicKey) {
+    if (!publicKey) {
       toast.error("Connect your wallet first");
       return;
     }
+    // const p = getPhantom();
+    // if (!p?.publicKey) {
+    //   toast.error("Connect your wallet first");
+    //   return;
+    // }
     setLoading(true);
     try {
-      const list = await listOnchainWorkflows(p.publicKey);
+      const list = await listOnchainWorkflows(publicKey);
       setEntries(list);
     } catch (e: any) {
       toast.error(e?.message || "Failed to fetch from chain");

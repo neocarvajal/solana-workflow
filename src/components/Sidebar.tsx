@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { toast } from 'sonner';
 import { 
   Home, 
@@ -49,12 +49,11 @@ const NavItem: React.FC<NavItemProps> = ({
 const Sidebar: React.FC = () => {
   // Collapsed by default as requested: "El panel izquierdo debe iniciar retraido"
   const [isExpanded, setIsExpanded] = useState(false);
-  const navigate = useNavigate();
-  const location = useLocation();
+  const router = useRouter();
 
-  const isScenariosActive = location.pathname === '/dashboard';
-  const isOrgActive = location.pathname === '/dashboard/workflows';
-  const isDocActive = location.pathname === '/documentation';
+  const isScenariosActive = router.pathname === '/dashboard';
+  const isOrgActive = router.pathname === '/dashboard/workflows';
+  const isDocActive = router.pathname === '/documentation';
 
   return (
     <div className={`h-screen bg-solana-purple flex flex-col text-white transition-all duration-300 select-none ${isExpanded ? 'w-64' : 'w-16'}`}>
@@ -104,16 +103,16 @@ const Sidebar: React.FC = () => {
           <NavItem 
             icon={Home} 
             label="Home" 
-            active={location.pathname === '/'}
+            active={router.pathname === '/'}
             isExpanded={isExpanded} 
-            onClick={() => navigate('/')} 
+            onClick={() => router.push('/')} 
           />
           <NavItem 
             icon={Folder} 
             label="My Workflows" 
             active={isOrgActive}
             isExpanded={isExpanded} 
-            onClick={() => navigate('/dashboard/workflows')} 
+            onClick={() => router.push('/dashboard/workflows')} 
           />
         </div>
 
@@ -130,7 +129,7 @@ const Sidebar: React.FC = () => {
             label="Scenarios" 
             active={isScenariosActive} 
             isExpanded={isExpanded} 
-            onClick={() => navigate('/dashboard')}
+            onClick={() => router.push('/dashboard')}
           />
           <NavItem icon={FileCode} label="Templates" isExpanded={isExpanded} onClick={() => toast.info('Templates coming soon!')} />
           <NavItem icon={Link} label="Connections" isExpanded={isExpanded} onClick={() => toast.info('Connections coming soon!')} />
@@ -145,7 +144,7 @@ const Sidebar: React.FC = () => {
             label="Documentation" 
             active={isDocActive}
             isExpanded={isExpanded} 
-            onClick={() => navigate('/documentation')} 
+            onClick={() => router.push('/documentation')} 
           />
           <NavItem icon={Bell} label="What's New" isExpanded={isExpanded} onClick={() => toast.info("What's new coming soon!")} />
           <NavItem icon={HelpCircle} label="Help" isExpanded={isExpanded} onClick={() => toast.info('Help center coming soon!')} />

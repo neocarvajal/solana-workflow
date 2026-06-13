@@ -3,7 +3,7 @@ import NodeSettingsModal from "./NodeSettingsModal";
 import { Plus, Sparkles, Search, Zap, Wrench } from "lucide-react";
 import DraggableNode from "./DraggableNode";
 import type { FlowNode, ModuleDef } from "@/lib/workflow";
-import { TRIGGER_MODULES, STEP_MODULES, ALL_MODULES } from "@/lib/workflow";
+import { STEP_MODULES, ALL_MODULES } from "@/lib/workflow";
 import {
   getFlowNodes, setFlowNodes, subscribeNodes,
   getCanvasScale, setCanvasScale, subscribeScale,

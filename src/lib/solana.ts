@@ -4,7 +4,7 @@ import {
 import bs58 from "bs58";
 import type { Workflow } from "./workflow";
 
-const CLUSTER = (import.meta.env.VITE_SOLANA_CLUSTER || "devnet") as
+const CLUSTER = (process.env.NEXT_PUBLIC_SOLANA_CLUSTER || "devnet") as
   "devnet" | "mainnet-beta" | "testnet";
 
 export const SOLANA_CLUSTER = CLUSTER;
@@ -25,7 +25,6 @@ export type Phantom = {
   on: (event: string, cb: (...a: any[]) => void) => void;
 };
 
-// Interfaz para el nuevo estándar multi-wallet
 export interface WalletTools {
   sendTransaction: (
     transaction: Transaction,
@@ -59,7 +58,7 @@ export type OnchainEntry = {
  * Publica un flujo de trabajo on-chain usando cualquier Wallet del Wallet Standard
  */
 export async function publishWorkflowMemo(
-  walletTools: WalletTools, // <- Ahora acepta el adaptador agnóstico
+  walletTools: WalletTools,
   payload: { name: string; cid: string; version: number }
 ): Promise<{ signature: string }> {
   const { publicKey, sendTransaction } = walletTools;

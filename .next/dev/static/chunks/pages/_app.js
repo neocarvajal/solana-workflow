@@ -1,0 +1,23 @@
+__turbopack_load_page_chunks__("/_app", [
+  "static/chunks/src_components_Navbar_tsx_06d_jl7._.js",
+  "static/chunks/node_modules_next_dist_compiled_1n82w36._.js",
+  "static/chunks/node_modules_next_dist_shared_lib_0-i5q9k._.js",
+  "static/chunks/node_modules_next_dist_client_16lnmlo._.js",
+  "static/chunks/node_modules_next_dist_0zk-zb1._.js",
+  "static/chunks/node_modules_next_dynamic_1p43v_b.js",
+  "static/chunks/node_modules_react_1upe4-7._.js",
+  "static/chunks/node_modules_react-dom_cjs_react-dom_development_0d3scg3.js",
+  "static/chunks/node_modules_react-dom_13voigl._.js",
+  "static/chunks/node_modules_@noble_curves_esm_0jtu6ma._.js",
+  "static/chunks/node_modules_1bzj3td._.js",
+  "static/chunks/node_modules_@solana_web3_js_lib_index_browser_esm_195ecya.js",
+  "static/chunks/node_modules_@solana_0o0corz._.js",
+  "static/chunks/node_modules_@solana-mobile_wallet-standard-mobile_0j8-ek-._.js",
+  "static/chunks/node_modules_@radix-ui_09zcgk6._.js",
+  "static/chunks/node_modules_@floating-ui_1dwd37z._.js",
+  "static/chunks/node_modules_1dy4xsl._.js",
+  "static/chunks/[root-of-the-server]__04j0no3._.js",
+  "static/chunks/_00xx30t._.css",
+  "static/chunks/src_pages__app_0du2_q-._.js",
+  "static/chunks/turbopack-src_pages__app_0qypvsu._.js"
+])
