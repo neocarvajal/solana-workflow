@@ -13,7 +13,6 @@ const DEVNET_MINTS: Record<string, { mint: PublicKey; decimals: number }> = {
 };
 
 export async function handleTransferAction(owner: string, params: Record<string, any>): Promise<string> {
-  console.log("TRANSFER HANDLER PARAMS", JSON.stringify(params,null,2));
   const asset = params.asset?.toUpperCase();
   if (!asset || !params.to || !params.amount) {
     throw new Error("Faltan parámetros requeridos en el nodo de transferencia.");

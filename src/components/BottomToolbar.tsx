@@ -223,14 +223,36 @@ const BottomToolbar: React.FC = () => {
 
               console.log("Send Transaction Payload", JSON.stringify(payload, null, 2));
 
-              const response = await fetch("/api/workflow/simulate-tx", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
+              // const response = await fetch("/api/workflow/simulate-tx", {
+              //   method: "POST",
+              //   headers: { "Content-Type": "application/json" },
+              //   body: JSON.stringify(payload),
+              // });
+
+              // const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+              const { data, error } = await supabase.functions.invoke("simulate-transfer", {
+                body: {
+                  actionType: "send_transaction",
+                  owner: publicKey?.toBase58(),
+                  params: {
+                    to: targetTo,
+                    amount: parseFloat(targetAmount),
+                    asset: targetAsset,
+                  },
+                },
               });
 
-              const data = await response.json();
-              if (!response.ok) throw new Error(data.error || "Failed to simulate transaction");
+              if (error) {
+                throw new Error(error.message);
+              }
+
+              if (!data?.serializedTx) {
+                throw new Error("Failed to simulate transaction");
+              }
+
+              // const data = await response.json();
+              // if (!response.ok) throw new Error(data.error || "Failed to simulate transaction");
 
               const transaction = Transaction.from(Buffer.from(data.serializedTx, "base64"));
 
