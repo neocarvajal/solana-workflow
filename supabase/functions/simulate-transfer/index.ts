@@ -27,7 +27,7 @@ const DEVNET_MINTS: Record<string, { mint: PublicKey; decimals: number }> = {
 };
 
 const connection = new Connection(
-  "https://api.devnet.solana.com",
+  Deno.env.get("QUICKNODE_HTTP_URL")!,
   "confirmed"
 );
 
