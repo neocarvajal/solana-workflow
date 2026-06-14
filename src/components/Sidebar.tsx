@@ -68,7 +68,7 @@ const Sidebar: React.FC = () => {
                 <path d="M3 19L12 15L21 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
-            <span className="font-bold text-base gradient-text whitespace-nowrap">SOLANA FLOWS</span>
+            <span className="font-bold text-base text-ellipsis whitespace-nowrap">SOLANA WORKFLOW</span>
           </div>
           <button
             onClick={() => setIsExpanded(false)}
@@ -105,6 +105,13 @@ const Sidebar: React.FC = () => {
             onClick={() => router.push('/')}
           />
           <NavItem
+            icon={FilePlus}
+            label="Scenarios"
+            active={isScenariosActive}
+            isExpanded={isExpanded}
+            onClick={() => router.push('/dashboard')}
+          />
+          <NavItem
             icon={Folder}
             label="My Workflows"
             active={isOrgActive}
@@ -120,16 +127,10 @@ const Sidebar: React.FC = () => {
             <hr className="border-white/10 my-3" />
           )}
           <NavItem icon={Users} label="Team" isExpanded={isExpanded} onClick={() => toast.info('Team management coming soon!')} />
-          <NavItem
-            icon={FilePlus}
-            label="Scenarios"
-            active={isScenariosActive}
-            isExpanded={isExpanded}
-            onClick={() => router.push('/dashboard')}
-          />
+
           <NavItem icon={FileCode} label="Templates" isExpanded={isExpanded} onClick={() => toast.info('Templates coming soon!')} />
           <NavItem icon={Link} label="Connections" isExpanded={isExpanded} onClick={() => toast.info('Connections coming soon!')} />
-          <NavItem icon={MoreHorizontal} label="More" hasDropdown={true} isExpanded={isExpanded} />
+          {/* <NavItem icon={MoreHorizontal} label="More" hasDropdown={true} isExpanded={isExpanded} /> */}
         </div>
 
         <div className="mt-8 px-3">
