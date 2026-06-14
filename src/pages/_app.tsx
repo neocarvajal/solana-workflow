@@ -10,6 +10,7 @@ import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { clusterApiUrl } from "@solana/web3.js";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
+import ThemeToggle from '@/components/ThemeToggle';
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import dynamic from 'next/dynamic';
 
@@ -38,6 +39,7 @@ export default function App({ Component, pageProps }: AppProps) {
             <TooltipProvider>
               <Toaster />
               <Sonner />
+              <ThemeToggle />
               <div className="min-h-screen bg-background text-foreground antialiased">
                 <Navbar />
                 <Component {...pageProps} />

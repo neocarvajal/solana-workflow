@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useRouter } from 'next/router';
 import type { Workflow } from "@/lib/workflow";
 import { workflowToNodes } from "@/lib/workflow";
+import ThemeToggle from '@/components/ThemeToggle';
 import { setFlowNodes, setScenarioName, getSettings } from "@/lib/workflowStore";
 
 const EXAMPLES = [
@@ -89,41 +90,6 @@ const Landing: React.FC = () => {
     }
   };
 
-  // const generate = async (text: string) => {
-  //   if (!ensureWalletConnected()) return;
-  //   if (!text.trim()) return;
-  //   setLoading(true);
-  //   try {
-  //     const settings = getSettings();
-  //     const contextPrompt = settings.recipientWallet
-  //       ? `${text}\n\n[Context: default recipient wallet is ${settings.recipientWallet}, default alert channel is ${settings.alertChannel}]`
-  //       : text;
-
-  //     const { data, error } = await supabase.functions.invoke("generate-workflow", {
-  //       body: { prompt: contextPrompt },
-  //     });
-  //     if (error) throw error;
-  //     if (data?.error) throw new Error(data.error);
-  //     if (!data?.workflow) throw new Error("No workflow returned");
-
-  //     const wf = data.workflow as Workflow;
-
-  //     console.log("JSON generado por la IA:", JSON.stringify(wf, null, 2));
-
-  //     // Directly load generated workflow to canvas nodes
-  //     const nodes = workflowToNodes(wf);
-  //     setFlowNodes(nodes);
-  //     setScenarioName(wf.name || "My Scenario");
-
-  //     toast.success("Workflow generated & loaded!");
-  //     router.push("/dashboard");
-  //   } catch (e: any) {
-  //     toast.error(e.message || "Failed to generate");
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-
   const startEmpty = () => {
     if (!ensureWalletConnected()) return;
     setFlowNodes([]);
@@ -133,6 +99,7 @@ const Landing: React.FC = () => {
 
   return (
     <div className="h-screen w-screen bg-background relative overflow-hidden flex flex-col">
+      
       <div className="landing-orb landing-orb-1" />
       <div className="landing-orb landing-orb-2" />
       <div className="landing-orb landing-orb-3" />
@@ -223,8 +190,8 @@ const Landing: React.FC = () => {
               o empieza con un canvas vacío →
             </button>
           </div>
-
         </div>
+        <ThemeToggle />
       </main>
     </div>
   );

@@ -133,8 +133,12 @@ const Sidebar: React.FC = () => {
           {/* <NavItem icon={MoreHorizontal} label="More" hasDropdown={true} isExpanded={isExpanded} /> */}
         </div>
 
-        <div className="mt-8 px-3">
-          {!isExpanded && <hr className="border-white/10 my-3" />}
+        <div className="mt-4 px-3">
+          {isExpanded ? (
+            <div className="mb-1.5 px-2 text-[10px] uppercase tracking-wider font-semibold opacity-50">HELP</div>
+          ) : (
+            <hr className="border-white/10 my-3" />
+          )}
           <NavItem
             icon={Book}
             label="Documentation"
@@ -154,7 +158,7 @@ const Sidebar: React.FC = () => {
         {isExpanded && (
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-semibold whitespace-nowrap overflow-hidden text-ellipsis leading-none">Solana User</span>
-            <span className="text-[10px] opacity-50 leading-none mt-1">user@solana.com</span>
+            <span className="text-[10px] opacity-50 leading-none mt-1">solana.com</span>
           </div>
         )}
       </div>

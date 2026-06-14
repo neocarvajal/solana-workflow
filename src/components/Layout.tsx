@@ -2,7 +2,6 @@ import React from 'react';
 import Sidebar from './Sidebar';
 import DraggableCanvas from './DraggableCanvas';
 import BottomToolbar from './BottomToolbar';
-import ThemeToggle from './ThemeToggle';
 
 const Layout: React.FC = () => {
   return (
@@ -14,7 +13,6 @@ const Layout: React.FC = () => {
         </div>
         <BottomToolbar />
       </div>
-      <ThemeToggle />
     </div>
   );
 };
