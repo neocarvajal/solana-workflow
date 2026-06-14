@@ -5,44 +5,44 @@
 
 @layer base {
   :root {
-    --background: 220 20% 97%;
-    --foreground: 220 10% 10%;
+    --background: 220 20% 98%;
+    --foreground: 220 10% 4%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 10% 10%;
+    --card-foreground: 220 10% 4%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 10% 10%;
+    --popover-foreground: 220 10% 4%;
 
-    --primary: 263 100% 63%;
+    --primary: 263 90% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 160 82% 51%;
+    --secondary: 160 82% 40%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 220 10% 92%;
+    --muted: 220 15% 92%;
     --muted-foreground: 220 10% 40%;
 
-    --accent: 323 74% 65%;
+    --accent: 323 74% 55%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 220 10% 85%;
-    --input: 220 10% 85%;
-    --ring: 263 100% 63%;
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 263 90% 55%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 263 100% 98%;
-    --sidebar-foreground: 263 40% 40%;
-    --sidebar-primary: 263 100% 63%;
+    --sidebar-background: 263 85% 95%;
+    --sidebar-foreground: 263 70% 25%;
+    --sidebar-primary: 263 90% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 263 100% 95%;
-    --sidebar-accent-foreground: 263 100% 63%;
-    --sidebar-border: 263 100% 90%;
-    --sidebar-ring: 263 100% 63%;
+    --sidebar-accent: 263 70% 88%;
+    --sidebar-accent-foreground: 263 70% 20%;
+    --sidebar-border: 263 50% 85%;
+    --sidebar-ring: 263 90% 55%;
   }
 
   .dark {
@@ -83,46 +83,6 @@
     --sidebar-border: 263 100% 35%;
     --sidebar-ring: 263 100% 63%;
   }
-  .light {
-    --background: 220 20% 98%;        /* Blanco grisáceo muy limpio */
-    --foreground: 220 10% 4%;          /* Texto principal casi negro */
-
-    --card: 0 0% 100%;                 /* Tarjetas y contenedores en blanco puro */
-    --card-foreground: 220 10% 4%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 10% 4%;
-
-    --primary: 263 90% 55%;            /* El morado del nodo Wallet Transfer (ligeramente más vivo) */
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 160 82% 40%;          /* El verde del Price Monitor (un toque más oscuro para contraste) */
-    --secondary-foreground: 0 0% 100%;
-
-    --muted: 220 15% 92%;              /* Gris claro para fondos secundarios o deshabilitados */
-    --muted-foreground: 220 10% 40%;   /* Texto secundario (ej. "Send SOL / SPL") */
-
-    --accent: 323 74% 55%;             /* Tono rosa/fucsia de acento, adaptado a modo claro */
-    --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 220 15% 88%;             /* Bordes suaves y visibles en fondo claro */
-    --input: 220 15% 88%;
-    --ring: 263 90% 55%;
-
-    /* Variables específicas para esa barra lateral morada de la izquierda */
-    --sidebar-background: 263 85% 95%; /* Un morado pastel muy suave y estético */
-    --sidebar-foreground: 263 70% 25%; /* Texto e iconos en morado oscuro para contraste */
-    --sidebar-primary: 263 90% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 263 70% 88%;     /* Color de fondo al hacer hover en la barra lateral */
-    --sidebar-accent-foreground: 263 70% 20%;
-    --sidebar-border: 263 50% 85%;
-    --sidebar-ring: 263 90% 55%;
-  }
-  
 }
 
 @layer base {
@@ -131,7 +91,7 @@
   }
 
   body {
-    @apply bg-background text-foreground dark;
+    @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
@@ -139,6 +99,11 @@
 /* Grid background pattern for canvas */
 .grid-pattern {
   background-size: 30px 30px;
+  background-image: 
+    linear-gradient(to right, rgba(150, 150, 150, 0.1) 1px, transparent 1px), 
+    linear-gradient(to bottom, rgba(150, 150, 150, 0.1) 1px, transparent 1px);
+}
+.dark .grid-pattern {
   background-image: 
     linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px), 
     linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
@@ -160,7 +125,7 @@
 }
 
 .connection-line {
-  @apply stroke-white/50;
+  @apply stroke-foreground/20 dark:stroke-white/50;
   stroke-width: 2px;
 }
 
@@ -254,16 +219,12 @@
 
 /* Glassmorphism containers */
 .landing-glass {
-  background: rgba(10, 10, 12, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  @apply bg-background/70 border-border/50 shadow-lg backdrop-blur-md;
 }
 
 /* Dotted connections and animations */
 .dotted-connection {
-  stroke: rgba(255, 255, 255, 0.15);
+  @apply stroke-foreground/20 dark:stroke-white/15;
   stroke-width: 3;
   stroke-dasharray: 8 6;
   animation: dash-flow 30s linear infinite;
@@ -295,14 +256,15 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  border: 3px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  @apply border-foreground/20 dark:border-white/20 shadow-md;
+  border-width: 3px;
+  border-style: solid;
   transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
 }
 
 .node-circle:hover {
   transform: scale(1.05);
-  border-color: rgba(255, 255, 255, 0.6);
+  @apply border-foreground/40 dark:border-white/60;
   box-shadow: 0 8px 25px rgba(153, 69, 255, 0.5);
 }
 
@@ -314,11 +276,10 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: #18181b;
-  border: 2px solid #27272a;
-  color: #a1a1aa;
+  @apply bg-muted border-border text-muted-foreground shadow-sm;
+  border-width: 2px;
+  border-style: solid;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
   transition: all 0.2s ease;
 }
 
@@ -338,8 +299,9 @@
   height: 28px;
   border-radius: 50%;
   background: transparent;
-  border: 2px dashed rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.4);
+  @apply border-foreground/20 dark:border-white/20 text-foreground/40 dark:text-white/40;
+  border-width: 2px;
+  border-style: dashed;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -358,12 +320,10 @@
   right: 1rem;
   bottom: 1rem;
   width: 320px;
-  background-color: rgba(18, 18, 22, 0.95);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  @apply bg-background/95 backdrop-blur-md border-border shadow-2xl;
+  border-width: 1px;
+  border-style: solid;
   border-radius: 1rem;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
   z-index: 40;
   display: flex;
   flex-direction: column;

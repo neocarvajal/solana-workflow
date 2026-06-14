@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { Plus } from 'lucide-react';
+import { Plus, LayoutDashboard } from 'lucide-react';
 import OnchainWorkflowsSheet from './OnchainWorkflowsSheet';
 import SettingsDialog from './SettingsDialog';
 import { getScenarioName, setScenarioName, subscribeWorkflow, setFlowNodes } from '@/lib/workflowStore';
@@ -40,6 +40,9 @@ const Header: React.FC = () => {
           placeholder="Scenario name..."
           className="text-lg font-semibold bg-transparent border-0 border-b border-transparent hover:border-border focus:border-primary focus:outline-none px-1 py-0.5 rounded transition-colors w-48 md:w-64"
         />
+      </div>
+
+      <div className="flex items-center gap-3">
         <button
           onClick={handleNew}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-muted hover:bg-muted/80 text-foreground rounded-lg font-medium transition-colors border border-border/40"
@@ -48,9 +51,16 @@ const Header: React.FC = () => {
           <Plus className="h-3.5 w-3.5" />
           <span>New</span>
         </button>
-      </div>
-
-      <div className="flex items-center gap-3">
+        
+        <button
+          onClick={() => router.push("/dashboard")}
+          className="px-3 py-2 rounded-full text-sm border border-border hover:bg-muted flex items-center gap-2 transition-colors"
+          title="Go to Dashboard"
+        >
+          <LayoutDashboard className="h-4 w-4" />
+          <span>Dashboard</span>
+        </button>
+        
         <button
           onClick={() => router.push("/")}
           className="ai-button text-xs px-3.5 py-1.5 flex items-center gap-1"
@@ -59,7 +69,6 @@ const Header: React.FC = () => {
         </button>
         <SettingsDialog />
         <OnchainWorkflowsSheet />
-
       </div>
     </div>
   );
