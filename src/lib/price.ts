@@ -1,38 +1,31 @@
 export const getPrice = async (asset: string): Promise<number> => {
-  const SOL_MINT = "So11111111111111111111111111111111111111112";
+  const SOL_MINT =
+    "So11111111111111111111111111111111111111112";
+
   const address = asset === "SOL" ? SOL_MINT : asset;
 
-  const JUP_API_KEY = process.env.NEXT_PUBLIC_JUPITER_API || "";
-
-  try {
-    const response = await fetch(`https://api.jup.ag/price/v3?ids=${address}`, {
-      method: "GET",
+  const response = await fetch(
+    `https://api.jup.ag/price/v3?ids=${address}`,
+    {
       headers: {
-        "x-api-key": JUP_API_KEY,
-        "Accept": "application/json"
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Jupiter API returned status ${response.status}`);
+        "x-api-key": process.env.NEXT_PUBLIC_JUPITER_API || "",
+      },
     }
+  );
 
-    const priceData = await response.json();
-
-    const assetData = priceData?.data?.[address];
-
-    if (!assetData || typeof assetData.price !== "number") {
-      throw new Error(`Price field missing or malformed for address: ${address}`);
-    }
-
-    return assetData.price;
-
-  } catch (error: any) {
-    console.error(`[PRICE FETCH ERROR] Failed to fetch price from Jupiter V3 for ${asset}:`, error.message);
-
-    if (asset === "SOL" || address === SOL_MINT) {
-      return 140.00;
-    }
-    return 1.00;
+  if (!response.ok) {
+    throw new Error(`Jupiter API error ${response.status}`);
   }
+
+  const json = await response.json();
+
+  const assetData = json?.[address];
+
+  const price = assetData?.usdPrice;
+
+  if (typeof price !== "number") {
+    throw new Error(`Invalid price for ${asset}`);
+  }
+
+  return price;
 };
