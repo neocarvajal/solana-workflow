@@ -74,9 +74,6 @@ const Landing: React.FC = () => {
 
       const wf = data.workflow as Workflow;
 
-      console.log("JSON generado por la IA:", JSON.stringify(wf, null, 2));
-
-      // Directly load generated workflow to canvas nodes
       const nodes = workflowToNodes(wf);
       setFlowNodes(nodes);
       setScenarioName(wf.name || "My Scenario");

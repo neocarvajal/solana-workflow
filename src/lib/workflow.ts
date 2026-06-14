@@ -91,11 +91,8 @@ const START_X = 200;
 const START_Y = 300;
 
 export function workflowToNodes(wf: Workflow): FlowNode[] {
-  console.log('[workflowToNodes] Received workflow:', JSON.stringify(wf, null, 2));
   const nodes: FlowNode[] = [];
-
   let idx = 0;
-
   const settings = getSettings();
   const globalWallet = settings?.recipientWallet || "";
 
@@ -132,11 +129,6 @@ export function workflowToNodes(wf: Workflow): FlowNode[] {
 
   if (t) {
     const pos = wf.trigger.params?._pos;
-    console.log('[workflowToNodes] Added Trigger node', {
-      id: `n-${Date.now()}-trig`,
-      type: t.type,
-      params: normalize(t, wf.trigger.params)
-    });
     nodes.push({
       id: `n-${Date.now()}-trig`,
       module: t,
@@ -156,11 +148,6 @@ export function workflowToNodes(wf: Workflow): FlowNode[] {
         params: normalize(m, s.params),
         x: pos?.x ?? START_X + idx * NODE_SPACING_X,
         y: pos?.y ?? START_Y,
-      });
-      console.log('[workflowToNodes] Added Step node', {
-        id: `n-${Date.now()}-${i}`,
-        type: m.type,
-        params: normalize(m, s.params)
       });
       idx++;
     }

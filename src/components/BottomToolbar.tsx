@@ -156,14 +156,11 @@ const BottomToolbar: React.FC = () => {
         setRunningNodeId(node.id);
         setAnimatingLineIndex(-1);
 
-        console.log(`Procesando nodo ${i}: ${node.module.name} (Kind: ${node.module.kind})`);
         const params = node.params || {};
 
         if (node.module.kind === "trigger") {
           toast.info(`Validating trigger: ${node.module.name}...`);
           const isTriggered = await triggerEngine.validateTrigger(node);
-
-          console.log(`Resultado de la validación del trigger: ${isTriggered}`);
 
           if (!isTriggered) {
             toast.error(`Condition not met: ${node.module.name}`);
@@ -181,7 +178,7 @@ const BottomToolbar: React.FC = () => {
           try {
             if (node.module.type === "send_transaction") {
               // Extract parameters with defaults
-              const toParam = node.params?.to ?? ""; // default empty string when not configured
+              const toParam = node.params?.to ?? "";
               const amountParam = node.params?.amount;
               const assetParam = node.params?.asset;
 
@@ -223,6 +220,8 @@ const BottomToolbar: React.FC = () => {
                   asset: targetAsset,
                 },
               };
+
+              console.log("Send Transaction Payload", JSON.stringify(payload, null, 2));
 
               const response = await fetch("/api/workflow/simulate-tx", {
                 method: "POST",
