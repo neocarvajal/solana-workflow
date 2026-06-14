@@ -180,42 +180,54 @@ const BottomToolbar: React.FC = () => {
 
           try {
             if (node.module.type === "send_transaction") {
-              console.log("Nodo analizado:", node);
-              console.log("Params del nodo:", node.params);
-              const targetAmount = params.amount || "1";
-              const targetAsset = params.asset || "USDC";
-              const targetTo = params.to || "11111111111111111111111111111111";
+              // Extract parameters with defaults
+              const toParam = node.params?.to ?? ""; // default empty string when not configured
+              const amountParam = node.params?.amount;
+              const assetParam = node.params?.asset;
 
-              toast.info(`Preparing transfer of ${node.params.amount} ${node.params.asset}...`, {
-                description: "Please sign the transaction in your wallet"
+              // Validate required parameters
+              if (!amountParam) {
+                toast.error("Missing amount for transaction", {
+                  description: "Please configure the amount parameter in the node settings.",
+                });
+                throw new Error("Missing amount parameter");
+              }
+              if (!assetParam) {
+                toast.error("Missing asset for transaction", {
+                  description: "Please configure the asset parameter in the node settings.",
+                });
+                throw new Error("Missing asset parameter");
+              }
+
+              if (!toParam || toParam.trim() === "") {
+                toast.error("Missing recipient for transaction", {
+                  description: "Please configure the recipient wallet in the node settings.",
+                });
+                throw new Error("Missing recipient parameter");
+              }
+
+              const targetAmount = amountParam;
+              const targetAsset = assetParam;
+              const targetTo = toParam;
+
+              toast.info(`Preparing transfer of ${targetAmount} ${targetAsset}...`, {
+                description: "Please sign the transaction in your wallet",
               });
-
-              console.log("Nodo enviado a simular:", JSON.stringify(node, null, 2));
 
               const payload = {
                 actionType: "send_transaction",
                 owner: publicKey?.toBase58(),
                 params: {
-                  to: node.params.to,
-                  amount: parseFloat(node.params.amount),
-                  asset: node.params.asset,
+                  to: targetTo,
+                  amount: parseFloat(targetAmount),
+                  asset: targetAsset,
                 },
               };
-
-              console.log("Payload enviado al servidor:", JSON.stringify(payload, null, 2));
 
               const response = await fetch("/api/workflow/simulate-tx", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  actionType: "send_transaction",
-                  owner: publicKey?.toBase58(),
-                  params: {
-                    to: node.params.to,
-                    amount: parseFloat(node.params.amount),
-                    asset: node.params.asset,
-                  },
-                }),
+                body: JSON.stringify(payload),
               });
 
               const data = await response.json();
@@ -223,9 +235,8 @@ const BottomToolbar: React.FC = () => {
 
               const transaction = Transaction.from(Buffer.from(data.serializedTx, "base64"));
 
-              // Manejo de la firma con captura de cancelación
               const signature = await sendTransaction(transaction, connection).catch((err) => {
-                if (err.name === 'WalletSendTransactionError' || err.message?.includes('User rejected')) {
+                if (err.name === "WalletSendTransactionError" || err.message?.includes("User rejected")) {
                   throw new Error("Canceled By User");
                 }
                 throw err;
@@ -234,10 +245,9 @@ const BottomToolbar: React.FC = () => {
               toast.info("Transaction broadcasted! Waiting for confirmation...");
               await connection.confirmTransaction(signature, "confirmed");
 
-              desc = `Successfully sent ${node.params.amount} ${node.params.asset} to ${node.params.to.slice(0, 6)}...`;
+              desc = `Successfully sent ${targetAmount} ${targetAsset} to ${targetTo.slice(0, 6)}...`;
               simulatedTxSnapshot = { signature, actionType: "send_transaction" };
               setLastTxData(simulatedTxSnapshot);
-
             } else if (node.module.type === "send_alert") {
               desc = `Alert "${node.params.message || 'Trigger fired!'}" sent via ${node.params.channel || 'app'}`;
             } else if (node.module.type === "swap") {
@@ -245,13 +255,10 @@ const BottomToolbar: React.FC = () => {
             }
 
             toast.success(`Step ${i} completed: ${node.module.name}`, { description: desc });
-
           } catch (err: any) {
-
             if (err.message === "Canceled By User") {
               throw err;
             }
-
             console.error("Step execution error:", err);
             throw new Error(`Step ${i} failed: ${err.message}`);
           }

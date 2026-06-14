@@ -36,16 +36,37 @@ const Landing: React.FC = () => {
   const generate = async (text: string) => {
     if (!ensureWalletConnected()) return;
     if (!text.trim()) return;
+
     setLoading(true);
+
     try {
       const settings = getSettings();
-      const contextPrompt = settings.recipientWallet
-        ? `${text}\n\n[Context: default recipient wallet is ${settings.recipientWallet}, default alert channel is ${settings.alertChannel}]`
-        : text;
 
-      const { data, error } = await supabase.functions.invoke("generate-workflow", {
-        body: { prompt: contextPrompt },
-      });
+      const recipientWallet = settings.recipientWallet?.trim() || "";
+      const alertChannel = settings.alertChannel?.trim() || "";
+
+      const contextParts: string[] = [];
+
+      if (recipientWallet) {
+        contextParts.push(`default recipient wallet is ${recipientWallet}`);
+      }
+
+      if (alertChannel) {
+        contextParts.push(`default alert channel is ${alertChannel}`);
+      }
+
+      const contextPrompt =
+        contextParts.length > 0
+          ? `${text}\n\n[Context: ${contextParts.join(", ")}]`
+          : text;
+
+      const { data, error } = await supabase.functions.invoke(
+        "generate-workflow",
+        {
+          body: { prompt: contextPrompt },
+        }
+      );
+
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       if (!data?.workflow) throw new Error("No workflow returned");
@@ -68,6 +89,41 @@ const Landing: React.FC = () => {
     }
   };
 
+  // const generate = async (text: string) => {
+  //   if (!ensureWalletConnected()) return;
+  //   if (!text.trim()) return;
+  //   setLoading(true);
+  //   try {
+  //     const settings = getSettings();
+  //     const contextPrompt = settings.recipientWallet
+  //       ? `${text}\n\n[Context: default recipient wallet is ${settings.recipientWallet}, default alert channel is ${settings.alertChannel}]`
+  //       : text;
+
+  //     const { data, error } = await supabase.functions.invoke("generate-workflow", {
+  //       body: { prompt: contextPrompt },
+  //     });
+  //     if (error) throw error;
+  //     if (data?.error) throw new Error(data.error);
+  //     if (!data?.workflow) throw new Error("No workflow returned");
+
+  //     const wf = data.workflow as Workflow;
+
+  //     console.log("JSON generado por la IA:", JSON.stringify(wf, null, 2));
+
+  //     // Directly load generated workflow to canvas nodes
+  //     const nodes = workflowToNodes(wf);
+  //     setFlowNodes(nodes);
+  //     setScenarioName(wf.name || "My Scenario");
+
+  //     toast.success("Workflow generated & loaded!");
+  //     router.push("/dashboard");
+  //   } catch (e: any) {
+  //     toast.error(e.message || "Failed to generate");
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
   const startEmpty = () => {
     if (!ensureWalletConnected()) return;
     setFlowNodes([]);
@@ -77,18 +133,13 @@ const Landing: React.FC = () => {
 
   return (
     <div className="h-screen w-screen bg-background relative overflow-hidden flex flex-col">
-      {/* Animated background orbs */}
       <div className="landing-orb landing-orb-1" />
       <div className="landing-orb landing-orb-2" />
       <div className="landing-orb landing-orb-3" />
 
-
-
-      {/* Hero Content (Centered, No Scroll) */}
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 max-h-[calc(100vh-70px)] py-4 overflow-y-auto">
         <div className="w-full max-w-2xl flex flex-col justify-center">
 
-          {/* Badge */}
           <div className="flex justify-center mb-4 md:mb-5">
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[11px] font-semibold tracking-wide">
               <Sparkles className="h-3.5 w-3.5" />
@@ -96,7 +147,6 @@ const Landing: React.FC = () => {
             </div>
           </div>
 
-          {/* Title */}
           <h1 className="text-4xl md:text-5xl font-extrabold text-center mb-3 leading-tight tracking-tight">
             <span className="gradient-text">¿Qué quieres</span>
             <br />
@@ -106,7 +156,6 @@ const Landing: React.FC = () => {
             Describe tu flujo en lenguaje natural — la IA lo convertirá en un workflow visual editable en Solana.
           </p>
 
-          {/* Prompt box */}
           <div className="landing-glass rounded-2xl p-2.5 flex flex-col bg-card/85 backdrop-blur-sm border border-border/40 shadow-xl">
             <textarea id="promptBox"
               value={prompt}
@@ -141,7 +190,6 @@ const Landing: React.FC = () => {
             </div>
           </div>
 
-          {/* Examples */}
           <div className="mt-6 md:mt-7">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-2.5 text-center font-medium">
               Prueba con un ejemplo
@@ -166,7 +214,6 @@ const Landing: React.FC = () => {
             </div>
           </div>
 
-          {/* Empty canvas CTA */}
           <div className="text-center mt-5 md:mt-6">
             <button
               onClick={startEmpty}

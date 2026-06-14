@@ -27,29 +27,49 @@ export interface ModuleDef {
 }
 
 export const TRIGGER_MODULES: ModuleDef[] = [
-  { type: "price_monitor", kind: "trigger", name: "Price Monitor", description: "Triggers on token price", color: "#14F195", icon: LineChart,
-    defaultParams: { asset: "SOL", condition: "below", value: 80, interval: "1m" } },
-  { type: "dexscreener_pair", kind: "trigger", name: "DexScreener Pair", description: "Watch a pair", color: "#FF6B6B", icon: Activity,
-    defaultParams: { pairAddress: "", metric: "price", condition: "above", value: 0 } },
-  { type: "schedule", kind: "trigger", name: "Schedule", description: "Run periodically", color: "#FFB020", icon: Clock,
-    defaultParams: { every: "15m" } },
-  { type: "webhook", kind: "trigger", name: "Webhook In", description: "HTTP entry point", color: "#D85A6A", icon: Webhook,
-    defaultParams: { path: "/incoming" } },
+  {
+    type: "price_monitor", kind: "trigger", name: "Price Monitor", description: "Triggers on token price", color: "#14F195", icon: LineChart,
+    defaultParams: { asset: "SOL", condition: "below", value: 80, interval: "1m" }
+  },
+  {
+    type: "dexscreener_pair", kind: "trigger", name: "DexScreener Pair", description: "Watch a pair", color: "#FF6B6B", icon: Activity,
+    defaultParams: { pairAddress: "", metric: "price", condition: "above", value: 0 }
+  },
+  {
+    type: "schedule", kind: "trigger", name: "Schedule", description: "Run periodically", color: "#FFB020", icon: Clock,
+    defaultParams: { every: "15m" }
+  },
+  {
+    type: "webhook", kind: "trigger", name: "Webhook In", description: "HTTP entry point", color: "#D85A6A", icon: Webhook,
+    defaultParams: { path: "/incoming" }
+  },
 ];
 
 export const STEP_MODULES: ModuleDef[] = [
-  { type: "send_transaction", kind: "step", name: "Wallet Transfer", description: "Send SOL / SPL", color: "#9945FF", icon: Send,
-    defaultParams: { to: "", amount: 1, asset: "USDC" } },
-  { type: "send_alert", kind: "step", name: "Alert", description: "Notify user", color: "#F59E0B", icon: Bell,
-    defaultParams: { channel: "app", message: "Trigger fired!" } },
-  { type: "swap", kind: "step", name: "Jupiter Swap", description: "Token swap", color: "#22D3EE", icon: ArrowLeftRight,
-    defaultParams: { from: "SOL", to: "USDC", amount: 1 } },
-  { type: "http_request", kind: "step", name: "HTTP Request", description: "Call an API", color: "#2196F3", icon: Globe,
-    defaultParams: { method: "POST", url: "", body: {} } },
-  { type: "ai_decision", kind: "step", name: "AI Agent", description: "LLM reasoning", color: "#10A37F", icon: Sparkles,
-    defaultParams: { prompt: "Analyze the data and decide next action." } },
-  { type: "dexscreener_lookup", kind: "step", name: "DexScreener Lookup", description: "Fetch pair data", color: "#FF6B6B", icon: Braces,
-    defaultParams: { pairAddress: "" } },
+  {
+    type: "send_transaction", kind: "step", name: "Wallet Transfer", description: "Send SOL / SPL", color: "#9945FF", icon: Send,
+    defaultParams: { to: "", amount: 1, asset: "USDC" }
+  },
+  {
+    type: "send_alert", kind: "step", name: "Alert", description: "Notify user", color: "#F59E0B", icon: Bell,
+    defaultParams: { channel: "app", message: "Trigger fired!" }
+  },
+  {
+    type: "swap", kind: "step", name: "Jupiter Swap", description: "Token swap", color: "#22D3EE", icon: ArrowLeftRight,
+    defaultParams: { from: "SOL", to: "USDC", amount: 1 }
+  },
+  {
+    type: "http_request", kind: "step", name: "HTTP Request", description: "Call an API", color: "#2196F3", icon: Globe,
+    defaultParams: { method: "POST", url: "", body: {} }
+  },
+  {
+    type: "ai_decision", kind: "step", name: "AI Agent", description: "LLM reasoning", color: "#10A37F", icon: Sparkles,
+    defaultParams: { prompt: "Analyze the data and decide next action." }
+  },
+  {
+    type: "dexscreener_lookup", kind: "step", name: "DexScreener Lookup", description: "Fetch pair data", color: "#FF6B6B", icon: Braces,
+    defaultParams: { pairAddress: "" }
+  },
 ];
 
 export const ALL_MODULES = [...TRIGGER_MODULES, ...STEP_MODULES];
@@ -73,18 +93,18 @@ const START_Y = 300;
 export function workflowToNodes(wf: Workflow): FlowNode[] {
   console.log('[workflowToNodes] Received workflow:', JSON.stringify(wf, null, 2));
   const nodes: FlowNode[] = [];
-  
+
   let idx = 0;
 
   const settings = getSettings();
-  const globalWallet = settings?.recipientWallet || ""; 
+  const globalWallet = settings?.recipientWallet || "";
 
   const normalize = (module: ModuleDef, params: any) => {
     const defaults = module.defaultParams || {};
-    const allowedKeys = Object.keys(defaults); 
-    
+    const allowedKeys = Object.keys(defaults);
+
     const cleanParams: any = { ...defaults };
-    
+
     if (params) {
       allowedKeys.forEach(key => {
         if (params[key] !== undefined) {
@@ -95,6 +115,19 @@ export function workflowToNodes(wf: Workflow): FlowNode[] {
 
     if (params?.fromAsset && !cleanParams.asset) {
       cleanParams.asset = params.fromAsset;
+    }
+
+    if (module.type === "send_transaction") {
+      if (globalWallet) {
+        cleanParams.to = globalWallet;
+      } else
+      // cleanParams.to === "tu_recipient" || 
+      // cleanParams.to === "mi_recipient" || 
+      // cleanParams.to === "mi recipient" || 
+      // cleanParams.to?.toLowerCase().includes("recipient")
+      {
+        cleanParams.to = "";
+      }
     }
 
     return cleanParams;

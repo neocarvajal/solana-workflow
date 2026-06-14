@@ -1,6 +1,14 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const SYSTEM = `You translate natural language Solana automation requests into a strict JSON workflow.
+
+[STRICT RULES]
+- NEVER use placeholder values like "tu_recipient"
+- If recipientWallet is empty, set "to" field as an empty string ""
+- Do not invent wallet addresses
+- alertChannel default only if provided
+If recipientWallet is empty, set "to" field as ""
+
 You MUST output a valid JSON object matching this schema:
 {
   "name": "string",

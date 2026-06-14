@@ -121,10 +121,19 @@ const DraggableCanvas: React.FC = () => {
       }
     }
 
+    const newNodeParams = { ...mod.defaultParams };
+    if (mod.type === "send_transaction") {
+      const { getSettings } = require("@/lib/workflowStore");
+      const settings = getSettings();
+      if (settings?.recipientWallet) {
+        newNodeParams.to = settings.recipientWallet;
+      }
+    }
+
     const newNode: FlowNode = {
       id: `n-${Date.now()}`,
       module: mod,
-      params: { ...mod.defaultParams },
+      params: newNodeParams,
       x,
       y,
     };
