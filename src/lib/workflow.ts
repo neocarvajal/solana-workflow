@@ -120,12 +120,7 @@ export function workflowToNodes(wf: Workflow): FlowNode[] {
     if (module.type === "send_transaction") {
       if (globalWallet) {
         cleanParams.to = globalWallet;
-      } else
-      // cleanParams.to === "tu_recipient" || 
-      // cleanParams.to === "mi_recipient" || 
-      // cleanParams.to === "mi recipient" || 
-      // cleanParams.to?.toLowerCase().includes("recipient")
-      {
+      } else {
         cleanParams.to = "";
       }
     }

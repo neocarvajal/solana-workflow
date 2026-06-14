@@ -21,8 +21,7 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
         { value: "SOL", label: "SOL" },
         { value: "BONK", label: "BONK" },
         { value: "JUP", label: "JUP" },
-        { value: "RAY", label: "RAY" },
-        { value: "WIF", label: "WIF" },
+        { value: "MF", label: "MF" },
       ]
     },
     {
@@ -114,6 +113,7 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
         { value: "USDC", label: "USDC" },
         { value: "BONK", label: "BONK" },
         { value: "JUP", label: "JUP" },
+        { value: "MF", label: "MF" },
       ]
     },
   ],
