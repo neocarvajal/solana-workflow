@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Save, Play, ZoomIn, ZoomOut, Clock, Upload, Loader2 } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Buffer } from 'buffer';
-import { Connection, Transaction } from '@solana/web3.js';
-import { connection, publishWorkflowMemo, solscanUrl } from '@/lib/solana';
+import { Connection, Transaction, VersionedTransaction } from '@solana/web3.js';
+import { connection, publishWorkflowMemo,solexplorerUrl } from '@/lib/solana';
 import { workflowToNodes, nodesToWorkflow } from "@/lib/workflow";
 import {
   getWorkflow, getOnchainMeta, setOnchainMeta, setScenarioName, setFlowNodes, updateWorkflow,
@@ -29,6 +29,7 @@ const BottomToolbar: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const router = useRouter();
+  const wallet = useWallet();
 
   useEffect(() => {
     const unsub = subscribeScale((s) => setScale(s));
@@ -85,16 +86,15 @@ const BottomToolbar: React.FC = () => {
 
     const saved = getSavedWorkflows(walletAddress);
     // FIX: Search using actual storage record properties
-    const existing = saved.find(s => s.id === editingId || (s as any).pinata_file_id === editingId);
+    // const existing = saved.find(s => s.id === editingId || (s as any).pinata_file_id === editingId);
 
     // CRITICAL FIX: Pinata requires the actual "pinata_file_id" from cloud to update the JSON
-    const cloudTargetId = (existing as any)?.pinata_file_id || existing?.id || editingId;
-    const oldCid = existing?.cid;
+    // const cloudTargetId = (existing as any)?.pinata_file_id || existing?.id || editingId;
+    // const oldCid = existing?.cid;
 
     toast.promise(
       async () => {
         if (editingId) {
-          // Sincronizado exactamente con: (id, name, updatedData, walletAddress)
           const result = await updateWorkflow(
             editingId,
             wf.name,
@@ -223,14 +223,6 @@ const BottomToolbar: React.FC = () => {
 
               console.log("Send Transaction Payload", JSON.stringify(payload, null, 2));
 
-              // const response = await fetch("/api/workflow/simulate-tx", {
-              //   method: "POST",
-              //   headers: { "Content-Type": "application/json" },
-              //   body: JSON.stringify(payload),
-              // });
-
-              // const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-
               const { data, error } = await supabase.functions.invoke("simulate-transfer", {
                 body: {
                   actionType: "send_transaction",
@@ -251,9 +243,6 @@ const BottomToolbar: React.FC = () => {
                 throw new Error("Failed to simulate transaction");
               }
 
-              // const data = await response.json();
-              // if (!response.ok) throw new Error(data.error || "Failed to simulate transaction");
-
               const transaction = Transaction.from(Buffer.from(data.serializedTx, "base64"));
 
               const signature = await sendTransaction(transaction, connection).catch((err) => {
@@ -272,9 +261,60 @@ const BottomToolbar: React.FC = () => {
             } else if (node.module.type === "send_alert") {
               desc = `Alert "${node.params.message || 'Trigger fired!'}" sent via ${node.params.channel || 'app'}`;
             } else if (node.module.type === "swap") {
-              desc = `Swapped ${node.params.amount || 1} ${node.params.from || 'SOL'} for ${node.params.to || 'USDC'} via Jupiter`;
-            }
 
+              const { amount, from, to } = node.params;
+  
+              if (!amount || !from || !to) {
+                throw new Error("Missing swap parameters (amount, from, or to)");
+              }
+
+              toast.info("Preparing swap...");
+
+              // 1. Llamar a tu Edge Function para obtener el "Order" (Jupiter v2)
+              const { transaction, requestId } = await supabase.functions.invoke("simulate-swap", {
+                body: {
+                  owner: publicKey?.toBase58(),
+                  params: { fromMint: from, toMint: to, amount: amount }
+                }
+              }).then(res => res.data);
+
+              if (!transaction || !requestId) throw new Error("Failed to initialize swap order");
+
+              // 2. Deserializar la VersionedTransaction (v0)
+              const swapTxBuffer = Buffer.from(transaction, "base64");
+              const tx = VersionedTransaction.deserialize(swapTxBuffer);
+              // 3. FIRMA (Importante: NO enviar a la red todavía)
+              // Asegúrate de que tu objeto 'wallet' tenga el método signTransaction
+              // Si usas el hook 'useWallet' de @solana/wallet-adapter-react:
+              const signedTx = await wallet.signTransaction(tx); 
+
+              // 4. Ejecución gestionada por Jupiter (Managed Landing)
+              toast.info("Executing swap via Jupiter...");
+              
+              const executeResult = await fetch("https://api.jup.ag/swap/v2/execute", {
+                method: "POST",
+                headers: { 
+                  "Content-Type": "application/json",
+                  "x-api-key": process.env.NEXT_PUBLIC_JUPITER_API
+                },
+                body: JSON.stringify({
+                  signedTransaction: Buffer.from(signedTx.serialize()).toString("base64"),
+                  requestId: requestId,
+                }),
+              }).then(r => r.json());
+
+              if (executeResult.error) {
+                console.error("Jupiter Execute Error:", executeResult);
+                throw new Error(`Execution failed: ${executeResult.error}`);
+              }
+
+              // 5. Éxito
+              toast.success("Swap completed successfully!");
+              desc = `Swapped ${amount} ${from.slice(0, 4)}... to ${to.slice(0, 4)}...`;
+              simulatedTxSnapshot = { signature: executeResult.signature, actionType: "swap" };
+              setLastTxData(simulatedTxSnapshot);
+            }
+              // desc = `Swapped ${node.params.amount || 1} ${node.params.from || 'SOL'} for ${node.params.to || 'USDC'} via Jupiter`;
             toast.success(`Step ${i} completed: ${node.module.name}`, { description: desc });
           } catch (err: any) {
             if (err.message === "Canceled By User") {
@@ -323,57 +363,74 @@ const BottomToolbar: React.FC = () => {
 
     setPublishing(true);
     try {
-      // 1. Pin to IPFS
-      const { data: pin, error: pinErr } = await supabase.functions.invoke("pin-to-ipfs", {
-        body: { json: wf, name: wf.name },
-      });
-      if (pinErr) throw pinErr;
-      if (pin?.error) throw new Error(typeof pin.error === "string" ? pin.error : JSON.stringify(pin.error));
-      const cid: string = pin.cid;
+    // 1. Preparación de datos segura
+    const skip = "skip";
+    const body = {
+      json: wf,
+      name: (wf.name && wf.name.trim() !== "") ? wf.name : "Untitled Workflow",
+      owner_wallet: publicKey.toBase58(),
+      signature: skip,
+    };
 
-      // 2. Sign + send memo on Solana
-      const prev = getOnchainMeta();
-      const version = (prev.version ?? 0) + 1;
+    // 2. Llamada a Supabase (IPFS)
+    const { data: pin, error: pinErr, response } = await supabase.functions.invoke("pin-to-ipfs", { body });
+    if (pinErr) {
+      const errorBody = response ? await response.json().catch(() => ({})) : {};
+      throw new Error(errorBody.error?.message || pinErr.message || "IPFS Pinning failed");
+    }
+    const cid = pin?.cid;
 
-      // Create a dynamic connection instance pointing to Devnet
-      const connection = new Connection("https://api.devnet.solana.com", "confirmed");
+    // 3. Publicación On-Chain
+    const prev = getOnchainMeta();
+    const version = (prev.version ?? 0) + 1;
+    const connection = new Connection("https://api.devnet.solana.com", "confirmed");
+    const { signature } = await publishWorkflowMemo({ sendTransaction, publicKey }, { name: body.name, cid, version });
+    setOnchainMeta({ cid, signature, version });
 
-      // Inject required tools into the helper
-      const { signature } = await publishWorkflowMemo(
-        { sendTransaction, publicKey },
-        {
-          name: wf.name,
-          cid,
-          version,
-        }
-      );
-      setOnchainMeta({ cid, signature, version });
+    // 4. Lógica de persistencia manual (evita el error de UPSERT)
+    // Primero buscamos si ya existe el nombre
+    const safeJson = JSON.parse(JSON.stringify(wf));
 
-      // 3. Persist link in Cloud
-      await supabase.from("workflows").upsert({
-        name: wf.name,
-        json: wf as any,
+    const { data: existing } = await supabase
+      .from("workflows")
+      .select("id")
+      .eq("name", body.name)
+      .maybeSingle();
+
+    let dbError;
+    if (existing) {
+      // Si existe, hacemos UPDATE por ID
+      const { error } = await supabase.from("workflows").update({
+        json: safeJson,
+        cid: cid,
+        onchain_signature: signature,
+        updated_at: new Date().toISOString(),
+      }).eq("id", existing.id);
+      dbError = error;
+    } else {
+      // Si no existe, hacemos INSERT
+      const { error } = await supabase.from("workflows").insert({
+        name: body.name,
+        json: safeJson,
         cid: cid,
         onchain_signature: signature,
         owner_wallet: publicKey.toBase58(),
-        device_id: localStorage.getItem("solflows_device_id") || "anon",
-      } as any, {
-        onConflict: "name"
-      }).then(() => { }, () => { });
-
-      toast.success("Published on-chain", {
-        description: `cid ${cid.slice(0, 8)}… · v${version}`,
-        action: {
-          label: "View",
-          onClick: () => window.open(solscanUrl(signature), "_blank"),
-        },
       });
-    } catch (e: any) {
-      console.error(e);
-      toast.error(e?.message || "Publish failed");
-    } finally {
-      setPublishing(false);
+      dbError = error;
     }
+
+    if (dbError) throw new Error(`DB Error: ${dbError.message}`);
+
+    toast.success("Published on-chain", {
+      description: `CID: ${cid.slice(0, 8)}... · v${version}`,
+      action: { label: "View", onClick: () => window.open(solexplorerUrl(signature), "_blank") },
+    });
+  } catch (e: any) {
+    console.error("--- PUBLISH ERROR ---", e);
+    toast.error(e.message || "Publish failed");
+  } finally {
+    setPublishing(false);
+  }
   };
 
   return (

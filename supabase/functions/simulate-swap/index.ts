@@ -12,31 +12,35 @@ serve(async (req) => {
     const { owner, params } = await req.json();
     const { fromMint, toMint, amount } = params;
 
-    // Usamos el endpoint /order de la v2 (Meta-Aggregator)
-    // Nota: Necesitas enviar tu x-api-key en los headers si tienes una clave del portal de Jupiter
-    const orderResponse = await fetch(
+    // La API v2 requiere el x-api-key en el header
+    const JUPITER_API_KEY = Deno.env.get("JUPITER_API_KEY");
+
+    // Llamada al Meta-Aggregator v2 (/order)
+    // Este endpoint nos da la transacción lista para firmar y un requestId
+    const response = await fetch(
       `https://api.jup.ag/swap/v2/order?` + new URLSearchParams({
         inputMint: fromMint,
         outputMint: toMint,
-        amount: amount.toString(), // En unidades atómicas
+        amount: amount.toString(), // Cantidad en unidades atómicas
         taker: owner,
         slippageBps: "50",
       }),
       { 
         headers: { 
-          "x-api-key": Deno.env.get("JUPITER_API_KEY") || "" 
+          "x-api-key": JUPITER_API_KEY || "" 
         } 
       }
     );
 
-    const order = await orderResponse.json();
+    const order = await response.json();
 
-    if (!orderResponse.ok || order.error) {
-      throw new Error(order.error || "Failed to get order from Jupiter");
+    if (!response.ok || order.error) {
+      throw new Error(order.error || "Failed to get order from Jupiter v2");
     }
 
-    // Retornamos el objeto 'order' completo al frontend.
-    // El frontend recibirá: transaction (base64) y requestId.
+    // Devolvemos el objeto 'order' completo que contiene:
+    // 1. transaction (la v0 transaction en base64)
+    // 2. requestId (necesario para el posterior /execute)
     return new Response(
       JSON.stringify({ 
         transaction: order.transaction, 

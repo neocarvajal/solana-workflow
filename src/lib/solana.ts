@@ -42,6 +42,11 @@ export function solscanUrl(sig: string) {
   return `https://solscan.io/tx/${sig}${c}`;
 }
 
+export function solexplorerUrl(sig: string) {
+  const c = CLUSTER === "mainnet-beta" ? "" : `?cluster=${CLUSTER}`;
+  return `https://explorer.solana.com//tx/${sig}${c}`;
+}
+
 export function explorerAddrUrl(addr: string) {
   const c = CLUSTER === "mainnet-beta" ? "" : `?cluster=${CLUSTER}`;
   return `https://solscan.io/account/${addr}${c}`;
@@ -72,14 +77,18 @@ export async function publishWorkflowMemo(
   });
 
   const tx = new Transaction().add(ix);
-  tx.feePayer = publicKey;
+  
+  // tx.feePayer = publicKey;
+  // const { blockhash } = await connection.getLatestBlockhash();
+  // tx.recentBlockhash = blockhash;
 
-  // Obtenemos el blockhash más reciente usando la conexión configurada
-  const { blockhash } = await connection.getLatestBlockhash();
-  tx.recentBlockhash = blockhash;
-
-  // Enviamos y firmamos la transacción delegando el proceso al Adapter de la Wallet activa
-  const sig = await sendTransaction(tx, connection);
+  console.log("Tx preparada, instrucciones:", tx.instructions.length);
+  console.log("Program ID:", ix.programId.toBase58());
+  
+  const sig = await sendTransaction(tx, connection).catch((err) => {
+    console.error("Detalle del error en Wallet Adapter:", err);
+    throw err;
+  });
 
   // Confirmamos la transacción
   await connection.confirmTransaction(sig, "confirmed");
