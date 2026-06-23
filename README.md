@@ -6,7 +6,13 @@ Solana Workflow is a platform that allows users to create, manage, and execute a
 
 ---
 
-https://youtu.be/tjctwyRoGsE?si=Ul994ptAhqmrXqfV
+<a href="https://youtu.be/tjctwyRoGsE?si=SAhd5vHIpqxKY7QV" target="_blank">
+  <img src="https://raw.githubusercontent.com/neocarvajal/solana-workflow/refs/heads/main/public/solana-workflow-banner.jpeg" alt="Ver Video" width="100%" />
+</a>
+
+
+<video src="public/solana-workflow.mp4" width="100%" controls muted></video>
+
 
 ## Overview
 
