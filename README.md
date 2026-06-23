@@ -6,6 +6,8 @@ Solana Workflow is a platform that allows users to create, manage, and execute a
 
 ---
 
+https://youtu.be/tjctwyRoGsE?si=Ul994ptAhqmrXqfV
+
 ## Overview
 
 Solana Workflow combines artificial intelligence and blockchain automation to make Web3 more accessible.
