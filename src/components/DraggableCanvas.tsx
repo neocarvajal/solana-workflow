@@ -283,7 +283,7 @@ const DraggableCanvas: React.FC = () => {
     return (
       <svg
         className="absolute inset-0 w-full h-full pointer-events-none"
-        style={{ zIndex: 0 }}
+        style={{ zIndex: 0, overflow: "visible" }}
       >
         {nodes.slice(0, -1).map((node, i) => {
           const next = nodes[i + 1];
