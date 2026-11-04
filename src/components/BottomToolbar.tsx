@@ -505,7 +505,7 @@ const BottomToolbar: React.FC = () => {
               </span>
             </button>
 
-            <SettingsDialog />
+            <SettingsDialog listenForOpenEvent />
           </div>
 
           <div className="flex shrink-0 items-center gap-1 rounded-full bg-muted/50">

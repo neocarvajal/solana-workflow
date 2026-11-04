@@ -4,7 +4,7 @@ import { Settings, X, Save, Wallet, Bell, ChevronDown, Mail, Send, MessageSquare
 import { getSettings, saveSettings } from "@/lib/workflowStore";
 import { toast } from "sonner";
 
-const SettingsDialog: React.FC = () => {
+const SettingsDialog: React.FC<{ listenForOpenEvent?: boolean }> = ({ listenForOpenEvent = false }) => {
   const [open, setOpen] = useState(false);
   const [recipient, setRecipient] = useState("");
   const [alertChannel, setAlertChannel] = useState("app");
@@ -26,6 +26,13 @@ const SettingsDialog: React.FC = () => {
       setWhatsappPhone(s.whatsappPhone);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!listenForOpenEvent) return;
+    const openSettings = () => setOpen(true);
+    window.addEventListener("open-settings", openSettings);
+    return () => window.removeEventListener("open-settings", openSettings);
+  }, [listenForOpenEvent]);
 
   const handleSave = () => {
     saveSettings({

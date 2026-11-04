@@ -34,6 +34,12 @@ const OnchainWorkflowsSheet: React.FC = () => {
 
   useEffect(() => { if (open) load(); /* eslint-disable-next-line */ }, [open]);
 
+  useEffect(() => {
+    const openSheet = () => setOpen(true);
+    window.addEventListener("open-onchain", openSheet);
+    return () => window.removeEventListener("open-onchain", openSheet);
+  }, []);
+
   const loadOne = async (e: OnchainEntry) => {
     setLoadingCid(e.payload.cid);
     try {
