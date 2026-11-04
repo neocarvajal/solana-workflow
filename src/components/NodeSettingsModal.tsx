@@ -447,6 +447,10 @@ const NodeSettingsModal: React.FC<{
               )}
               {testingAlert ? "Enviando prueba…" : "Enviar alerta de prueba"}
             </button>
+            <p className="mt-2 text-xs text-muted-foreground">
+              La alerta de prueba no ejecuta el trigger. Las variables como {"{{price}}"} se
+              resuelven cuando ejecutas el workflow.
+            </p>
           )}
 
           <div className="mt-6 grid grid-cols-2 gap-2 border-t border-border/30 pt-4 sm:flex sm:justify-end sm:gap-3">
