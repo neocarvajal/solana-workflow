@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { X, Trash2 } from "lucide-react";
+import { X, Trash2, Loader2, Send } from "lucide-react";
+import { toast } from "sonner";
 import type { FlowNode } from "@/lib/workflow";
+import { sendAlert } from "@/lib/alerts";
 
 /* ── Per-module field definitions ────────────────────────────── */
 interface FieldDef {
@@ -10,6 +12,10 @@ interface FieldDef {
   placeholder?: string;
   description?: string;
   options?: { value: string; label: string }[];
+  /** Only show this field when another param matches. */
+  showWhen?: { key: string; equals: string | string[] };
+  /** Parse the textarea value as JSON instead of plain text. */
+  json?: boolean;
 }
 
 const MODULE_FIELDS: Record<string, FieldDef[]> = {
@@ -126,9 +132,39 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
         { value: "telegram", label: "Telegram" },
         { value: "discord", label: "Discord Webhook" },
         { value: "email", label: "Email" },
+        { value: "whatsapp", label: "WhatsApp" },
       ]
     },
-    { key: "message", label: "Message", type: "textarea", placeholder: "Trigger fired! SOL hit $200…", description: "Alert message content" },
+    {
+      key: "title", label: "Título", type: "text",
+      placeholder: "Alerta de precio",
+      description: "Asunto del email o título de la notificación (opcional)",
+    },
+    { key: "message", label: "Mensaje", type: "textarea", placeholder: "Trigger fired! SOL hit $200…", description: "Contenido de la alerta" },
+    {
+      key: "email", label: "Email destinatario", type: "text",
+      showWhen: { key: "channel", equals: "email" },
+      placeholder: "tu@email.com",
+      description: "Vacío = usar el email configurado en Ajustes",
+    },
+    {
+      key: "chatId", label: "Telegram Chat ID", type: "text",
+      showWhen: { key: "channel", equals: "telegram" },
+      placeholder: "123456789",
+      description: "Vacío = usar el Chat ID de Ajustes o el secreto TELEGRAM_CHAT_ID",
+    },
+    {
+      key: "webhookUrl", label: "Discord Webhook URL", type: "text",
+      showWhen: { key: "channel", equals: "discord" },
+      placeholder: "https://discord.com/api/webhooks/…",
+      description: "Recomendado configurarlo en Ajustes para no guardarlo dentro del workflow",
+    },
+    {
+      key: "phone", label: "WhatsApp", type: "text",
+      showWhen: { key: "channel", equals: "whatsapp" },
+      placeholder: "+5215512345678",
+      description: "Número con código de país. Vacío = usar Ajustes o el secreto WHATSAPP_TO",
+    },
   ],
 
   swap: [
@@ -166,7 +202,7 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
       ]
     },
     { key: "url", label: "URL", type: "text", placeholder: "https://api.example.com/data" },
-    { key: "body", label: "Body (JSON)", type: "textarea", placeholder: '{ "key": "value" }', description: "Request body for POST/PUT" },
+    { key: "body", label: "Body (JSON)", type: "textarea", placeholder: '{ "key": "value" }', description: "Request body for POST/PUT", json: true },
   ],
 
   ai_decision: [
@@ -214,6 +250,7 @@ const NodeSettingsModal: React.FC<{
   const [params, setParams] = useState<Record<string, any>>(() =>
     mergeParams(node.params)
   );
+  const [testingAlert, setTestingAlert] = useState(false);
 
   useEffect(() => {
     const cleanParams = mergeParams(node.params);
@@ -221,6 +258,13 @@ const NodeSettingsModal: React.FC<{
   }, [node.id, JSON.stringify(node.params)]);
 
   const fields = MODULE_FIELDS[node.module.type] ?? [];
+  const visibleFields = fields.filter((field) => {
+    if (!field.showWhen) return true;
+    const current = params[field.showWhen.key];
+    return Array.isArray(field.showWhen.equals)
+      ? field.showWhen.equals.includes(current)
+      : current === field.showWhen.equals;
+  });
 
   const handleChange = (key: string, value: any) => {
     setParams((prev) => ({ ...prev, [key]: value }));
@@ -231,6 +275,30 @@ const NodeSettingsModal: React.FC<{
     const finalParams = mergeParams(params);
     console.log("Saving node with final params:", finalParams);
     onSave({ ...node, params: finalParams });
+  };
+
+  const handleTestAlert = async () => {
+    setTestingAlert(true);
+    try {
+      const result = await sendAlert({
+        channel: params.channel,
+        title: params.title || "Prueba de alerta",
+        message:
+          params.message ||
+          "Esta es una alerta de prueba enviada desde Solana Workflow.",
+        email: params.email,
+        chatId: params.chatId,
+        webhookUrl: params.webhookUrl,
+        phone: params.phone,
+      });
+      if (result.ok) {
+        toast.success(result.message);
+      } else {
+        toast.error(result.message);
+      }
+    } finally {
+      setTestingAlert(false);
+    }
   };
 
   const Icon = node.module.icon;
@@ -276,13 +344,13 @@ const NodeSettingsModal: React.FC<{
           onSubmit={handleSubmit}
           className="flex-1 overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:p-5"
         >
-          {fields.length === 0 ? (
+          {visibleFields.length === 0 ? (
             <div className="text-sm text-muted-foreground text-center py-8">
               This module has no configurable parameters.
             </div>
           ) : (
             <div className="space-y-5">
-              {fields.map((field) => (
+              {visibleFields.map((field) => (
                 <div key={field.key}>
                   <label
                     htmlFor={`field-${field.key}`}
@@ -311,11 +379,15 @@ const NodeSettingsModal: React.FC<{
                     <textarea
                       id={`field-${field.key}`}
                       value={
-                        typeof params[field.key] === "object"
+                        field.json && typeof params[field.key] === "object"
                           ? JSON.stringify(params[field.key], null, 2)
                           : params[field.key] ?? ""
                       }
                       onChange={(e) => {
+                        if (!field.json) {
+                          handleChange(field.key, e.target.value);
+                          return;
+                        }
                         try {
                           const parsed = JSON.parse(e.target.value);
                           handleChange(field.key, parsed);
@@ -359,6 +431,22 @@ const NodeSettingsModal: React.FC<{
                 </div>
               ))}
             </div>
+          )}
+
+          {node.module.type === "send_alert" && (
+            <button
+              type="button"
+              onClick={handleTestAlert}
+              disabled={testingAlert}
+              className="mt-5 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
+            >
+              {testingAlert ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              {testingAlert ? "Enviando prueba…" : "Enviar alerta de prueba"}
+            </button>
           )}
 
           <div className="mt-6 grid grid-cols-2 gap-2 border-t border-border/30 pt-4 sm:flex sm:justify-end sm:gap-3">

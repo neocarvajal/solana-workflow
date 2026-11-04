@@ -16,6 +16,25 @@ const Documentation: React.FC = () => {
         </section>
 
         <section className="space-y-4">
+          <h2 className="text-xl font-semibold sm:text-2xl">Canales de alerta</h2>
+          <p className="text-muted-foreground">
+            El nodo <strong>Alert</strong> puede enviar notificaciones a distintos canales. Las alertas
+            in-app aparecen en el centro de notificaciones de la app y se guardan en el navegador.
+          </p>
+          <ul className="list-disc list-inside text-muted-foreground space-y-2">
+            <li><strong>In-App:</strong> badge de no leídas, historial y persistencia local.</li>
+            <li><strong>Telegram:</strong> bot token y chat ID configurables.</li>
+            <li><strong>Discord:</strong> webhook del servidor.</li>
+            <li><strong>Email:</strong> envío con Resend y remitente verificado.</li>
+            <li><strong>WhatsApp:</strong> Meta Cloud API o Twilio.</li>
+          </ul>
+          <p className="text-sm text-muted-foreground">
+            Los canales externos se activan configurando los secretos del servidor. Consulta la
+            sección <strong>Alert Channels</strong> del README para los pasos exactos.
+          </p>
+        </section>
+
+        <section className="space-y-4">
           <h2 className="text-xl font-semibold sm:text-2xl">¿Para quién está pensado?</h2>
           <ul className="list-disc list-inside text-muted-foreground space-y-2">
             <li>Usuarios nuevos en Solana que no saben programar.</li>

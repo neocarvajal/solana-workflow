@@ -52,7 +52,15 @@ export const STEP_MODULES: ModuleDef[] = [
   },
   {
     type: "send_alert", kind: "step", name: "Alert", description: "Notify user", color: "#F59E0B", icon: Bell,
-    defaultParams: { channel: "app", message: "Trigger fired!" }
+    defaultParams: {
+      channel: "app",
+      title: "Alerta de Solana Workflow",
+      message: "Trigger fired!",
+      email: "",
+      chatId: "",
+      webhookUrl: "",
+      phone: "",
+    }
   },
   {
     type: "swap", kind: "step", name: "Jupiter Swap", description: "Token swap", color: "#22D3EE", icon: ArrowLeftRight,

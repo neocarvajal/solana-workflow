@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import SettingsDialog from './SettingsDialog';
 import TransactionSuccessModal from './TransactionSuccessModal';
 import { TriggerEngine } from "@/lib/triggerEngine";
+import { sendAlert } from "@/lib/alerts";
 import { useRouter } from 'next/router';
 
 const BottomToolbar: React.FC = () => {
@@ -265,7 +266,22 @@ const BottomToolbar: React.FC = () => {
               simulatedTxSnapshot = { signature, actionType: "send_transaction" };
               setLastTxData(simulatedTxSnapshot);
             } else if (node.module.type === "send_alert") {
-              desc = `Alert "${node.params.message || 'Trigger fired!'}" sent via ${node.params.channel || 'app'}`;
+              const alertResult = await sendAlert({
+                channel: node.params.channel || "app",
+                title: node.params.title,
+                message: node.params.message || "Trigger fired!",
+                email: node.params.email,
+                chatId: node.params.chatId,
+                webhookUrl: node.params.webhookUrl,
+                phone: node.params.phone,
+                ownerWallet: publicKey?.toBase58(),
+              });
+
+              if (!alertResult.ok) {
+                throw new Error(alertResult.message);
+              }
+
+              desc = alertResult.message;
             } else if (node.module.type === "swap") {
 
               const { amount, from, to } = node.params;

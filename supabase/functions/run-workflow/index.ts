@@ -1,5 +1,6 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { deliverAlert } from "../_shared/alerts.ts";
 
 const COIN_IDS: Record<string, string> = {
   SOL: "solana", BONK: "bonk", JUP: "jupiter-exchange-solana", WIF: "dogwifcoin", USDC: "usd-coin",
@@ -84,7 +85,23 @@ Deno.serve(async (req) => {
               note: "Transaction simulated — wallet signing pending integration.",
             });
           } else if (step.type === "send_alert") {
-            logs.push({ step: "send_alert", channel: step.params.channel || "app", message: step.params.message });
+            const alert = await deliverAlert({
+              channel: step.params.channel || "app",
+              title: step.params.title,
+              message: step.params.message || "Trigger fired!",
+              email: step.params.email,
+              chatId: step.params.chatId,
+              webhookUrl: step.params.webhookUrl,
+              phone: step.params.phone,
+            });
+            logs.push({
+              step: "send_alert",
+              channel: alert.channel,
+              provider: alert.provider,
+              ok: alert.ok,
+              message: alert.message,
+            });
+            if (!alert.ok) throw new Error(alert.message);
           } else if (step.type === "http_request") {
             const r = await fetch(step.params.url, {
               method: step.params.method || "GET",

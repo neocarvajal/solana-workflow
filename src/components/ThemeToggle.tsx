@@ -34,7 +34,7 @@ const ThemeToggle = () => {
   return (
     <button
       onClick={toggleTheme}
-      className="fixed bottom-[calc(7.5rem+env(safe-area-inset-bottom))] right-4 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-muted shadow-lg transition-all duration-300 hover:bg-muted/80 hover:shadow-xl sm:bottom-20 sm:right-8"
+      className="fixed bottom-[calc(10.5rem+env(safe-area-inset-bottom))] right-4 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-muted shadow-lg transition-all duration-300 hover:bg-muted/80 hover:shadow-xl sm:bottom-20 sm:right-8"
       aria-label={
         !mounted
           ? 'Cambiar tema'

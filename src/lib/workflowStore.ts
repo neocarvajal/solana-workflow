@@ -61,18 +61,34 @@ function syncWorkflow() {
 
 /* ── Settings (localStorage) ──────────────────────────────── */
 const SETTINGS_KEY = "solflows_settings";
-export interface AppSettings { recipientWallet: string; alertChannel: string; }
+export interface AppSettings {
+  recipientWallet: string;
+  alertChannel: string;
+  alertEmail: string;
+  telegramChatId: string;
+  discordWebhookUrl: string;
+  whatsappPhone: string;
+}
+
+const DEFAULT_SETTINGS: AppSettings = {
+  recipientWallet: "",
+  alertChannel: "app",
+  alertEmail: "",
+  telegramChatId: "",
+  discordWebhookUrl: "",
+  whatsappPhone: "",
+};
 
 export function getSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
   } catch { }
-  return { recipientWallet: "", alertChannel: "app" };
+  return { ...DEFAULT_SETTINGS };
 }
 
 export function saveSettings(s: AppSettings) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ...s }));
 }
 
 /* ── Scale / Zoom State ──────────────────────── */

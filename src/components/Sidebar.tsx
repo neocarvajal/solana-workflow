@@ -145,7 +145,15 @@ const Sidebar: React.FC = () => {
           isExpanded={expanded}
           onClick={() => go('/documentation', mobile)}
         />
-        <NavItem icon={Bell} label="What's New" isExpanded={expanded} onClick={() => comingSoon("What's new coming soon!", mobile)} />
+        <NavItem
+          icon={Bell}
+          label="Notificaciones"
+          isExpanded={expanded}
+          onClick={() => {
+            if (mobile) setMobileOpen(false);
+            window.dispatchEvent(new Event('open-notifications'));
+          }}
+        />
         <NavItem icon={HelpCircle} label="Help" isExpanded={expanded} onClick={() => comingSoon('Help center coming soon!', mobile)} />
       </div>
     </>

@@ -57,6 +57,43 @@ Solana Workflow leverages industry-leading infrastructure to ensure high-speed e
 
 ---
 
+## 🔔 Alert Channels
+
+The **Alert** node can deliver to:
+
+| Channel | What it needs |
+| --- | --- |
+| **In-App** | Nothing. Uses the notification center in the app (unread badge, persisted in the browser). |
+| **Telegram** | `TELEGRAM_BOT_TOKEN` + a chat ID (node, Settings, or `TELEGRAM_CHAT_ID`). |
+| **Discord** | A Discord webhook URL (node, Settings, or `DISCORD_WEBHOOK_URL`). |
+| **Email** | `RESEND_API_KEY` + `ALERT_FROM_EMAIL` (verified sender). Optional default recipient: `ALERT_EMAIL_TO`. |
+| **WhatsApp** | Meta Cloud API: `WHATSAPP_ACCESS_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID`. Or Twilio: `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` + `TWILIO_WHATSAPP_FROM`. Optional default recipient: `WHATSAPP_TO`. |
+
+Configure the server secrets once:
+
+```bash
+npx supabase secrets set --project-ref hessksbxjcfkmujiqhnr \
+  TELEGRAM_BOT_TOKEN="..." \
+  TELEGRAM_CHAT_ID="..." \
+  RESEND_API_KEY="..." \
+  ALERT_FROM_EMAIL="Solana Workflow <alerts@your-domain.com>" \
+  WHATSAPP_ACCESS_TOKEN="..." \
+  WHATSAPP_PHONE_NUMBER_ID="..."
+```
+
+Discord and WhatsApp can also be configured per node. Because a Discord webhook URL is a secret, prefer saving it in **Settings** instead of inside a workflow that may be pinned to IPFS.
+
+The `send-alert` Edge Function exposes a read-only health check:
+
+```bash
+curl "$NEXT_PUBLIC_SUPABASE_URL/functions/v1/send-alert" \
+  -H "Authorization: Bearer $NEXT_PUBLIC_SUPABASE_ANON_KEY"
+```
+
+It returns which server-side channels are configured (never the secret values). The **Send test alert** button in the Alert node uses the same path, so you can verify a channel before running a workflow.
+
+---
+
 ## 🚀 Roadmap
 
 ### Phase 1: Core Automation & Integrations
