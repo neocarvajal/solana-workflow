@@ -1,12 +1,25 @@
 import { getPrice } from "@/lib/price";
-import { toast } from "sonner";
 import type { FlowNode } from "@/lib/workflow";
+
+export interface TriggerEvaluation {
+  triggered: boolean;
+  data: Record<string, unknown>;
+}
 
 export class TriggerEngine {
   /**
    * Main entry point to validate any trigger node.
+   * Kept for callers that only need the boolean result.
    */
   async validateTrigger(node: FlowNode): Promise<boolean> {
+    return (await this.evaluateTrigger(node)).triggered;
+  }
+
+  /**
+   * Evaluate a trigger and return the data that caused it to fire.
+   * Alert steps use this data to render `{{price}}`, `{{asset}}`, etc.
+   */
+  async evaluateTrigger(node: FlowNode): Promise<TriggerEvaluation> {
     const { params } = node;
 
     switch (node.module.type) {
@@ -18,42 +31,56 @@ export class TriggerEngine {
         return await this.evaluateWebhook(params);
       default:
         console.warn(`Unknown trigger type: ${node.module.type}`);
-        return false;
+        return { triggered: false, data: {} };
     }
   }
 
-  private async evaluatePriceMonitor(params: any): Promise<boolean> {
+  private async evaluatePriceMonitor(params: any): Promise<TriggerEvaluation> {
     const { asset, condition, value } = params;
 
-    if (!asset || typeof asset !== 'string') {
+    if (!asset || typeof asset !== "string") {
       console.error("Trigger failed: 'asset' is missing or invalid", asset);
-      return false;
+      return { triggered: false, data: { asset } };
     }
 
-    if (!asset || value === undefined || !condition) {
+    if (value === undefined || !condition) {
       console.error("Price Monitor configuration is missing required fields:", params);
-      return false;
+      return { triggered: false, data: { asset, condition, value } };
     }
 
     const currentPrice = await getPrice(asset);
+    const numericValue = Number(value);
+
+    const data = {
+      asset: asset.toUpperCase(),
+      price: currentPrice,
+      condition,
+      value: numericValue,
+      threshold: numericValue,
+    };
 
     switch (condition) {
       case "above":
-        return currentPrice > value;
+        return { triggered: currentPrice > numericValue, data };
       case "below":
-        return currentPrice < value;
+        return { triggered: currentPrice < numericValue, data };
       case "change_pct":
-        return false; 
+        return { triggered: false, data };
       default:
-        return false;
+        return { triggered: false, data };
     }
   }
 
-  private async evaluateSchedule(params: any): Promise<boolean> {
-    return true; 
+  private async evaluateSchedule(params: any): Promise<TriggerEvaluation> {
+    return {
+      triggered: true,
+      data: {
+        schedule: params.every || params.cron || "manual",
+      },
+    };
   }
 
-  private async evaluateWebhook(params: any): Promise<boolean> {
-    return false; // Webhooks usually wait for external signal
+  private async evaluateWebhook(_params: any): Promise<TriggerEvaluation> {
+    return { triggered: false, data: {} };
   }
 }

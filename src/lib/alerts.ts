@@ -21,6 +21,8 @@ export interface AlertInput {
   webhookUrl?: string;
   phone?: string;
   ownerWallet?: string;
+  /** Data from the trigger, used to resolve {{price}}, {{asset}}, etc. */
+  variables?: Record<string, unknown>;
 }
 
 export interface AlertResult {
@@ -44,12 +46,116 @@ export function alertChannelLabel(channel: unknown): string {
   return ALERT_CHANNEL_OPTIONS.find((item) => item.value === value)?.label || "In-App Notification";
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function getPath(source: Record<string, unknown>, path: string): unknown {
+  return path.split(".").reduce<unknown>((current, key) => {
+    if (current === null || current === undefined || typeof current !== "object") return undefined;
+    return (current as Record<string, unknown>)[key];
+  }, source);
+}
+
+export function formatAlertPrice(value: number): string {
+  if (!Number.isFinite(value)) return "";
+  const absolute = Math.abs(value);
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: absolute > 0 && absolute < 1 ? 8 : 2,
+  }).format(value);
+}
+
+function formatAlertValue(key: string, value: unknown, variables: Record<string, unknown>): string {
+  const normalizedKey = key.split(".").pop()?.toLowerCase() || "";
+  const condition = String(variables.condition || "").toLowerCase();
+  const numericValue = typeof value === "number"
+    ? value
+    : typeof value === "string" && value.trim() !== ""
+      ? Number(value)
+      : Number.NaN;
+
+  if (
+    Number.isFinite(numericValue) &&
+    (normalizedKey === "price" || normalizedKey === "priceusd")
+  ) {
+    return formatAlertPrice(numericValue);
+  }
+
+  if (
+    Number.isFinite(numericValue) &&
+    (normalizedKey === "value" || normalizedKey === "threshold")
+  ) {
+    return condition === "change_pct" ? `${numericValue}%` : formatAlertPrice(numericValue);
+  }
+
+  if (normalizedKey === "asset") return String(value).toUpperCase();
+  if (normalizedKey === "timestamp") {
+    const date = new Date(String(value));
+    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("es");
+  }
+
+  return String(value);
+}
+
+/**
+ * Replaces `{{price}}`, `{{asset}}`, `{{condition}}`, `{{value}}`, etc. in an
+ * alert title/message. If the message doesn't reference the price but the
+ * trigger provides one, a compact price line is appended automatically.
+ */
+export function resolveAlertMessage(
+  template: string,
+  variables?: Record<string, unknown>,
+  options?: { appendPriceContext?: boolean },
+): string {
+  const input = String(template || "");
+  const source = asRecord(variables);
+  const trigger = asRecord(source.trigger);
+  const flat: Record<string, unknown> = {
+    ...trigger,
+    ...source,
+    trigger: source.trigger ?? trigger,
+    timestamp: source.timestamp ?? new Date().toISOString(),
+  };
+
+  let resolved = input.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (token, path: string) => {
+    const value = getPath(flat, path);
+    if (value === undefined || value === null || value === "") return token;
+    return formatAlertValue(path, value, flat);
+  });
+
+  if (options?.appendPriceContext !== false && input.trim()) {
+    const rawPrice = flat.price;
+    const price = typeof rawPrice === "number"
+      ? rawPrice
+      : rawPrice === null || rawPrice === undefined || rawPrice === ""
+        ? Number.NaN
+        : Number(rawPrice);
+    if (Number.isFinite(price)) {
+      const priceText = formatAlertPrice(price);
+      if (priceText && !resolved.includes(priceText) && !resolved.includes(String(price))) {
+        const asset = String(flat.asset || "Token").toUpperCase();
+        resolved = `${resolved}\n\n${asset}: ${priceText}`;
+      }
+    }
+  }
+
+  return resolved.trim();
+}
+
 function resolvePayload(input: AlertInput) {
   const settings = getSettings();
+  const variables = input.variables || {};
   return {
     channel: normalizeAlertChannel(input.channel),
-    message: String(input.message || "").trim(),
-    title: String(input.title || "").trim() || "Alerta de Solana Workflow",
+    message: resolveAlertMessage(String(input.message || "").trim(), variables),
+    title: resolveAlertMessage(
+      String(input.title || "").trim() || "Alerta de Solana Workflow",
+      variables,
+      { appendPriceContext: false },
+    ),
     email: String(input.email || "").trim() || settings.alertEmail.trim(),
     chatId: String(input.chatId || "").trim() || settings.telegramChatId.trim(),
     webhookUrl: String(input.webhookUrl || "").trim() || settings.discordWebhookUrl.trim(),

@@ -9,6 +9,8 @@ export interface AlertPayload {
   webhookUrl?: string;
   phone?: string;
   ownerWallet?: string;
+  /** Trigger data used to resolve {{price}}, {{asset}}, etc. */
+  variables?: Record<string, unknown>;
 }
 
 export interface AlertResult {
@@ -27,6 +29,100 @@ const DISCORD_HOSTS = new Set(["discord.com", "discordapp.com", "ptb.discord.com
 
 const env = (name: string) => (Deno.env.get(name) || "").trim();
 const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function getPath(source: Record<string, unknown>, path: string): unknown {
+  return path.split(".").reduce<unknown>((current, key) => {
+    if (current === null || current === undefined || typeof current !== "object") return undefined;
+    return (current as Record<string, unknown>)[key];
+  }, source);
+}
+
+export function formatAlertPrice(value: number): string {
+  if (!Number.isFinite(value)) return "";
+  const absolute = Math.abs(value);
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: absolute > 0 && absolute < 1 ? 8 : 2,
+  }).format(value);
+}
+
+function formatAlertValue(key: string, value: unknown, variables: Record<string, unknown>): string {
+  const normalizedKey = key.split(".").pop()?.toLowerCase() || "";
+  const condition = String(variables.condition || "").toLowerCase();
+  const numericValue = typeof value === "number"
+    ? value
+    : typeof value === "string" && value.trim() !== ""
+      ? Number(value)
+      : Number.NaN;
+
+  if (
+    Number.isFinite(numericValue) &&
+    (normalizedKey === "price" || normalizedKey === "priceusd")
+  ) {
+    return formatAlertPrice(numericValue);
+  }
+
+  if (
+    Number.isFinite(numericValue) &&
+    (normalizedKey === "value" || normalizedKey === "threshold")
+  ) {
+    return condition === "change_pct" ? `${numericValue}%` : formatAlertPrice(numericValue);
+  }
+
+  if (normalizedKey === "asset") return String(value).toUpperCase();
+  if (normalizedKey === "timestamp") {
+    const date = new Date(String(value));
+    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("es");
+  }
+
+  return String(value);
+}
+
+export function resolveAlertMessage(
+  template: string,
+  variables?: Record<string, unknown>,
+  options?: { appendPriceContext?: boolean },
+): string {
+  const input = String(template || "");
+  const source = asRecord(variables);
+  const trigger = asRecord(source.trigger);
+  const flat: Record<string, unknown> = {
+    ...trigger,
+    ...source,
+    trigger: source.trigger ?? trigger,
+    timestamp: source.timestamp ?? new Date().toISOString(),
+  };
+
+  let resolved = input.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (token, path: string) => {
+    const value = getPath(flat, path);
+    if (value === undefined || value === null || value === "") return token;
+    return formatAlertValue(path, value, flat);
+  });
+
+  if (options?.appendPriceContext !== false && input.trim()) {
+    const rawPrice = flat.price;
+    const price = typeof rawPrice === "number"
+      ? rawPrice
+      : rawPrice === null || rawPrice === undefined || rawPrice === ""
+        ? Number.NaN
+        : Number(rawPrice);
+    if (Number.isFinite(price)) {
+      const priceText = formatAlertPrice(price);
+      if (priceText && !resolved.includes(priceText) && !resolved.includes(String(price))) {
+        const asset = String(flat.asset || "Token").toUpperCase();
+        resolved = `${resolved}\n\n${asset}: ${priceText}`;
+      }
+    }
+  }
+
+  return resolved.trim();
+}
 
 function success(
   channel: AlertChannel,
@@ -413,12 +509,15 @@ export async function deliverAlert(
     return fail("app", "Canal de alerta no válido.", 400);
   }
 
-  const message = text(payload?.message).slice(0, MAX_MESSAGE_LENGTH);
+  const variables = payload?.variables;
+  const message = resolveAlertMessage(text(payload?.message), variables).slice(0, MAX_MESSAGE_LENGTH);
   if (!message) {
     return fail(channel, "El mensaje de la alerta está vacío.", 400);
   }
 
-  const title = text(payload?.title).slice(0, MAX_TITLE_LENGTH);
+  const title = resolveAlertMessage(text(payload?.title), variables, {
+    appendPriceContext: false,
+  }).slice(0, MAX_TITLE_LENGTH);
   const body = composeText(title, message);
 
   switch (channel) {

@@ -92,6 +92,22 @@ curl "$NEXT_PUBLIC_SUPABASE_URL/functions/v1/send-alert" \
 
 It returns which server-side channels are configured (never the secret values). The **Send test alert** button in the Alert node uses the same path, so you can verify a channel before running a workflow.
 
+### Dynamic alert data
+
+Alert titles and messages support trigger placeholders:
+
+| Placeholder | Example |
+| --- | --- |
+| `{{asset}}` | `SOL` |
+| `{{price}}` | `$95.20` |
+| `{{condition}}` | `above` |
+| `{{value}}` / `{{threshold}}` | `$100.00` |
+| `{{timestamp}}` | Local date/time |
+| `{{workflow}}` | Workflow name |
+| `{{trigger.price}}` | Nested trigger value |
+
+If a price trigger provides a price and the message doesn't reference it, the app appends a compact line such as `SOL: $95.20`. That means an existing message like `Current SOL price` still shows the real price instead of only the static text.
+
 ---
 
 ## 🚀 Roadmap

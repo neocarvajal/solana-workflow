@@ -32,6 +32,12 @@ const Documentation: React.FC = () => {
             Los canales externos se activan configurando los secretos del servidor. Consulta la
             sección <strong>Alert Channels</strong> del README para los pasos exactos.
           </p>
+          <p className="text-muted-foreground">
+            Los mensajes admiten datos del trigger: <code>{"{{asset}}"}</code>,{" "}
+            <code>{"{{price}}"}</code>, <code>{"{{condition}}"}</code>,{" "}
+            <code>{"{{value}}"}</code> y <code>{"{{timestamp}}"}</code>. Si el mensaje no incluye
+            el precio, se añade automáticamente una línea como <strong>SOL: $95.20</strong>.
+          </p>
         </section>
 
         <section className="space-y-4">

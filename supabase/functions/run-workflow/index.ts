@@ -46,12 +46,20 @@ Deno.serve(async (req) => {
 
     const t = workflow.trigger;
     if (t.type === "price_monitor") {
-      const price = await getPrice(t.params.asset || "SOL");
-      triggerData = { asset: t.params.asset, price };
+      const asset = String(t.params.asset || "SOL").toUpperCase();
+      const price = await getPrice(asset);
+      const threshold = Number(t.params.value);
+      triggerData = {
+        asset,
+        price,
+        condition: t.params.condition,
+        value: threshold,
+        threshold,
+      };
       logs.push({ step: "trigger", type: t.type, price });
       if (price !== null) {
         const cond = t.params.condition;
-        const v = Number(t.params.value);
+        const v = threshold;
         triggered = cond === "above" ? price > v : cond === "below" ? price < v : Math.abs(price - v) < v * 0.01;
       }
     } else if (t.type === "dexscreener_pair") {
@@ -62,6 +70,14 @@ Deno.serve(async (req) => {
       const val = metric === "price" ? Number(pair?.priceUsd)
         : metric === "volume" ? Number(pair?.volume?.h24)
         : Number(pair?.liquidity?.usd);
+      triggerData = {
+        ...triggerData,
+        metric,
+        value: Number.isNaN(val) ? null : val,
+        price: metric === "price" && !Number.isNaN(val) ? val : undefined,
+        condition: t.params.condition,
+        threshold: Number(t.params.value),
+      };
       logs.push({ step: "trigger", type: t.type, metric, val });
       if (!isNaN(val)) {
         triggered = t.params.condition === "above" ? val > t.params.value : val < t.params.value;
@@ -93,6 +109,11 @@ Deno.serve(async (req) => {
               chatId: step.params.chatId,
               webhookUrl: step.params.webhookUrl,
               phone: step.params.phone,
+              variables: {
+                ...triggerData,
+                trigger: triggerData,
+                workflow: workflow.name,
+              },
             });
             logs.push({
               step: "send_alert",

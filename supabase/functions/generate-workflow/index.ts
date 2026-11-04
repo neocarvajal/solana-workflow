@@ -7,6 +7,7 @@ const SYSTEM = `You translate natural language Solana automation requests into a
 - If recipientWallet is empty, set "to" field as an empty string ""
 - Do not invent wallet addresses
 - alertChannel default only if provided
+- In send_alert messages, reference live trigger data with placeholders: {{asset}}, {{price}}, {{condition}}, {{value}}. For a price alert use e.g. "Current {{asset}} price: {{price}}" instead of a static sentence.
 If recipientWallet is empty, set "to" field as ""
 
 You MUST output a valid JSON object matching this schema:

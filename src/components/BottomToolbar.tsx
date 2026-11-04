@@ -151,6 +151,7 @@ const BottomToolbar: React.FC = () => {
 
     let simulatedTxSnapshot = null;
     let activeNodeId: string | null = null;
+    let triggerVariables: Record<string, unknown> = {};
 
     try {
       setLastTxData(null);
@@ -164,9 +165,9 @@ const BottomToolbar: React.FC = () => {
 
         if (node.module.kind === "trigger") {
           toast.info(`Validating trigger: ${node.module.name}...`);
-          const isTriggered = await triggerEngine.validateTrigger(node);
+          const evaluation = await triggerEngine.evaluateTrigger(node);
 
-          if (!isTriggered) {
+          if (!evaluation.triggered) {
             setErrorNodeId(node.id);
             setRunningNodeId(null);
             setAnimatingLineIndex(-1);
@@ -174,6 +175,7 @@ const BottomToolbar: React.FC = () => {
             return;
           }
 
+          triggerVariables = evaluation.data;
           toast.success("Trigger condition met!");
 
         } else {
@@ -275,6 +277,11 @@ const BottomToolbar: React.FC = () => {
                 webhookUrl: node.params.webhookUrl,
                 phone: node.params.phone,
                 ownerWallet: publicKey?.toBase58(),
+                variables: {
+                  ...triggerVariables,
+                  trigger: triggerVariables,
+                  workflow: getScenarioName(),
+                },
               });
 
               if (!alertResult.ok) {
