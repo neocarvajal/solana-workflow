@@ -105,6 +105,20 @@ export function subscribeRunningNode(l: RunningNodeListener) {
   return () => runningNodeListeners.delete(l);
 }
 
+type ErrorNodeListener = (nodeId: string | null) => void;
+let errorNodeId: string | null = null;
+const errorNodeListeners = new Set<ErrorNodeListener>();
+
+export function getErrorNodeId() { return errorNodeId; }
+export function setErrorNodeId(id: string | null) {
+  errorNodeId = id;
+  errorNodeListeners.forEach((l) => l(errorNodeId));
+}
+export function subscribeErrorNode(l: ErrorNodeListener) {
+  errorNodeListeners.add(l);
+  return () => errorNodeListeners.delete(l);
+}
+
 type AnimatingLineListener = (index: number) => void;
 let animatingLineIndex: number = -1;
 const animatingLineListeners = new Set<AnimatingLineListener>();

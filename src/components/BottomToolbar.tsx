@@ -8,7 +8,7 @@ import { workflowToNodes, nodesToWorkflow } from "@/lib/workflow";
 import {
   getWorkflow, getOnchainMeta, setOnchainMeta, setScenarioName, setFlowNodes, updateWorkflow,
   getFlowNodes, getCanvasScale, setCanvasScale, subscribeScale, getScenarioName,
-  setRunningNodeId, setAnimatingLineIndex, saveWorkflow, saveLocalOnly, getSavedWorkflows,
+  setRunningNodeId, setAnimatingLineIndex, setErrorNodeId, saveWorkflow, saveLocalOnly, getSavedWorkflows,
 } from '@/lib/workflowStore';
 
 import { FlowNode } from "@/lib/workflow";
@@ -144,15 +144,18 @@ const BottomToolbar: React.FC = () => {
     }
 
     setIsRunning(true);
+    setErrorNodeId(null);
     const triggerEngine = new TriggerEngine();
     toast.info("Starting workflow simulation...");
 
     let simulatedTxSnapshot = null;
+    let activeNodeId: string | null = null;
 
     try {
       setLastTxData(null);
       for (let i = 0; i < nodes.length; i++) {
         const node = nodes[i] as FlowNode;
+        activeNodeId = node.id;
         setRunningNodeId(node.id);
         setAnimatingLineIndex(-1);
 
@@ -163,6 +166,9 @@ const BottomToolbar: React.FC = () => {
           const isTriggered = await triggerEngine.validateTrigger(node);
 
           if (!isTriggered) {
+            setErrorNodeId(node.id);
+            setRunningNodeId(null);
+            setAnimatingLineIndex(-1);
             toast.error(`Condition not met: ${node.module.name}`);
             return;
           }
@@ -320,6 +326,7 @@ const BottomToolbar: React.FC = () => {
             if (err.message === "Canceled By User") {
               throw err;
             }
+            setErrorNodeId(node.id);
             console.error("Step execution error:", err);
             throw new Error(`Step ${i} failed: ${err.message}`);
           }
@@ -340,6 +347,9 @@ const BottomToolbar: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || "Simulation failed");
+      if (activeNodeId && err?.message !== "Canceled By User") {
+        setErrorNodeId(activeNodeId);
+      }
       setRunningNodeId(null);
       setAnimatingLineIndex(-1);
     } finally {

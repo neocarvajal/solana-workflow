@@ -8,6 +8,7 @@ import {
   getFlowNodes, setFlowNodes, subscribeNodes,
   getCanvasScale, setCanvasScale, subscribeScale,
   subscribeRunningNode, subscribeAnimatingLine,
+  subscribeErrorNode, getErrorNodeId, setErrorNodeId,
 } from "@/lib/workflowStore";
 
 const NODE_RADIUS = 48;
@@ -27,6 +28,7 @@ const DraggableCanvas: React.FC = () => {
   const [insertIndex, setInsertIndex] = useState<number>(0);
   const [search, setSearch] = useState("");
   const [runningNodeId, setRunningNodeId] = useState<string | null>(null);
+  const [errorNodeId, setErrorNodeIdState] = useState<string | null>(getErrorNodeId());
   const [animatingLineIndex, setAnimatingLineIndex] = useState<number>(-1);
 
   /* Canvas pan, wheel zoom & pinch zoom */
@@ -49,11 +51,13 @@ const DraggableCanvas: React.FC = () => {
     const unsubNodes = subscribeNodes((n) => setNodes([...n]));
     const unsubScale = subscribeScale((s) => setScale(s));
     const unsubRunning = subscribeRunningNode((id) => setRunningNodeId(id));
+    const unsubError = subscribeErrorNode((id) => setErrorNodeIdState(id));
     const unsubAnimating = subscribeAnimatingLine((idx) => setAnimatingLineIndex(idx));
     return () => {
       unsubNodes();
       unsubScale();
       unsubRunning();
+      unsubError();
       unsubAnimating();
     };
   }, []);
@@ -394,7 +398,8 @@ const DraggableCanvas: React.FC = () => {
               isFirst={i === 0}
               index={i}
               scale={scale}
-              isActive={runningNodeId === node.id}
+              isActive={runningNodeId === node.id && errorNodeId !== node.id}
+              hasError={errorNodeId === node.id}
               onDrag={onNodeDrag}
               onDoubleClick={onNodeDoubleClick}
               onSettings={openSettings}
@@ -425,10 +430,12 @@ const DraggableCanvas: React.FC = () => {
           onSave={(updatedNode) => {
             const list = getFlowNodes().map((n) => (n.id === updatedNode.id ? updatedNode : n));
             setFlowNodes(list);
+            if (getErrorNodeId() === updatedNode.id) setErrorNodeId(null);
             closeSettings();
           }}
           onDelete={(id) => {
             onDeleteNode(id);
+            if (getErrorNodeId() === id) setErrorNodeId(null);
             closeSettings();
           }}
           onClose={closeSettings}

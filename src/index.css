@@ -357,6 +357,34 @@
   border-color: #14F195 !important;
 }
 
+/* Red glow for the node that failed during simulation */
+@keyframes node-error-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 16px 4px rgba(239, 68, 68, 0.65), 0 0 0 2px rgba(239, 68, 68, 0.35);
+    transform: scale(1);
+    border-color: rgba(248, 113, 113, 0.95);
+  }
+  50% {
+    box-shadow: 0 0 36px 14px rgba(239, 68, 68, 0.9), 0 0 0 4px rgba(239, 68, 68, 0.25);
+    transform: scale(1.07);
+    border-color: #ef4444;
+  }
+}
+
+.node-circle.node-error {
+  animation: node-error-glow 1.3s infinite ease-in-out;
+  border-color: #ef4444 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .node-circle.node-error {
+    animation: none;
+    box-shadow: 0 0 24px 8px rgba(239, 68, 68, 0.75);
+    border-color: #ef4444 !important;
+  }
+}
+
 .dotted-connection.active-path {
   stroke: #14F195 !important;
   stroke-width: 4px;

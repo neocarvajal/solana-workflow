@@ -8,6 +8,7 @@ interface Props {
   index: number;
   scale: number;
   isActive: boolean;
+  hasError: boolean;
   onDrag: (id: string, x: number, y: number) => void;
   onDoubleClick: (node: FlowNode) => void;
   onSettings: (node: FlowNode) => void;
@@ -21,6 +22,7 @@ const DraggableNode: React.FC<Props> = ({
   index,
   scale,
   isActive,
+  hasError,
   onDrag,
   onDoubleClick,
   onSettings,
@@ -117,7 +119,7 @@ const DraggableNode: React.FC<Props> = ({
       <div className="flex flex-col items-center">
         <div className="relative">
           <div
-            className={`node-circle ${isActive ? "node-active" : ""}`}
+            className={`node-circle ${isActive ? "node-active" : ""} ${hasError ? "node-error" : ""}`}
             style={{
               width: NODE_RADIUS * 2,
               height: NODE_RADIUS * 2,
