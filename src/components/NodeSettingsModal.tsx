@@ -434,23 +434,25 @@ const NodeSettingsModal: React.FC<{
           )}
 
           {node.module.type === "send_alert" && (
-            <button
-              type="button"
-              onClick={handleTestAlert}
-              disabled={testingAlert}
-              className="mt-5 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
-            >
-              {testingAlert ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-              {testingAlert ? "Enviando prueba…" : "Enviar alerta de prueba"}
-            </button>
-            <p className="mt-2 text-xs text-muted-foreground">
-              La alerta de prueba no ejecuta el trigger. Las variables como {"{{price}}"} se
-              resuelven cuando ejecutas el workflow.
-            </p>
+            <>
+              <button
+                type="button"
+                onClick={handleTestAlert}
+                disabled={testingAlert}
+                className="mt-5 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
+              >
+                {testingAlert ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                {testingAlert ? "Enviando prueba…" : "Enviar alerta de prueba"}
+              </button>
+              <p className="mt-2 text-xs text-muted-foreground">
+                La alerta de prueba no ejecuta el trigger. Las variables como {"{{price}}"} se
+                resuelven cuando ejecutas el workflow.
+              </p>
+            </>
           )}
 
           <div className="mt-6 grid grid-cols-2 gap-2 border-t border-border/30 pt-4 sm:flex sm:justify-end sm:gap-3">
