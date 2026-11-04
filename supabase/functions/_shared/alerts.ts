@@ -302,6 +302,30 @@ async function sendWhatsApp(
   const metaPhoneId = env("WHATSAPP_PHONE_NUMBER_ID");
 
   if (metaToken && metaPhoneId) {
+    const templateName = env("WHATSAPP_TEMPLATE_NAME");
+    const metaPayload = templateName
+      ? {
+          messaging_product: "whatsapp",
+          to: phone.replace(/^\+/, ""),
+          type: "template",
+          template: {
+            name: templateName,
+            language: { code: env("WHATSAPP_TEMPLATE_LANGUAGE") || "es" },
+            components: [
+              {
+                type: "body",
+                parameters: [{ type: "text", text: body.slice(0, 1024) }],
+              },
+            ],
+          },
+        }
+      : {
+          messaging_product: "whatsapp",
+          to: phone.replace(/^\+/, ""),
+          type: "text",
+          text: { preview_url: false, body: body.slice(0, 4096) },
+        };
+
     const response = await fetchImpl(
       `https://graph.facebook.com/v20.0/${metaPhoneId}/messages`,
       {
@@ -310,12 +334,7 @@ async function sendWhatsApp(
           Authorization: `Bearer ${metaToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: phone.replace(/^\+/, ""),
-          type: "text",
-          text: { preview_url: false, body: body.slice(0, 4096) },
-        }),
+        body: JSON.stringify(metaPayload),
       },
     );
 
@@ -431,5 +450,6 @@ export function alertChannelHealth() {
     email: Boolean(env("RESEND_API_KEY") && (env("ALERT_FROM_EMAIL") || env("RESEND_FROM_EMAIL"))),
     whatsapp: metaWhatsApp || twilioWhatsApp,
     whatsappProvider: metaWhatsApp ? "meta" : twilioWhatsApp ? "twilio" : null,
+    whatsappTemplate: Boolean(env("WHATSAPP_TEMPLATE_NAME")),
   };
 }

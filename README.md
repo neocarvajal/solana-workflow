@@ -67,7 +67,7 @@ The **Alert** node can deliver to:
 | **Telegram** | `TELEGRAM_BOT_TOKEN` + a chat ID (node, Settings, or `TELEGRAM_CHAT_ID`). |
 | **Discord** | A Discord webhook URL (node, Settings, or `DISCORD_WEBHOOK_URL`). |
 | **Email** | `RESEND_API_KEY` + `ALERT_FROM_EMAIL` (verified sender). Optional default recipient: `ALERT_EMAIL_TO`. |
-| **WhatsApp** | Meta Cloud API: `WHATSAPP_ACCESS_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID`. Or Twilio: `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` + `TWILIO_WHATSAPP_FROM`. Optional default recipient: `WHATSAPP_TO`. |
+| **WhatsApp** | Meta Cloud API: `WHATSAPP_ACCESS_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID`. Or Twilio: `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` + `TWILIO_WHATSAPP_FROM`. Optional default recipient: `WHATSAPP_TO`. For Meta business-initiated alerts outside the 24-hour window, set `WHATSAPP_TEMPLATE_NAME` (+ optional `WHATSAPP_TEMPLATE_LANGUAGE`, default `es`). |
 
 Configure the server secrets once:
 
