@@ -100,13 +100,22 @@ Alert titles and messages support trigger placeholders:
 | --- | --- |
 | `{{asset}}` | `SOL` |
 | `{{price}}` | `$95.20` |
+| `{{priceChange24h}}` | `+2.31%` |
 | `{{condition}}` | `above` |
 | `{{value}}` / `{{threshold}}` | `$100.00` |
 | `{{timestamp}}` | Local date/time |
 | `{{workflow}}` | Workflow name |
 | `{{trigger.price}}` | Nested trigger value |
 
-If a price trigger provides a price and the message doesn't reference it, the app appends a compact line such as `SOL: $95.20`. That means an existing message like `Current SOL price` still shows the real price instead of only the static text.
+If a price trigger provides a price and the message doesn't reference it, the app appends a compact line such as `SOL: $95.20 (24h +2.31%)`. That means an existing message like `Current SOL price` still shows the real price instead of only the static text.
+
+### Price Monitor conditions
+
+| Condition | What it compares |
+| --- | --- |
+| **Price is above target** | Current USD price > `Target price (USD)`. |
+| **Price is below target** | Current USD price < `Target price (USD)`. |
+| **24h change ≥ threshold (%)** | Absolute Jupiter 24h price change ≥ `24h change threshold (%)`. It fires for either direction. |
 
 ---
 

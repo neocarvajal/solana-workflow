@@ -31,16 +31,27 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
       ]
     },
     {
-      key: "condition", label: "Condition", type: "select", description: "When to fire",
+      key: "condition", label: "Price condition", type: "select", description: "Choose the rule that fires the alert",
       options: [
-        { value: "above", label: "Price goes above" },
-        { value: "below", label: "Price goes below" },
-        { value: "change_pct", label: "% change exceeds" },
+        { value: "above", label: "Price is above target" },
+        { value: "below", label: "Price is below target" },
+        { value: "change_pct", label: "24h change ≥ threshold (%)" },
       ]
     },
-    { key: "value", label: "Threshold Value", type: "number", placeholder: "e.g. 150", description: "USD value or percentage" },
     {
-      key: "interval", label: "Check Interval", type: "select", description: "How often to poll",
+      key: "value", label: "Target price (USD)", type: "number",
+      showWhen: { key: "condition", equals: ["above", "below"] },
+      placeholder: "e.g. 150",
+      description: "The alert fires when the current price is above or below this USD value",
+    },
+    {
+      key: "value", label: "24h change threshold (%)", type: "number",
+      showWhen: { key: "condition", equals: "change_pct" },
+      placeholder: "e.g. 5",
+      description: "Fires when the absolute 24h price change is at least this percentage, up or down",
+    },
+    {
+      key: "interval", label: "Check interval", type: "select", description: "How often to check the price",
       options: [
         { value: "30s", label: "Every 30 seconds" },
         { value: "1m", label: "Every minute" },
@@ -431,6 +442,14 @@ const NodeSettingsModal: React.FC<{
                 </div>
               ))}
             </div>
+          )}
+
+          {node.module.type === "price_monitor" && (
+            <p className="mt-3 rounded-lg border border-border/40 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              {params.condition === "change_pct"
+                ? `Se activa si ${params.asset || "el token"} cambia ${params.value ?? 0}% o más en 24h, en cualquier dirección.`
+                : `Se activa si ${params.asset || "el token"} está ${params.condition === "above" ? "por encima" : "por debajo"} de $${params.value ?? 0}.`}
+            </p>
           )}
 
           {node.module.type === "send_alert" && (

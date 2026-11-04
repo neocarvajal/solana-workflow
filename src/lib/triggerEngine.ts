@@ -1,4 +1,4 @@
-import { getPrice } from "@/lib/price";
+import { getPriceData } from "@/lib/price";
 import type { FlowNode } from "@/lib/workflow";
 
 export interface TriggerEvaluation {
@@ -48,12 +48,15 @@ export class TriggerEngine {
       return { triggered: false, data: { asset, condition, value } };
     }
 
-    const currentPrice = await getPrice(asset);
+    const snapshot = await getPriceData(asset);
+    const currentPrice = snapshot.price;
+    const priceChange24h = snapshot.priceChange24h;
     const numericValue = Number(value);
 
     const data = {
       asset: asset.toUpperCase(),
       price: currentPrice,
+      priceChange24h,
       condition,
       value: numericValue,
       threshold: numericValue,
@@ -65,7 +68,12 @@ export class TriggerEngine {
       case "below":
         return { triggered: currentPrice < numericValue, data };
       case "change_pct":
-        return { triggered: false, data };
+        return {
+          triggered:
+            priceChange24h !== null &&
+            Math.abs(priceChange24h) >= Math.abs(numericValue),
+          data,
+        };
       default:
         return { triggered: false, data };
     }

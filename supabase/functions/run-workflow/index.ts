@@ -6,12 +6,17 @@ const COIN_IDS: Record<string, string> = {
   SOL: "solana", BONK: "bonk", JUP: "jupiter-exchange-solana", WIF: "dogwifcoin", USDC: "usd-coin",
 };
 
-async function getPrice(asset: string): Promise<number | null> {
+async function getPriceData(asset: string): Promise<{ price: number | null; change24h: number | null }> {
   const id = COIN_IDS[asset.toUpperCase()] || asset.toLowerCase();
-  const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd`);
-  if (!r.ok) return null;
+  const r = await fetch(
+    `https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd&include_24hr_change=true`,
+  );
+  if (!r.ok) return { price: null, change24h: null };
   const json = await r.json();
-  return json[id]?.usd ?? null;
+  return {
+    price: typeof json[id]?.usd === "number" ? json[id].usd : null,
+    change24h: typeof json[id]?.usd_24h_change === "number" ? json[id].usd_24h_change : null,
+  };
 }
 
 async function getDexPair(addr: string) {
@@ -47,20 +52,26 @@ Deno.serve(async (req) => {
     const t = workflow.trigger;
     if (t.type === "price_monitor") {
       const asset = String(t.params.asset || "SOL").toUpperCase();
-      const price = await getPrice(asset);
+      const snapshot = await getPriceData(asset);
+      const price = snapshot.price;
+      const priceChange24h = snapshot.change24h;
       const threshold = Number(t.params.value);
       triggerData = {
         asset,
         price,
+        priceChange24h,
         condition: t.params.condition,
         value: threshold,
         threshold,
       };
-      logs.push({ step: "trigger", type: t.type, price });
+      logs.push({ step: "trigger", type: t.type, price, change24h: priceChange24h });
       if (price !== null) {
         const cond = t.params.condition;
-        const v = threshold;
-        triggered = cond === "above" ? price > v : cond === "below" ? price < v : Math.abs(price - v) < v * 0.01;
+        if (cond === "above") triggered = price > threshold;
+        else if (cond === "below") triggered = price < threshold;
+        else if (cond === "change_pct") {
+          triggered = priceChange24h !== null && Math.abs(priceChange24h) >= Math.abs(threshold);
+        }
       }
     } else if (t.type === "dexscreener_pair") {
       const data = await getDexPair(t.params.pairAddress);

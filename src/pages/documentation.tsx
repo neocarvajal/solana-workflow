@@ -34,9 +34,15 @@ const Documentation: React.FC = () => {
           </p>
           <p className="text-muted-foreground">
             Los mensajes admiten datos del trigger: <code>{"{{asset}}"}</code>,{" "}
-            <code>{"{{price}}"}</code>, <code>{"{{condition}}"}</code>,{" "}
-            <code>{"{{value}}"}</code> y <code>{"{{timestamp}}"}</code>. Si el mensaje no incluye
-            el precio, se añade automáticamente una línea como <strong>SOL: $95.20</strong>.
+            <code>{"{{price}}"}</code>, <code>{"{{priceChange24h}}"}</code>,{" "}
+            <code>{"{{condition}}"}</code>, <code>{"{{value}}"}</code> y{" "}
+            <code>{"{{timestamp}}"}</code>. Si el mensaje no incluye el precio, se añade
+            automáticamente una línea como <strong>SOL: $95.20 (24h +2.31%)</strong>.
+          </p>
+          <p className="text-muted-foreground">
+            El nodo <strong>Price Monitor</strong> permite tres reglas claras: precio por encima
+            del objetivo, precio por debajo del objetivo, o cambio absoluto de las últimas 24 horas
+            mayor o igual al porcentaje configurado.
           </p>
         </section>
 

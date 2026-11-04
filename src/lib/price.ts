@@ -1,11 +1,16 @@
-export const getPrice = async (asset: string): Promise<number> => {
-  const TOKEN_MAP: Record<string, string> = {
-    SOL: "So11111111111111111111111111111111111111112",
-    BONK: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
-    JUP: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
-    MF: "moonThZEkkTVoNB7v6YVCQiT56JYDZ1oN185ba3WizL",
-  };
+export interface PriceSnapshot {
+  price: number;
+  priceChange24h: number | null;
+}
 
+const TOKEN_MAP: Record<string, string> = {
+  SOL: "So11111111111111111111111111111111111111112",
+  BONK: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+  JUP: "JUPyiwrYJFskUPiHa7hke8VUtAeFoSYbKedZNsDvCN",
+  MF: "moonThZEkkTVoNB7v6YVCQiT56JYDZ1oN185ba3WizL",
+};
+
+export const getPriceData = async (asset: string): Promise<PriceSnapshot> => {
   const address = TOKEN_MAP[asset.toUpperCase()] || asset;
 
   const response = await fetch(
@@ -37,5 +42,15 @@ export const getPrice = async (asset: string): Promise<number> => {
     );
   }
 
-  return price;
+  return {
+    price,
+    priceChange24h:
+      typeof assetData?.priceChange24h === "number"
+        ? assetData.priceChange24h
+        : null,
+  };
+};
+
+export const getPrice = async (asset: string): Promise<number> => {
+  return (await getPriceData(asset)).price;
 };

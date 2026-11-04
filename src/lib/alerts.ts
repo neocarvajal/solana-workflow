@@ -91,6 +91,11 @@ function formatAlertValue(key: string, value: unknown, variables: Record<string,
     return condition === "change_pct" ? `${numericValue}%` : formatAlertPrice(numericValue);
   }
 
+  if (normalizedKey === "pricechange24h") {
+    if (!Number.isFinite(numericValue)) return String(value);
+    return `${numericValue >= 0 ? "+" : ""}${numericValue.toFixed(2)}%`;
+  }
+
   if (normalizedKey === "asset") return String(value).toUpperCase();
   if (normalizedKey === "timestamp") {
     const date = new Date(String(value));
@@ -137,7 +142,15 @@ export function resolveAlertMessage(
       const priceText = formatAlertPrice(price);
       if (priceText && !resolved.includes(priceText) && !resolved.includes(String(price))) {
         const asset = String(flat.asset || "Token").toUpperCase();
-        resolved = `${resolved}\n\n${asset}: ${priceText}`;
+        const change24h = typeof flat.priceChange24h === "number"
+          ? flat.priceChange24h
+          : flat.priceChange24h === null || flat.priceChange24h === undefined || flat.priceChange24h === ""
+            ? Number.NaN
+            : Number(flat.priceChange24h);
+        const changeText = Number.isFinite(change24h)
+          ? ` (24h ${change24h >= 0 ? "+" : ""}${change24h.toFixed(2)}%)`
+          : "";
+        resolved = `${resolved}\n\n${asset}: ${priceText}${changeText}`;
       }
     }
   }
