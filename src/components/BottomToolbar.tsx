@@ -435,68 +435,80 @@ const BottomToolbar: React.FC = () => {
 
   return (
     <>
-      <div className="fixed bottom-0 left-0 right-0 h-12 bg-background border-t border-border flex items-center justify-between px-4 z-30">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleSave}
-            className="p-2 hover:bg-muted rounded-md flex items-center gap-1 text-sm text-foreground transition-colors"
-          >
-            <Save className="h-4 w-4" />
-            <span>Save</span>
-          </button>
-          <button
-            onClick={runSimulation}
-            disabled={isRunning}
-            className="p-2 hover:bg-muted rounded-md flex items-center gap-1 text-sm text-foreground transition-colors disabled:opacity-50"
-          >
-            {isRunning ? (
-              <Loader2 className="h-4 w-4 animate-spin text-primary" />
-            ) : (
-              <Play className="h-4 w-4 text-emerald-400 fill-emerald-400/20" />
-            )}
-            <span>{isRunning ? "Running..." : "Run once"}</span>
-          </button>
-          <button
-            onClick={publishOnchain}
-            disabled={publishing}
-            className="px-3 py-1.5 rounded-md flex items-center gap-1.5 text-sm bg-gradient-purple-cyan text-white hover:opacity-90 disabled:opacity-60 font-medium transition-all"
-            title="Pin JSON to IPFS and record CID on Solana"
-          >
-            {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            <span>Publish on-chain</span>
-          </button>
+      <div className="z-30 w-full shrink-0 border-t border-border bg-background px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 sm:h-12 sm:px-4 sm:py-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 sm:h-full sm:flex-nowrap">
+          <div className="flex min-w-0 items-center gap-1 overflow-x-auto no-scrollbar sm:gap-2">
+            <button
+              onClick={handleSave}
+              className="flex min-h-10 shrink-0 items-center gap-1 rounded-md px-2 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+            >
+              <Save className="h-4 w-4" />
+              <span>Guardar</span>
+            </button>
+            <button
+              onClick={runSimulation}
+              disabled={isRunning}
+              className="flex min-h-10 shrink-0 items-center gap-1 rounded-md px-2 py-2 text-sm text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+            >
+              {isRunning ? (
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              ) : (
+                <Play className="h-4 w-4 text-emerald-400 fill-emerald-400/20" />
+              )}
+              <span className="whitespace-nowrap">
+                {isRunning ? "Ejecutando..." : "Ejecutar"}
+              </span>
+            </button>
+            <button
+              onClick={publishOnchain}
+              disabled={publishing}
+              className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-md bg-gradient-purple-cyan px-2.5 py-1.5 text-sm font-medium text-white transition-all hover:opacity-90 disabled:opacity-60"
+              title="Pin JSON to IPFS and record CID on Solana"
+            >
+              {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              <span className="whitespace-nowrap">
+                <span className="sm:hidden">Publicar</span>
+                <span className="hidden sm:inline">Publicar on-chain</span>
+              </span>
+            </button>
 
-          <SettingsDialog />
-        </div>
-
-        <div className="flex items-center gap-2 bg-muted/50 rounded-full">
-          <div className="flex items-center gap-1 px-2 py-1 text-sm text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <select className="bg-transparent border-none focus:outline-none text-sm">
-              <option>Every 15 minutes</option>
-              <option>Every hour</option>
-              <option>Every day</option>
-              <option>Manual only</option>
-            </select>
+            <SettingsDialog />
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCanvasScale(scale - 0.1)}
-            className="p-1 hover:bg-muted rounded-md text-foreground transition-colors"
-            title="Zoom Out"
-          >
-            <ZoomOut className="h-4 w-4" />
-          </button>
-          <span className="text-xs w-10 text-center font-mono">{Math.round(scale * 100)}%</span>
-          <button
-            onClick={() => setCanvasScale(scale + 0.1)}
-            className="p-1 hover:bg-muted rounded-md text-foreground transition-colors"
-            title="Zoom In"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </button>
+          <div className="flex shrink-0 items-center gap-1 rounded-full bg-muted/50">
+            <div className="flex items-center gap-1 px-2 py-0 text-muted-foreground">
+              <Clock className="h-4 w-4 shrink-0" />
+              <select
+                className="h-10 w-[8.5rem] border-none bg-transparent text-base focus:outline-none sm:w-auto sm:text-sm"
+                aria-label="Frecuencia de ejecución"
+              >
+                <option>Every 15 minutes</option>
+                <option>Every hour</option>
+                <option>Every day</option>
+                <option>Manual only</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={() => setCanvasScale(scale - 0.1)}
+              className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition-colors hover:bg-muted"
+              title="Zoom Out"
+              aria-label="Alejar"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </button>
+            <span className="w-10 text-center font-mono text-xs">{Math.round(scale * 100)}%</span>
+            <button
+              onClick={() => setCanvasScale(scale + 0.1)}
+              className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition-colors hover:bg-muted"
+              title="Zoom In"
+              aria-label="Acercar"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
       <TransactionSuccessModal

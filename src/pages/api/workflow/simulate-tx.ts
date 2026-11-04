@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { handleTransferAction } from "./handlers/transferHandler";
-import { handleSwapAction } from "./handlers/swapHandler";
+import { handleTransferAction } from "@/server/workflow/transferHandler";
+import { handleSwapAction } from "@/server/workflow/swapHandler";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {

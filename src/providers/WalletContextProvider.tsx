@@ -21,8 +21,11 @@ export const WalletContextProvider: FC<Props> = ({ children }) => {
     // Puedes cambiar a 'mainnet-beta' o 'testnet' según lo necesites
     const network = WalletAdapterNetwork.Devnet;
 
-    // Puedes usar una URL de RPC personalizada de QuickNode, Helius, Alchemy, etc.
-    const endpoint = useMemo(() => clusterApiUrl(network), [network]);
+    // Alchemy es el RPC por defecto; si falta la variable usamos el RPC público.
+    const endpoint = useMemo(
+        () => process.env.NEXT_PUBLIC_ALCHEMY_HTTP_URL || clusterApiUrl(network),
+        [network]
+    );
 
     // Al dejar este array vacío, la librería detectará automáticamente 
     // cualquier wallet instalada en el navegador que use el "Wallet Standard" (Phantom, Solflare, Backpack, etc.)

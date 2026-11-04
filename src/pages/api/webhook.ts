@@ -1,68 +1,146 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { createClient } from '@supabase/supabase-js';
+import type { NextApiRequest, NextApiResponse } from "next";
+import { createHmac, timingSafeEqual } from "crypto";
+import { createClient } from "@supabase/supabase-js";
 
-// Inicialización del cliente Supabase con privilegios de administrador (Service Role)
-// Esta clave permite realizar operaciones de escritura ignorando las políticas RLS.
+// Necesitamos el body crudo para validar la firma HMAC de Alchemy.
+export const config = {
+  api: { bodyParser: false },
+};
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // 1. Validación de Seguridad: Verificar que la petición viene de QuickNode
-  const signature = req.headers['x-qn-signature'];
-  const expectedToken = process.env.QUICKNODE_SECURITY_TOKEN;
+async function readRawBody(req: NextApiRequest): Promise<Buffer> {
+  const chunks: Buffer[] = [];
 
-  if (!signature || signature !== expectedToken) {
-    console.error('Intento de acceso no autorizado detectado');
-    return res.status(401).json({ error: 'Acceso no autorizado: Token inválido' });
+  for await (const chunk of req) {
+    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
   }
 
-  // 2. Validación de Método: Solo permitimos POST
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return res.status(405).json({ error: 'Method Not Allowed' });
+  return Buffer.concat(chunks);
+}
+
+function isValidSignature(
+  rawBody: Buffer,
+  signature: string | undefined,
+  secret: string
+): boolean {
+  if (!signature) return false;
+
+  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+  const a = Buffer.from(expected, "utf8");
+  const b = Buffer.from(signature, "utf8");
+
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+type AlchemyActivity = {
+  fromAddress?: string;
+  toAddress?: string;
+  address?: string;
+  value?: number | string;
+  amount?: number | string;
+  hash?: string;
+  transactionHash?: string;
+  category?: string;
+  asset?: string;
+};
+
+function activitiesFrom(payload: unknown): AlchemyActivity[] {
+  const body = payload as Record<string, any> | null;
+
+  if (Array.isArray(body?.event?.activity)) return body.event.activity;
+  if (Array.isArray(body?.activity)) return body.activity;
+  if (body?.event?.transaction) return [body.event.transaction];
+
+  return [];
+}
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return res.status(405).json({ error: "Method Not Allowed" });
   }
 
-  // 3. Extracción de datos del payload de QuickNode
-  const { eventType, account, amount } = req.body;
+  const signingKey = process.env.ALCHEMY_WEBHOOK_SIGNING_KEY;
 
-  if (!account || !eventType) {
-    return res.status(400).json({ error: 'Missing required fields: account or eventType' });
+  // Fail-closed: si no hay clave configurada no aceptamos eventos.
+  if (!signingKey) {
+    console.error("ALCHEMY_WEBHOOK_SIGNING_KEY no está configurada");
+    return res.status(503).json({ error: "Webhook no configurado" });
   }
 
-  // 4. Lógica de Negocio: Si detectamos una transferencia, registramos la acción
-  if (eventType === 'transfer') {
-    try {
-      console.log(`Transferencia detectada en ${account}. Registrando en Supabase...`);
+  const signatureHeader = req.headers["x-alchemy-signature"];
+  const signature = Array.isArray(signatureHeader)
+    ? signatureHeader[0]
+    : signatureHeader;
 
-      const { data, error } = await supabase
-        .from('pending_actions')
-        .insert([
-          { 
-            wallet_address: account, 
-            action: 'swap_sol_to_usdc', 
-            status: 'pending',
-            amount: amount || '0', // Manejo de caso por si el monto no viene definido
-            created_at: new Date().toISOString()
-          }
-        ]);
+  let rawBody: Buffer;
 
-      if (error) {
-        console.error('Error al insertar en Supabase:', error);
-        throw error;
-      }
-
-      return res.status(200).json({ 
-        message: 'Evento guardado exitosamente. Pendiente de firma en el frontend.' 
-      });
-
-    } catch (e) {
-      console.error('Error interno procesando el webhook:', e);
-      return res.status(500).json({ error: 'Error interno de base de datos' });
-    }
+  try {
+    rawBody = await readRawBody(req);
+  } catch (e) {
+    console.error("No se pudo leer el body del webhook:", e);
+    return res.status(400).json({ error: "Body inválido" });
   }
 
-  // Si el evento no es de tipo 'transfer', lo ignoramos
-  return res.status(200).json({ message: 'Evento recibido pero no procesado', eventType });
+  if (!isValidSignature(rawBody, signature, signingKey)) {
+    console.error("Firma de Alchemy inválida");
+    return res.status(401).json({ error: "Firma inválida" });
+  }
+
+  let payload: unknown;
+
+  try {
+    payload = JSON.parse(rawBody.toString("utf8"));
+  } catch (_e) {
+    return res.status(400).json({ error: "JSON inválido" });
+  }
+
+  const activities = activitiesFrom(payload);
+
+  if (activities.length === 0) {
+    return res.status(200).json({ message: "Evento sin actividad, ignorado" });
+  }
+
+  const rows = activities
+    .map((activity) => {
+      const wallet =
+        activity.toAddress || activity.fromAddress || activity.address;
+
+      if (!wallet) return null;
+
+      const amount = activity.value ?? activity.amount ?? "0";
+
+      return {
+        wallet_address: wallet,
+        action: activity.category || "onchain_activity",
+        status: "pending",
+        amount: String(amount),
+        tx_hash: activity.hash || activity.transactionHash || null,
+        created_at: new Date().toISOString(),
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
+
+  if (rows.length === 0) {
+    return res.status(200).json({ message: "Actividad sin wallet, ignorada" });
+  }
+
+  const { error } = await supabase.from("pending_actions").insert(rows);
+
+  if (error) {
+    console.error("Error al insertar en pending_actions:", error);
+    return res.status(500).json({ error: "Error interno de base de datos" });
+  }
+
+  return res.status(200).json({
+    message: "Evento guardado exitosamente",
+    inserted: rows.length,
+  });
 }

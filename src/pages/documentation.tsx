@@ -3,20 +3,20 @@ import Link from "next/link";
 
 const Documentation: React.FC = () => {
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center pt-12 px-4 md:px-8 pb-16">
-      <header className="w-full max-w-5xl flex items-center gap-4 mb-10">
-        <h1 className="text-3xl font-bold gradient-text">Solana Workflow</h1>
+    <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto bg-background px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-6 sm:px-6 sm:pt-10 md:px-8">
+      <header className="mb-6 flex w-full max-w-5xl items-center gap-4 sm:mb-10">
+        <h1 className="text-2xl font-bold gradient-text sm:text-3xl">Solana Workflow</h1>
       </header>
-      <main className="w-full max-w-4xl space-y-8">
+      <main className="w-full max-w-4xl space-y-6 sm:space-y-8">
         <section className="space-y-4">
-          <h2 className="text-2xl font-semibold">¿Qué es?</h2>
+          <h2 className="text-xl font-semibold sm:text-2xl">¿Qué es?</h2>
           <p className="text-muted-foreground">
             Solana Workflow es una plataforma que permite crear automatizaciones simples para el ecosistema de Solana usando lenguaje natural e inteligencia artificial.
           </p>
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-2xl font-semibold">¿Para quién está pensado?</h2>
+          <h2 className="text-xl font-semibold sm:text-2xl">¿Para quién está pensado?</h2>
           <ul className="list-disc list-inside text-muted-foreground space-y-2">
             <li>Usuarios nuevos en Solana que no saben programar.</li>
             <li>Traders que desean alertas y acciones automáticas.</li>
@@ -26,14 +26,14 @@ const Documentation: React.FC = () => {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-2xl font-semibold">Problema que resuelve</h2>
+          <h2 className="text-xl font-semibold sm:text-2xl">Problema que resuelve</h2>
           <p className="text-muted-foreground">
             Automatizar tareas en Web3 suele requerir conocimientos de programación, contratos y APIs. Con Solana Workflow cualquier persona describe la tarea en texto y la IA genera y ejecuta el workflow.
           </p>
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-2xl font-semibold">¿Cuál es la versión mínima que vamos a terminar?</h2>
+          <h2 className="text-xl font-semibold sm:text-2xl">¿Cuál es la versión mínima que vamos a terminar?</h2>
           <p className="text-muted-foreground">
             La versión mínima (MVP) incluye las cuatro plantillas de workflow prediseñadas que pueden ser usadas directamente desde la DApp.
           </p>
@@ -45,10 +45,10 @@ const Documentation: React.FC = () => {
           </ul>
         </section>
 
-        <div className="text-center mt-12 mt-8">
+        <div className="mt-8 text-center">
           <Link
             href="/"
-            className="inline-block px-8 py-3.5 bg-primary text-primary-foreground font-semibold rounded-xl hover:opacity-90 transition-all shadow-lg shadow-primary/20"
+            className="flex min-h-12 w-full items-center justify-center rounded-xl bg-primary px-8 py-3.5 font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:opacity-90 sm:inline-flex sm:w-auto"
           >
             Empezar a usar la DApp
           </Link>

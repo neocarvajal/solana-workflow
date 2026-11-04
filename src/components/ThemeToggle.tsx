@@ -12,6 +12,11 @@ const ThemeToggle = () => {
   };
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(getInitialTheme());
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Apply theme class on mount and when toggled
   useEffect(() => {
@@ -29,10 +34,18 @@ const ThemeToggle = () => {
   return (
     <button
       onClick={toggleTheme}
-      className="fixed bottom-20 right-8 z-50 p-3 rounded-full bg-muted hover:bg-muted/80 transition-all duration-300 shadow-lg hover:shadow-xl"
-      aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+      className="fixed bottom-[calc(7.5rem+env(safe-area-inset-bottom))] right-4 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-muted shadow-lg transition-all duration-300 hover:bg-muted/80 hover:shadow-xl sm:bottom-20 sm:right-8"
+      aria-label={
+        !mounted
+          ? 'Cambiar tema'
+          : isDarkMode
+            ? 'Switch to light mode'
+            : 'Switch to dark mode'
+      }
     >
-      {isDarkMode ? (
+      {!mounted ? (
+        <span className="h-5 w-5" aria-hidden="true" />
+      ) : isDarkMode ? (
         <Sun className="h-5 w-5 text-yellow-400" />
       ) : (
         <Moon className="h-5 w-5 text-purple-500" />

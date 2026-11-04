@@ -5,10 +5,10 @@ import BottomToolbar from './BottomToolbar';
 
 const Layout: React.FC = () => {
   return (
-    <div className="flex h-screen">
+    <div className="flex min-h-0 w-full flex-1">
       <Sidebar />
-      <div className="flex flex-col flex-1">
-        <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 overflow-hidden">
           <DraggableCanvas />
         </div>
         <BottomToolbar />

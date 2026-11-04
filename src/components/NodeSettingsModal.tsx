@@ -237,15 +237,18 @@ const NodeSettingsModal: React.FC<{
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-50 p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-2 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
-        className="bg-card border border-border/60 rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden"
+        className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl sm:max-h-[85vh]"
         onClick={(e) => e.stopPropagation()}
         style={{ animation: "fadeIn 0.2s ease-out" }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Configurar ${node.module.name}`}
       >
-        <div className="flex items-center gap-3 p-5 border-b border-border/40">
+        <div className="flex items-center gap-3 border-b border-border/40 p-4 sm:p-5">
           <div
             className="w-10 h-10 rounded-full flex items-center justify-center text-white shrink-0 shadow-md"
             style={{ backgroundColor: node.module.color }}
@@ -262,13 +265,17 @@ const NodeSettingsModal: React.FC<{
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-muted"
+            aria-label="Cerrar"
           >
-            <X className="h-4 w-4 text-muted-foreground" />
+            <X className="h-5 w-5 text-muted-foreground" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5">
+        <form
+          onSubmit={handleSubmit}
+          className="flex-1 overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:p-5"
+        >
           {fields.length === 0 ? (
             <div className="text-sm text-muted-foreground text-center py-8">
               This module has no configurable parameters.
@@ -292,7 +299,7 @@ const NodeSettingsModal: React.FC<{
                       id={`field-${field.key}`}
                       value={params[field.key] ?? ""}
                       onChange={(e) => handleChange(field.key, e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border/40 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                      className="w-full rounded-lg border border-border/40 bg-muted/50 px-3 py-3 text-base text-foreground transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 sm:py-2.5 sm:text-sm"
                     >
                       {field.options?.map((opt) => (
                         <option key={opt.value} value={opt.value}>
@@ -318,14 +325,14 @@ const NodeSettingsModal: React.FC<{
                       }}
                       placeholder={field.placeholder}
                       rows={3}
-                      className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border/40 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none transition-all font-mono"
+                      className="w-full resize-none rounded-lg border border-border/40 bg-muted/50 px-3 py-3 font-mono text-base text-foreground transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 sm:py-2.5 sm:text-sm"
                     />
                   ) : field.type === "toggle" ? (
                     <button
                       type="button"
                       id={`field-${field.key}`}
                       onClick={() => handleChange(field.key, !params[field.key])}
-                      className={`relative w-11 h-6 rounded-full transition-colors ${params[field.key] ? "bg-primary" : "bg-muted"
+                      className={`relative h-6 w-11 rounded-full transition-colors after:absolute after:-inset-2 after:content-[''] ${params[field.key] ? "bg-primary" : "bg-muted"
                         }`}
                     >
                       <span
@@ -346,7 +353,7 @@ const NodeSettingsModal: React.FC<{
                       }
                       placeholder={field.placeholder}
                       step={field.type === "number" ? "any" : undefined}
-                      className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border/40 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                      className="w-full rounded-lg border border-border/40 bg-muted/50 px-3 py-3 text-base text-foreground transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 sm:py-2.5 sm:text-sm"
                     />
                   )}
                 </div>
@@ -354,30 +361,30 @@ const NodeSettingsModal: React.FC<{
             </div>
           )}
 
-          <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border/30">
+          <div className="mt-6 grid grid-cols-2 gap-2 border-t border-border/30 pt-4 sm:flex sm:justify-end sm:gap-3">
             {onDelete && (
               <button
                 type="button"
                 onClick={() => onDelete(node.id)}
-                className="px-4 py-2 text-sm font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-lg transition-colors mr-auto flex items-center gap-2"
-                title="Delete node"
+                className="col-span-2 flex min-h-11 items-center justify-center gap-2 rounded-lg bg-destructive/10 px-4 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20 sm:col-auto sm:mr-auto"
+                title="Eliminar nodo"
               >
                 <Trash2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Delete</span>
+                <span>Eliminar</span>
               </button>
             )}
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-muted-foreground bg-muted/50 hover:bg-muted rounded-lg transition-colors"
+              className="min-h-11 rounded-lg bg-muted/50 px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
             >
-              Cancel
+              Cancelar
             </button>
             <button
               type="submit"
-              className="px-5 py-2 text-sm font-medium text-white rounded-lg bg-gradient-purple-cyan hover:opacity-90 transition-opacity shadow-md"
+              className="min-h-11 rounded-lg bg-gradient-purple-cyan px-5 py-2 text-sm font-medium text-white shadow-md transition-opacity hover:opacity-90"
             >
-              Save Settings
+              Guardar
             </button>
           </div>
         </form>

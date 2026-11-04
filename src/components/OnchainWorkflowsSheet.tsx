@@ -57,16 +57,21 @@ const OnchainWorkflowsSheet: React.FC = () => {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <button className="px-3 py-2 rounded-full text-sm border border-border hover:bg-muted flex items-center gap-2">
+        <button className="flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-border px-2.5 py-2 text-xs hover:bg-muted sm:px-3 sm:text-sm">
           <Database className="h-4 w-4" />
           On-chain
         </button>
       </SheetTrigger>
-      <SheetContent className="w-[420px] sm:max-w-[420px] overflow-y-auto">
+      <SheetContent className="w-full overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:w-[420px] sm:max-w-[420px] sm:p-6">
         <SheetHeader>
-          <SheetTitle className="flex items-center justify-between">
-            <span>My on-chain workflows</span>
-            <button onClick={load} className="p-1 hover:bg-muted rounded" title="Refresh">
+          <SheetTitle className="flex items-center justify-between gap-2">
+            <span className="truncate">My on-chain workflows</span>
+            <button
+              onClick={load}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg hover:bg-muted"
+              title="Refresh"
+              aria-label="Refresh"
+            >
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             </button>
           </SheetTitle>
@@ -99,8 +104,9 @@ const OnchainWorkflowsSheet: React.FC = () => {
                   href={solscanUrl(e.signature)}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-muted-foreground hover:text-foreground shrink-0"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
                   title="View on Solscan"
+                  aria-label="View on Solscan"
                 >
                   <ExternalLink className="h-4 w-4" />
                 </a>
@@ -108,7 +114,7 @@ const OnchainWorkflowsSheet: React.FC = () => {
               <button
                 onClick={() => loadOne(e)}
                 disabled={loadingCid === e.payload.cid}
-                className="mt-2 w-full text-xs flex items-center justify-center gap-1 py-1.5 rounded bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                className="mt-2 flex min-h-11 w-full items-center justify-center gap-1 rounded bg-primary py-2 text-sm text-primary-foreground hover:opacity-90 disabled:opacity-50"
               >
                 {loadingCid === e.payload.cid ? (
                   <Loader2 className="h-3 w-3 animate-spin" />

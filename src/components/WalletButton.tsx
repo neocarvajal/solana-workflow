@@ -21,13 +21,23 @@ const WalletButton = () => {
     <button
       onClick={handleClick}
       disabled={connecting}
-      className={`px-3 md:px-4 py-1.5 md:py-2 rounded-full font-medium transition-all duration-300 flex items-center gap-1.5 md:gap-2 text-xs md:text-sm whitespace-nowrap shrink-0 ${address
+      className={`flex min-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium transition-all duration-300 disabled:opacity-60 md:px-4 md:text-sm ${address
           ? "bg-muted text-primary border border-primary"
           : "bg-gradient-purple-cyan text-white"
         }`}
+      aria-label={address ? "Desconectar wallet" : "Conectar wallet"}
     >
-      <Wallet className="h-3.5 w-3.5 md:h-4 md:w-4 shrink-0" />
-      {connecting ? "..." : address ? shortAddr(address) : "Conectar Wallet"}
+      <Wallet className="h-3.5 w-3.5 shrink-0 md:h-4 md:w-4" />
+      {connecting ? (
+        "..."
+      ) : address ? (
+        shortAddr(address)
+      ) : (
+        <>
+          <span className="sm:hidden">Conectar</span>
+          <span className="hidden sm:inline">Conectar Wallet</span>
+        </>
+      )}
     </button>
   );
 };

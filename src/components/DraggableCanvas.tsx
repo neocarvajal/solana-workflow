@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import NodeSettingsModal from "./NodeSettingsModal";
-import { Plus, Sparkles, Search, Zap, Wrench } from "lucide-react";
+import { Plus, Sparkles, Search, Zap, Wrench, X } from "lucide-react";
 import DraggableNode from "./DraggableNode";
 import type { FlowNode, ModuleDef } from "@/lib/workflow";
 import { STEP_MODULES, ALL_MODULES } from "@/lib/workflow";
@@ -29,12 +29,20 @@ const DraggableCanvas: React.FC = () => {
   const [runningNodeId, setRunningNodeId] = useState<string | null>(null);
   const [animatingLineIndex, setAnimatingLineIndex] = useState<number>(-1);
 
-  /* Canvas pan & zoom */
+  /* Canvas pan, wheel zoom & pinch zoom */
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(getCanvasScale());
-  const isPanning = useRef(false);
-  const panStart = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const panStart = useRef({ x: 0, y: 0 });
+  const pinchStart = useRef<{
+    distance: number;
+    scale: number;
+    offset: { x: number; y: number };
+    center: { x: number; y: number };
+  } | null>(null);
+  const offsetRef = useRef(offset);
+  const scaleRef = useRef(scale);
 
   /* Sync with store */
   useEffect(() => {
@@ -50,32 +58,146 @@ const DraggableCanvas: React.FC = () => {
     };
   }, []);
 
-  /* ── Pan handlers ──────────────────────────── */
-  const onCanvasMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest("[data-node]")) return;
-    isPanning.current = true;
-    panStart.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
+  useEffect(() => { offsetRef.current = offset; }, [offset]);
+  useEffect(() => { scaleRef.current = scale; }, [scale]);
+
+  const clampScale = (value: number) => Math.min(2, Math.max(0.3, value));
+
+  const applyOffset = useCallback((next: { x: number; y: number }) => {
+    offsetRef.current = next;
+    setOffset(next);
+  }, []);
+
+  /* Zoom keeps the point under the finger/cursor fixed. */
+  const zoomAtPoint = useCallback(
+    (
+      clientX: number,
+      clientY: number,
+      nextScaleRaw: number,
+      baseScale: number,
+      baseOffset: { x: number; y: number }
+    ) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect || baseScale <= 0) return;
+
+      const nextScale = clampScale(nextScaleRaw);
+      const cx = clientX - rect.left;
+      const cy = clientY - rect.top;
+      const ratio = nextScale / baseScale;
+
+      applyOffset({
+        x: cx - (cx - baseOffset.x) * ratio,
+        y: cy - (cy - baseOffset.y) * ratio,
+      });
+      setCanvasScale(nextScale);
+    },
+    [applyOffset]
+  );
+
+  /* Wheel needs a non-passive native listener to prevent page scroll. */
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const baseScale = scaleRef.current;
+      const factor = event.deltaY > 0 ? 0.9 : 1.1;
+      zoomAtPoint(
+        event.clientX,
+        event.clientY,
+        baseScale * factor,
+        baseScale,
+        offsetRef.current
+      );
+    };
+
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, [zoomAtPoint]);
+
+  const onCanvasPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+
+    const target = event.target as HTMLElement;
+    if (target.closest("[data-node]") || target.closest("button") || target.closest("input")) {
+      return;
+    }
+
+    const el = event.currentTarget;
+    try {
+      el.setPointerCapture(event.pointerId);
+    } catch {
+      /* ignore */
+    }
+    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    if (pointers.current.size === 1) {
+      pinchStart.current = null;
+      panStart.current = {
+        x: event.clientX - offsetRef.current.x,
+        y: event.clientY - offsetRef.current.y,
+      };
+    } else if (pointers.current.size === 2) {
+      const [a, b] = Array.from(pointers.current.values());
+      pinchStart.current = {
+        distance: Math.hypot(a.x - b.x, a.y - b.y),
+        scale: scaleRef.current,
+        offset: { ...offsetRef.current },
+        center: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+      };
+    }
   };
 
-  const onCanvasMouseMove = (e: React.MouseEvent) => {
-    if (isPanning.current) {
-      setOffset({
-        x: e.clientX - panStart.current.x,
-        y: e.clientY - panStart.current.y,
+  const onCanvasPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!pointers.current.has(event.pointerId)) return;
+    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    if (pointers.current.size >= 2 && pinchStart.current) {
+      const [a, b] = Array.from(pointers.current.values());
+      const distance = Math.hypot(a.x - b.x, a.y - b.y);
+      const pinch = pinchStart.current;
+
+      if (pinch.distance > 0) {
+        zoomAtPoint(
+          pinch.center.x,
+          pinch.center.y,
+          pinch.scale * (distance / pinch.distance),
+          pinch.scale,
+          pinch.offset
+        );
+      }
+      return;
+    }
+
+    if (pointers.current.size === 1) {
+      applyOffset({
+        x: event.clientX - panStart.current.x,
+        y: event.clientY - panStart.current.y,
       });
     }
   };
 
-  const onCanvasMouseUp = () => {
-    isPanning.current = false;
-  };
+  const endCanvasPointer = (event: React.PointerEvent<HTMLDivElement>) => {
+    pointers.current.delete(event.pointerId);
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      /* ignore */
+    }
 
-  /* ── Zoom handler ──────────────────────────── */
-  const onWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.05 : 0.05;
-    setCanvasScale(getCanvasScale() + delta);
-  }, []);
+    if (pointers.current.size < 2) pinchStart.current = null;
+
+    if (pointers.current.size === 1) {
+      const [remaining] = Array.from(pointers.current.values());
+      panStart.current = {
+        x: remaining.x - offsetRef.current.x,
+        y: remaining.y - offsetRef.current.y,
+      };
+    }
+  };
 
   /* ── Node drag ─────────────────────────────── */
   const onNodeDrag = useCallback(
@@ -204,15 +326,17 @@ const DraggableCanvas: React.FC = () => {
       btns.push(
         <button
           key={`add-${i}`}
+          type="button"
           className="add-between-btn"
           style={{
             position: "absolute",
-            left: mx - 14,
-            top: my - 14,
+            left: mx - 20,
+            top: my - 20,
             zIndex: 5,
           }}
           onClick={() => openPicker(i + 1)}
           title="Insert step"
+          aria-label="Insert step"
         >
           <Plus className="h-4 w-4" />
         </button>
@@ -224,15 +348,17 @@ const DraggableCanvas: React.FC = () => {
       btns.push(
         <button
           key="add-end"
+          type="button"
           className="add-end-btn"
           style={{
             position: "absolute",
-            left: last.x + NODE_RADIUS + 30,
-            top: last.y - 14,
+            left: last.x + NODE_RADIUS + 10,
+            top: last.y - 20,
             zIndex: 5,
           }}
           onClick={() => openPicker(nodes.length)}
           title="Add step"
+          aria-label="Add step"
         >
           <Plus className="h-5 w-5" />
         </button>
@@ -242,15 +368,14 @@ const DraggableCanvas: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 h-full overflow-hidden relative">
+    <div className="relative h-full min-h-0 min-w-0 flex-1 overflow-hidden">
       <div
         ref={containerRef}
-        className="w-full h-full grid-pattern cursor-grab active:cursor-grabbing"
-        onMouseDown={onCanvasMouseDown}
-        onMouseMove={onCanvasMouseMove}
-        onMouseUp={onCanvasMouseUp}
-        onMouseLeave={onCanvasMouseUp}
-        onWheel={(e) => e.preventDefault()}
+        className="w-full h-full grid-pattern cursor-grab active:cursor-grabbing touch-none select-none"
+        onPointerDown={onCanvasPointerDown}
+        onPointerMove={onCanvasPointerMove}
+        onPointerUp={endCanvasPointer}
+        onPointerCancel={endCanvasPointer}
       >
         <div
           className="relative w-full h-full"
@@ -279,13 +404,15 @@ const DraggableCanvas: React.FC = () => {
           {nodes.length === 0 && (
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
               <button
+                type="button"
                 onClick={() => openPicker(0)}
                 className="w-28 h-28 rounded-full bg-muted/60 border-2 border-dashed border-muted-foreground/40 flex items-center justify-center hover:border-primary hover:bg-muted transition-all animate-glow"
+                aria-label="Añadir el primer módulo"
               >
                 <Plus className="h-10 w-10 text-muted-foreground" />
               </button>
-              <div className="mt-4 text-center text-muted-foreground text-sm">
-                Click to add your first module
+              <div className="mt-4 px-6 text-center text-muted-foreground text-sm">
+                Toca para añadir tu primer módulo
               </div>
             </div>
           )}
@@ -310,43 +437,55 @@ const DraggableCanvas: React.FC = () => {
 
       {pickerOpen && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-2 backdrop-blur-sm sm:items-center sm:p-4"
           onClick={() => setPickerOpen(false)}
         >
           <div
-            className="bg-card rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex overflow-hidden border border-border/60"
+            className="flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl sm:max-h-[80vh] sm:flex-row"
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Añadir módulo"
           >
-            <div className="w-48 bg-muted/30 p-3 border-r border-border/40 flex flex-col gap-1">
-              <button className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 text-primary text-sm font-medium">
+            <div className="hidden w-40 shrink-0 flex-col gap-1 border-r border-border/40 bg-muted/30 p-3 sm:flex md:w-48">
+              <button className="flex min-h-10 items-center gap-2 rounded-lg bg-primary/10 px-3 py-2 text-sm font-medium text-primary">
                 <span className="grid place-items-center w-5 h-5">▦</span>
                 All modules
               </button>
-              <button className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm hover:bg-muted transition-colors">
+              <button className="flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-muted transition-colors">
                 <Sparkles className="h-4 w-4" /> AI modules
               </button>
-              <button className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm hover:bg-muted transition-colors">
+              <button className="flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-muted transition-colors">
                 <Zap className="h-4 w-4" /> Triggers
               </button>
-              <button className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm hover:bg-muted transition-colors">
+              <button className="flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-muted transition-colors">
                 <Wrench className="h-4 w-4" /> Actions
               </button>
             </div>
-            <div className="flex-1 flex flex-col">
-              <div className="p-3 border-b border-border/40">
-                <div className="relative">
+
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex items-center gap-2 border-b border-border/40 p-3">
+                <div className="relative min-w-0 flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <input
-                    autoFocus
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search modules..."
-                    className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-muted/50 border border-border/40 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+                    placeholder="Buscar módulos..."
+                    className="w-full rounded-lg border border-border/40 bg-muted/50 py-2.5 pl-9 pr-3 text-base focus:outline-none focus:ring-2 focus:ring-primary/50 sm:text-sm"
                   />
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen(false)}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted sm:hidden"
+                  aria-label="Cerrar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-              <div className="overflow-y-auto flex-1 p-2">
-                <div className="text-xs font-semibold text-muted-foreground px-2 py-1.5 uppercase tracking-wide">
+
+              <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {nodes.length === 0 ? "All modules" : "Action modules"}
                 </div>
                 {filtered.map((mod) => {
@@ -355,18 +494,20 @@ const DraggableCanvas: React.FC = () => {
                     <button
                       key={mod.type}
                       onClick={() => addModule(mod)}
-                      className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/60 transition-colors text-left group"
+                      className="group flex w-full min-h-14 items-center gap-3 rounded-lg p-2.5 text-left transition-colors hover:bg-muted/60"
                     >
                       <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-white shrink-0 shadow-md group-hover:shadow-lg transition-shadow"
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white shadow-md transition-shadow group-hover:shadow-lg"
                         style={{ backgroundColor: mod.color }}
                       >
                         <Icon className="h-5 w-5" />
                       </div>
-                      <div>
-                        <div className="text-sm font-medium">{mod.name}</div>
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium">{mod.name}</div>
                         {mod.description && (
-                          <div className="text-xs text-muted-foreground">{mod.description}</div>
+                          <div className="line-clamp-2 text-xs text-muted-foreground sm:truncate">
+                            {mod.description}
+                          </div>
                         )}
                       </div>
                     </button>

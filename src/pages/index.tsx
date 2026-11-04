@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { useRouter } from 'next/router';
 import type { Workflow } from "@/lib/workflow";
 import { workflowToNodes } from "@/lib/workflow";
-import ThemeToggle from '@/components/ThemeToggle';
 import { setFlowNodes, setScenarioName, getSettings } from "@/lib/workflowStore";
 
 const EXAMPLES = [
@@ -95,13 +94,13 @@ const Landing: React.FC = () => {
   };
 
   return (
-    <div className="h-screen w-screen bg-background relative overflow-hidden flex flex-col">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
       
       <div className="landing-orb landing-orb-1" />
       <div className="landing-orb landing-orb-2" />
       <div className="landing-orb landing-orb-3" />
 
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 max-h-[calc(100vh-70px)] py-4 overflow-y-auto">
+      <main className="relative z-10 flex flex-1 flex-col items-center justify-start overflow-y-auto px-4 py-6 sm:justify-center sm:px-6">
         <div className="w-full max-w-2xl flex flex-col justify-center">
 
           <div className="flex justify-center mb-4 md:mb-5">
@@ -111,7 +110,7 @@ const Landing: React.FC = () => {
             </div>
           </div>
 
-          <h1 className="text-4xl md:text-5xl font-extrabold text-center mb-3 leading-tight tracking-tight">
+          <h1 className="mb-3 text-center text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl md:text-5xl">
             <span className="gradient-text">¿Qué quieres</span>
             <br />
             <span className="text-foreground">automatizar?</span>
@@ -127,7 +126,7 @@ const Landing: React.FC = () => {
               placeholder="Ej: Si el precio de SOL baja a $60, transfiere 1 SOL a mi recipient..."
               rows={3}
               disabled={loading}
-              className="w-full bg-transparent border-0 resize-none focus:outline-none text-sm placeholder:text-muted-foreground/60 p-2 text-foreground"
+              className="w-full resize-none border-0 bg-transparent p-2.5 text-base text-foreground placeholder:text-muted-foreground/60 focus:outline-none sm:text-sm"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault();
@@ -142,7 +141,7 @@ const Landing: React.FC = () => {
               <button
                 onClick={() => generate(prompt)}
                 disabled={loading || !prompt.trim()}
-                className="ai-button flex items-center gap-2 disabled:opacity-40 text-xs py-1.5 px-4 font-semibold shrink-0"
+                className="ai-button flex min-h-10 shrink-0 items-center gap-2 px-4 py-2 text-sm font-semibold disabled:opacity-40"
               >
                 {loading ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -158,7 +157,7 @@ const Landing: React.FC = () => {
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-2.5 text-center font-medium">
               Prueba con un ejemplo
             </div>
-            <div className="grid sm:grid-cols-2 gap-2.5">
+            <div className="grid gap-2.5 sm:grid-cols-2">
               {EXAMPLES.map((ex) => (
                 <button
                   key={ex}
@@ -167,7 +166,7 @@ const Landing: React.FC = () => {
                     generate(ex);
                   }}
                   disabled={loading}
-                  className="text-left p-3 rounded-xl border border-border/60 bg-card/40 backdrop-blur-sm hover:border-primary/40 hover:bg-card/70 transition-all duration-300 text-xs flex items-start gap-2.5 disabled:opacity-40 group"
+                  className="group flex min-h-14 items-start gap-2.5 rounded-xl border border-border/60 bg-card/40 p-3 text-left text-sm backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:bg-card/70 disabled:opacity-40"
                 >
                   <ArrowRight className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary opacity-50 group-hover:opacity-100 transition-opacity" />
                   <span className="text-muted-foreground group-hover:text-foreground transition-colors line-clamp-2">
@@ -182,13 +181,12 @@ const Landing: React.FC = () => {
             <button
               onClick={startEmpty}
               disabled={loading}
-              className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 transition-colors"
+              className="min-h-10 text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
             >
               o empieza con un canvas vacío →
             </button>
           </div>
         </div>
-        <ThemeToggle />
       </main>
     </div>
   );

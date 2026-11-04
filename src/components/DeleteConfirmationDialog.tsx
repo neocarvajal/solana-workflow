@@ -39,7 +39,7 @@ const DeleteWorkflowModal: React.FC<DeleteWorkflowModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[440px] border-destructive/20 bg-background text-foreground">
+      <DialogContent className="max-h-[90dvh] max-w-[calc(100%-1rem)] overflow-y-auto border-destructive/20 bg-background text-foreground sm:max-w-[440px]">
 
         <DialogHeader className="flex flex-col items-center text-center">
           <div className="w-14 h-14 bg-destructive/10 rounded-full flex items-center justify-center mb-3 text-destructive animate-pulse">
@@ -58,11 +58,11 @@ const DeleteWorkflowModal: React.FC<DeleteWorkflowModalProps> = ({
         <div className="bg-muted/40 p-4 rounded-lg border border-border/60 text-xs text-muted-foreground space-y-2 my-2">
           <p className="flex items-start gap-2">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" />
-            <span>The deletion (unpin) of the file will be requested from the **Pinata / IPFS** nodes.</span>
+            <span>The deletion (unpin) of the file will be requested from the <strong>Pinata / IPFS</strong> nodes.</span>
           </p>
           <p className="flex items-start gap-2">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" />
-            <span>Local **LocalStorage** data will be cleared immediately from your browser.</span>
+            <span>Local <strong>LocalStorage</strong> data will be cleared immediately from your browser.</span>
           </p>
         </div>
 
@@ -70,7 +70,7 @@ const DeleteWorkflowModal: React.FC<DeleteWorkflowModalProps> = ({
           <DialogClose asChild>
             <button
               disabled={isDeleting}
-              className="flex-1 sm:flex-none px-4 py-2 text-sm bg-muted hover:bg-muted/80 text-foreground font-medium rounded-lg transition-colors border border-border disabled:opacity-50"
+              className="min-h-11 flex-1 rounded-lg border border-border bg-muted px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:opacity-50 sm:flex-none"
             >
               Cancel
             </button>
@@ -79,7 +79,7 @@ const DeleteWorkflowModal: React.FC<DeleteWorkflowModalProps> = ({
           <button
             onClick={handleConfirm}
             disabled={isDeleting}
-            className="flex items-center justify-center gap-1.5 flex-1 px-4 py-2 text-sm bg-red-600 hover:bg-red-500 text-white font-medium rounded-lg transition-colors shadow-md shadow-red-900/10 text-center disabled:opacity-50"
+            className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-center text-sm font-medium text-white shadow-md shadow-red-900/10 transition-colors hover:bg-red-500 disabled:opacity-50"
           >
             {isDeleting ? (
               <>

@@ -31,7 +31,7 @@
 1.  **Define your goal:** Describe what you want (e.g., *"Notify me when SOL price exceeds $200"*).
 2.  **AI Processing:** Your request is processed by Gemini or Grok via Edge Functions to generate the workflow logic.
 3.  **Decentralized Storage:** The resulting JSON workflow is pinned to **IPFS**, and its unique CID is anchored to a **Solana Program** for permanent, immutable reference.
-4.  **Execution:** The system monitors the blockchain through QuickNode and executes actions automatically.
+4.  **Execution:** The system monitors the blockchain through Alchemy and executes actions automatically.
 
 ---
 
@@ -51,7 +51,7 @@ Built with a modern, high-performance web development stack:
 ## 🔗 Protocol & Data Integrations
 Solana Workflow leverages industry-leading infrastructure to ensure high-speed execution and accurate data:
 
-*   **Blockchain Infrastructure:** Powered by [QuickNode](https://www.quicknode.com/) for reliable, low-latency RPC communication.
+*   **Blockchain Infrastructure:** Powered by [Alchemy](https://www.alchemy.com/) for reliable, low-latency RPC communication.
 *   **DeFi & Liquidity:** Integrated with [Jupiter Aggregator API](https://jup.ag/) for precise price discovery and optimized trade routing.
 *   **Market Data:** Real-time analytics and liquidity tracking via [DexScreener API](https://dexscreener.com/).
 

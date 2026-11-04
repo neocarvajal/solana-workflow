@@ -34,7 +34,7 @@ const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = ({ isOpe
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[460px] border-emerald-500/20 bg-background text-foreground">
+      <DialogContent className="max-h-[90dvh] max-w-[calc(100%-1rem)] overflow-y-auto border-emerald-500/20 bg-background text-foreground sm:max-w-[460px]">
 
         <DialogHeader className="flex flex-col items-center text-center">
           <div className="w-14 h-14 bg-emerald-500/10 rounded-full flex items-center justify-center mb-3 text-emerald-500 animate-pulse">
@@ -77,8 +77,9 @@ const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = ({ isOpe
 
               <button
                 onClick={() => copyToClipboard(txData.signature || "")}
-                className="absolute top-2 right-2 p-1 rounded bg-background border border-border opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+                className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded border border-border bg-background opacity-100 transition-opacity hover:bg-muted sm:opacity-0 sm:group-hover:opacity-100"
                 title="Copiar Transacción"
+                aria-label="Copiar transacción"
               >
                 <Copy className="h-3 w-3 text-muted-foreground" />
               </button>
@@ -88,7 +89,7 @@ const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = ({ isOpe
 
         <DialogFooter className="sm:space-x-3 gap-2 sm:gap-0 mt-2">
           <DialogClose asChild>
-            <button className="flex-1 sm:flex-none px-4 py-2 text-sm bg-muted hover:bg-muted/80 text-foreground font-medium rounded-lg transition-colors border border-border">
+            <button className="min-h-11 flex-1 rounded-lg border border-border bg-muted px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 sm:flex-none">
               Cerrar
             </button>
           </DialogClose>
@@ -97,7 +98,7 @@ const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = ({ isOpe
             href={explorerUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 flex-1 px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition-colors shadow-md shadow-emerald-900/10 text-center"
+            className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-center text-sm font-medium text-white shadow-md shadow-emerald-900/10 transition-colors hover:bg-emerald-500"
           >
             <span>Ver transacción</span>
             <ExternalLink className="h-3.5 w-3.5" />

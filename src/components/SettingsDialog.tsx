@@ -27,26 +27,30 @@ const SettingsDialog: React.FC = () => {
 
   const modalContent = open && (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/60 p-2 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={() => setOpen(false)}
     >
       <div
-        className="bg-card w-full max-w-md rounded-2xl border border-border/60 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+        className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-border/60 bg-card shadow-2xl animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-5 border-b border-border/40">
+        <div className="flex items-center justify-between border-b border-border/40 p-4 sm:p-5">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
               <Settings className="h-5 w-5 text-primary" />
             </div>
             <h2 className="font-semibold">Settings</h2>
           </div>
-          <button onClick={() => setOpen(false)} className="p-1 hover:bg-muted rounded-lg">
-            <X className="h-4 w-4" />
+          <button
+            onClick={() => setOpen(false)}
+            className="flex h-10 w-10 items-center justify-center rounded-lg hover:bg-muted"
+            aria-label="Cerrar"
+          >
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="p-5 space-y-5">
+        <div className="space-y-5 p-4 sm:p-5">
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2 mb-2">
               <Wallet className="h-3.5 w-3.5" />
@@ -56,7 +60,7 @@ const SettingsDialog: React.FC = () => {
               type="text"
               value={recipient}
               onChange={(e) => setRecipient(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl bg-muted/50 border border-border/40 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm font-mono"
+              className="w-full rounded-xl border border-border/40 bg-muted/50 px-4 py-3 font-mono text-base focus:outline-none focus:ring-2 focus:ring-primary/50 sm:py-2.5 sm:text-sm"
             />
           </div>
 
@@ -70,7 +74,7 @@ const SettingsDialog: React.FC = () => {
               <select
                 value={alertChannel}
                 onChange={(e) => setAlertChannel(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl bg-muted/50 border border-border/40 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm appearance-none cursor-pointer pr-10"
+                className="w-full cursor-pointer appearance-none rounded-xl border border-border/40 bg-muted/50 px-4 py-3 pr-10 text-base focus:outline-none focus:ring-2 focus:ring-primary/50 sm:py-2.5 sm:text-sm"
               >
                 <option value="app">In-App Notification</option>
                 <option value="email">Email</option>
@@ -82,10 +86,10 @@ const SettingsDialog: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-5 border-t border-border/40">
+        <div className="border-t border-border/40 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:p-5">
           <button
             onClick={handleSave}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground font-medium text-sm hover:opacity-90 transition-opacity"
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
           >
             <Save className="h-4 w-4" />
             Save Settings
@@ -99,8 +103,9 @@ const SettingsDialog: React.FC = () => {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="p-2 rounded-full border border-border hover:bg-muted transition-colors"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border transition-colors hover:bg-muted"
         title="Settings"
+        aria-label="Settings"
       >
         <Settings className="h-4 w-4" />
       </button>

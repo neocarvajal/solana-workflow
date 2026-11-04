@@ -270,25 +270,6 @@ export async function saveWorkflow(
   }
 }
 
-// List IPFS files via Pinata (public list endpoint)
-export async function listIpfsFiles(): Promise<any[]> {
-  const PINATA_JWT = process.env.NEXT_PUBLIC_PINATA_JWT;
-  if (!PINATA_JWT) throw new Error('Missing PINATA_JWT env');
-  const response = await fetch('https://api.pinata.cloud/data/pinList', {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${PINATA_JWT}`,
-      'Content-Type': 'application/json',
-    },
-  });
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Pinata list failed ${response.status}: ${err}`);
-  }
-  const data = await response.json();
-  return data?.rows || [];
-}
-
 export function saveLocalOnly(name: string, wf: Workflow, walletAddress: string) {
   try {
     const raw = localStorage.getItem(SAVED_WORKFLOWS_KEY);
@@ -388,25 +369,17 @@ export async function deleteWorkflow(id: string, pinataFileId?: string, cid?: st
     if (pinataFileId || cid) {
       console.log(`[FRONTEND] Solicitando borrado en IPFS para file_id: ${pinataFileId} y cid: ${cid}`);
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/delete-ipfs-file`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
-        },
-
-        body: JSON.stringify({
+      const { data: result, error } = await supabase.functions.invoke("delete-ipfs-file", {
+        body: {
           pinata_file_id: pinataFileId,
-          cid: cid
-        })
+          cid: cid,
+        },
       });
 
-      const result = response.status !== 204 ? await response.json().catch(() => ({})) : {};
-
-      if (!response.ok) {
-        console.error("[FRONTEND] La Edge Function rechazó el borrado en IPFS:", result.error || response.statusText);
+      if (error) {
+        console.error("[FRONTEND] La Edge Function rechazó el borrado en IPFS:", error.message);
       } else {
-        console.log("[FRONTEND] ¡Archivo eliminado con éxito de IPFS/Pinata!");
+        console.log("[FRONTEND] ¡Archivo eliminado con éxito de IPFS/Pinata!", result);
       }
     } else {
       console.warn("[FRONTEND] No se detectaron credenciales de IPFS, se borrará solo localmente.");

@@ -120,75 +120,76 @@ const WorkflowDashboard: React.FC = () => {
   );
 
   return (
-    <div className="flex h-screen bg-background text-foreground">
+    <div className="flex min-h-0 flex-1 overflow-hidden bg-background text-foreground">
       <Sidebar />
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <main className="flex-1 overflow-y-auto p-8 relative">
-          <div className="max-w-5xl mx-auto">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <main className="relative flex-1 overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:p-6 md:p-8">
+          <div className="mx-auto max-w-5xl">
             
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+            <div className="mb-6 flex flex-col justify-between gap-3 sm:mb-8 md:flex-row md:items-end">
               <div>
-                <h1 className="text-3xl font-bold gradient-text mb-2">My Workflows</h1>
-                <p className="text-muted-foreground text-sm">
+                <h1 className="mb-2 text-2xl font-bold gradient-text sm:text-3xl">My Workflows</h1>
+                <p className="text-sm text-muted-foreground">
                   Manage, edit, and run your automated Solana Workflows.
                 </p>
               </div>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <input
                   type="text"
                   placeholder="Search workflows..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9 pr-4 py-2 bg-muted/50 border border-border/40 rounded-lg text-sm w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                  className="w-full rounded-lg border border-border/40 bg-muted/50 py-2.5 pl-9 pr-4 text-base transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 sm:text-sm md:w-64"
                 />
               </div>
             </div>
 
             {!walletAddress ? (
-              <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-border/40 rounded-2xl bg-muted/20">
-                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+              <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/40 bg-muted/20 px-4 py-12 text-center sm:py-24">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
                   <Folder className="h-8 w-8 text-muted-foreground" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Connect Your Wallet</h3>
-                <p className="text-muted-foreground mb-6 max-w-md">
+                <h3 className="mb-2 text-lg font-semibold sm:text-xl">Connect Your Wallet</h3>
+                <p className="mb-6 max-w-md text-sm text-muted-foreground">
                   Please connect your Solana wallet to view and manage your saved workflows.
                 </p>
-                <p className="text-sm text-primary font-medium">Use the "Connect Wallet" button above.</p>
+                <p className="text-sm font-medium text-primary">Use the "Connect Wallet" button above.</p>
               </div>
             ) : workflows.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-border/40 rounded-2xl bg-muted/20">
-                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+              <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/40 bg-muted/20 px-4 py-12 text-center sm:py-24">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
                   <Folder className="h-8 w-8 text-muted-foreground" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">No workflows found</h3>
-                <p className="text-muted-foreground mb-6 max-w-md">
+                <h3 className="mb-2 text-lg font-semibold sm:text-xl">No workflows found</h3>
+                <p className="mb-6 max-w-md text-sm text-muted-foreground">
                   You haven't saved any workflows yet for wallet {walletAddress.slice(0, 4)}...{walletAddress.slice(-4)}. Create a new flow from the editor and save it to see it here.
                 </p>
                 <Link
                   href="/dashboard"
-                  className="px-6 py-2.5 bg-gradient-purple-cyan text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
+                  className="flex min-h-11 items-center justify-center rounded-lg bg-gradient-purple-cyan px-5 py-3 font-medium text-white transition-opacity hover:opacity-90"
                 >
                   Create your first Workflow
                 </Link>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
                 {filtered.map((wf) => (
                   <div
                     key={wf.id}
-                    className="group bg-card border border-border/50 rounded-2xl p-5 hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/5 cursor-pointer flex flex-col h-full"
+                    className="group flex h-full cursor-pointer flex-col rounded-2xl border border-border/50 bg-card p-4 transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 sm:p-5"
                     onClick={() => handleEdit(wf)}
                   >
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="w-10 h-10 rounded-lg bg-gradient-purple-cyan flex items-center justify-center text-white shrink-0">
+                    <div className="mb-4 flex items-start justify-between">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-purple-cyan text-white">
                         <Folder className="h-5 w-5" />
                       </div>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                         <button
                           onClick={(e) => handleDelete(wf.id, e)}
-                          className="p-1.5 text-muted-foreground hover:text-red-400 hover:bg-red-400/10 rounded-md transition-colors"
+                          className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-red-400/10 hover:text-red-400"
                           title="Delete"
+                          aria-label={`Eliminar ${wf.name}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -228,7 +229,7 @@ const WorkflowDashboard: React.FC = () => {
                       )}
 
                       <button
-                        className="text-xs font-medium text-primary flex items-center gap-1 hover:underline"
+                        className="flex min-h-10 items-center gap-1 rounded-md px-2 text-xs font-medium text-primary hover:bg-primary/10 hover:underline"
                         onClick={(e) => { e.stopPropagation(); handleEdit(wf); }}
                       >
                         Edit <Edit className="h-3 w-3" />

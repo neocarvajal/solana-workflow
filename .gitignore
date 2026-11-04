@@ -1,3 +1,35 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+
+# Next.js
+.next/
+out/
+
+# Production builds
+build/
+dist/
+dist-ssr/
+
+# Environment
+.env
+.env.*
+!.env.example
+*.local
+
+# Vercel
+.vercel
+
+# Supabase local CLI cache
+supabase/.temp/
+
 # Logs
 logs
 *.log
@@ -7,15 +39,12 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-.env
-.env.*
+# Lockfiles (pnpm is the only source of truth)
+package-lock.json
+yarn.lock
+bun.lockb
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
+# Editor and OS
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -26,6 +55,8 @@ dist-ssr
 *.sln
 *.sw?
 
-.next/
+# TypeScript
+*.tsbuildinfo
 
+# Anchor
 anchor/
