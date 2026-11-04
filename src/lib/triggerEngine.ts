@@ -43,7 +43,8 @@ export class TriggerEngine {
       return { triggered: false, data: { asset } };
     }
 
-    if (value === undefined || !condition) {
+    const needsValue = condition === "above" || condition === "below" || condition === "change_pct";
+    if (!condition || (needsValue && (value === undefined || value === null || value === ""))) {
       console.error("Price Monitor configuration is missing required fields:", params);
       return { triggered: false, data: { asset, condition, value } };
     }
@@ -58,11 +59,13 @@ export class TriggerEngine {
       price: currentPrice,
       priceChange24h,
       condition,
-      value: numericValue,
-      threshold: numericValue,
+      value: Number.isFinite(numericValue) ? numericValue : null,
+      threshold: Number.isFinite(numericValue) ? numericValue : null,
     };
 
     switch (condition) {
+      case "price":
+        return { triggered: true, data };
       case "above":
         return { triggered: currentPrice > numericValue, data };
       case "below":

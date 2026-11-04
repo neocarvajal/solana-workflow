@@ -7,7 +7,8 @@ const SYSTEM = `You translate natural language Solana automation requests into a
 - If recipientWallet is empty, set "to" field as an empty string ""
 - Do not invent wallet addresses
 - alertChannel default only if provided
-- For price_monitor, "above"/"below" compare the current USD price with "value"; "change_pct" compares the absolute 24h change percentage with "value".
+- For price_monitor, "above"/"below" compare the current USD price with "value"; "change_pct" compares the absolute 24h change percentage with "value"; "price" only reports the current price and needs no "value".
+- Use "price" when the user only wants to know, check, or be notified of a token's current price without a threshold.
 - In send_alert messages, reference live trigger data with placeholders: {{asset}}, {{price}}, {{condition}}, {{value}}, {{priceChange24h}}. For a price alert use e.g. "Current {{asset}} price: {{price}}" instead of a static sentence.
 If recipientWallet is empty, set "to" field as ""
 
@@ -18,7 +19,7 @@ You MUST output a valid JSON object matching this schema:
     "type": "price_monitor" | "schedule" | "webhook" | "dexscreener_pair",
     "params": {
       "asset": "string (e.g. USDC)",
-      "condition": "above" | "below" | "change_pct",
+      "condition": "price" | "above" | "below" | "change_pct",
       "value": "number",
       "interval": "1m" | "5m" | "15m" | "1h",
       "cron": "string",

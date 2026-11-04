@@ -33,6 +33,7 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
     {
       key: "condition", label: "Price condition", type: "select", description: "Choose the rule that fires the alert",
       options: [
+        { value: "price", label: "Price check (always report)" },
         { value: "above", label: "Price is above target" },
         { value: "below", label: "Price is below target" },
         { value: "change_pct", label: "24h change ≥ threshold (%)" },
@@ -448,7 +449,9 @@ const NodeSettingsModal: React.FC<{
             <p className="mt-3 rounded-lg border border-border/40 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
               {params.condition === "change_pct"
                 ? `Se activa si ${params.asset || "el token"} cambia ${params.value ?? 0}% o más en 24h, en cualquier dirección.`
-                : `Se activa si ${params.asset || "el token"} está ${params.condition === "above" ? "por encima" : "por debajo"} de $${params.value ?? 0}.`}
+                : params.condition === "price"
+                  ? `Se activa en cada comprobación y reporta el precio actual de ${params.asset || "el token"}.`
+                  : `Se activa si ${params.asset || "el token"} está ${params.condition === "above" ? "por encima" : "por debajo"} de $${params.value ?? 0}.`}
             </p>
           )}
 

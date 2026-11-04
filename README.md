@@ -113,6 +113,7 @@ If a price trigger provides a price and the message doesn't reference it, the ap
 
 | Condition | What it compares |
 | --- | --- |
+| **Price check** | Fires on every check and reports the token's current price. No threshold is needed. |
 | **Price is above target** | Current USD price > `Target price (USD)`. |
 | **Price is below target** | Current USD price < `Target price (USD)`. |
 | **24h change ≥ threshold (%)** | Absolute Jupiter 24h price change ≥ `24h change threshold (%)`. It fires for either direction. |

@@ -40,9 +40,9 @@ const Documentation: React.FC = () => {
             automáticamente una línea como <strong>SOL: $95.20 (24h +2.31%)</strong>.
           </p>
           <p className="text-muted-foreground">
-            El nodo <strong>Price Monitor</strong> permite tres reglas claras: precio por encima
-            del objetivo, precio por debajo del objetivo, o cambio absoluto de las últimas 24 horas
-            mayor o igual al porcentaje configurado.
+            El nodo <strong>Price Monitor</strong> permite cuatro reglas claras: reportar el precio
+            actual, precio por encima del objetivo, precio por debajo del objetivo, o cambio absoluto
+            de las últimas 24 horas mayor o igual al porcentaje configurado.
           </p>
         </section>
 

@@ -56,18 +56,20 @@ Deno.serve(async (req) => {
       const price = snapshot.price;
       const priceChange24h = snapshot.change24h;
       const threshold = Number(t.params.value);
+      const thresholdValue = Number.isFinite(threshold) ? threshold : null;
       triggerData = {
         asset,
         price,
         priceChange24h,
         condition: t.params.condition,
-        value: threshold,
-        threshold,
+        value: thresholdValue,
+        threshold: thresholdValue,
       };
-      logs.push({ step: "trigger", type: t.type, price, change24h: priceChange24h });
+      logs.push({ step: "trigger", type: t.type, price, change24h: priceChange24h, condition: t.params.condition });
       if (price !== null) {
         const cond = t.params.condition;
-        if (cond === "above") triggered = price > threshold;
+        if (cond === "price") triggered = true;
+        else if (cond === "above") triggered = price > threshold;
         else if (cond === "below") triggered = price < threshold;
         else if (cond === "change_pct") {
           triggered = priceChange24h !== null && Math.abs(priceChange24h) >= Math.abs(threshold);
