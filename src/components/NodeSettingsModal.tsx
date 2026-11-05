@@ -52,7 +52,7 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
       description: "Fires when the absolute 24h price change is at least this percentage, up or down",
     },
     {
-      key: "interval", label: "Check interval", type: "select", description: "How often to check the price",
+      key: "interval", label: "Check interval", type: "select", description: "How often to check the price. Match the global execution frequency when publishing on-chain.",
       options: [
         { value: "30s", label: "Every 30 seconds" },
         { value: "1m", label: "Every minute" },
@@ -94,7 +94,7 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
 
   schedule: [
     {
-      key: "every", label: "Run Every", type: "select", description: "How often the workflow runs",
+      key: "every", label: "Run Every", type: "select", description: "How often the workflow runs. Match the global execution frequency when publishing on-chain.",
       options: [
         { value: "30s", label: "Every 30 seconds" },
         { value: "1m", label: "Every minute" },
