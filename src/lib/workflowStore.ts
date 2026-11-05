@@ -91,6 +91,61 @@ export function saveSettings(s: AppSettings) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ...s }));
 }
 
+/* ── Global execution frequency ───────────────────────────── */
+const EXECUTION_FREQUENCY_KEY = "solflows_execution_frequency";
+export type ExecutionFrequency =
+  | "30s" | "1m" | "2m" | "5m" | "15m" | "30m" | "1h" | "6h" | "24h" | "manual";
+
+const EXECUTION_FREQUENCIES: ExecutionFrequency[] = [
+  "30s", "1m", "2m", "5m", "15m", "30m", "1h", "6h", "24h", "manual",
+];
+const DEFAULT_EXECUTION_FREQUENCY: ExecutionFrequency = "15m";
+
+type FrequencyListener = (value: ExecutionFrequency) => void;
+const frequencyListeners = new Set<FrequencyListener>();
+let executionFrequency: ExecutionFrequency | null = null;
+
+function normalizeExecutionFrequency(value: unknown): ExecutionFrequency {
+  return EXECUTION_FREQUENCIES.includes(value as ExecutionFrequency)
+    ? (value as ExecutionFrequency)
+    : DEFAULT_EXECUTION_FREQUENCY;
+}
+
+export function getExecutionFrequency(): ExecutionFrequency {
+  if (executionFrequency) return executionFrequency;
+  try {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(EXECUTION_FREQUENCY_KEY);
+      if (saved) {
+        executionFrequency = normalizeExecutionFrequency(saved);
+        return executionFrequency;
+      }
+    }
+  } catch { }
+  executionFrequency = DEFAULT_EXECUTION_FREQUENCY;
+  return executionFrequency;
+}
+
+export function setExecutionFrequency(
+  value: string,
+  options: { sync?: boolean } = {},
+) {
+  const next = normalizeExecutionFrequency(value);
+  executionFrequency = next;
+  try {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(EXECUTION_FREQUENCY_KEY, next);
+    }
+  } catch { }
+  frequencyListeners.forEach((listener) => listener(next));
+  if (options.sync !== false) syncWorkflow();
+}
+
+export function subscribeExecutionFrequency(listener: FrequencyListener) {
+  frequencyListeners.add(listener);
+  return () => frequencyListeners.delete(listener);
+}
+
 /* ── Scale / Zoom State ──────────────────────── */
 type ScaleListener = (scale: number) => void;
 let canvasScale = 1;

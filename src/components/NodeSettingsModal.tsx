@@ -56,6 +56,7 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
       options: [
         { value: "30s", label: "Every 30 seconds" },
         { value: "1m", label: "Every minute" },
+        { value: "2m", label: "Every 2 minutes" },
         { value: "5m", label: "Every 5 minutes" },
         { value: "15m", label: "Every 15 minutes" },
       ]
@@ -95,7 +96,9 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
     {
       key: "every", label: "Run Every", type: "select", description: "How often the workflow runs",
       options: [
+        { value: "30s", label: "Every 30 seconds" },
         { value: "1m", label: "Every minute" },
+        { value: "2m", label: "Every 2 minutes" },
         { value: "5m", label: "Every 5 minutes" },
         { value: "15m", label: "Every 15 minutes" },
         { value: "30m", label: "Every 30 minutes" },

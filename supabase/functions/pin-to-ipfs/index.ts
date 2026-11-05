@@ -15,6 +15,7 @@ const Body = z.object({
   name: z.string().min(1).max(120).optional(),
   owner_wallet: z.string(),
   signature: z.string(),
+  schedule: z.string().max(20).optional(),
 });
 
 const GROUP_ID = Deno.env.get("PINATA_GROUP_ID");
@@ -37,7 +38,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { json, name, owner_wallet, signature } = parsed.data;
+    const { json, name, owner_wallet, signature, schedule } = parsed.data;
 
     // 2. Verificación de firma
     if (signature !== "skip") {
@@ -86,6 +87,7 @@ Deno.serve(async (req) => {
         cid, 
         json, 
         name, 
+        schedule: schedule || (typeof json.schedule === "string" ? json.schedule : "manual"),
         onchain_signature: signature
       })
       .select("id") // Capturamos el ID generado por la BD

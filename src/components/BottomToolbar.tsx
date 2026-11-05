@@ -9,6 +9,7 @@ import {
   getWorkflow, getOnchainMeta, setOnchainMeta, setScenarioName, setFlowNodes, updateWorkflow,
   getFlowNodes, getCanvasScale, setCanvasScale, subscribeScale, getScenarioName,
   setRunningNodeId, setAnimatingLineIndex, setErrorNodeId, saveWorkflow, saveLocalOnly, getSavedWorkflows,
+  getExecutionFrequency, setExecutionFrequency as persistExecutionFrequency, subscribeExecutionFrequency,
 } from '@/lib/workflowStore';
 
 import { FlowNode } from "@/lib/workflow";
@@ -24,6 +25,7 @@ const BottomToolbar: React.FC = () => {
   const [publishing, setPublishing] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [scale, setScale] = useState(getCanvasScale());
+  const [executionFrequency, setExecutionFrequency] = useState(getExecutionFrequency());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [lastTxData, setLastTxData] = useState<{ signature: string; actionType: string; blockhash?: string } | null>(null);
   const { publicKey, connected, sendTransaction } = useWallet();
@@ -34,6 +36,11 @@ const BottomToolbar: React.FC = () => {
 
   useEffect(() => {
     const unsub = subscribeScale((s) => setScale(s));
+    return () => { unsub(); };
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeExecutionFrequency((value) => setExecutionFrequency(value));
     return () => { unsub(); };
   }, []);
 
@@ -84,6 +91,7 @@ const BottomToolbar: React.FC = () => {
       wf.steps = currentWorkflow.steps;
       wf.name = getScenarioName();
     }
+    wf.schedule = getExecutionFrequency();
 
     const saved = getSavedWorkflows(walletAddress);
     // FIX: Search using actual storage record properties
@@ -398,11 +406,14 @@ const BottomToolbar: React.FC = () => {
     try {
     // 1. Preparación de datos segura
     const skip = "skip";
+    const schedule = getExecutionFrequency();
+    const publishableWorkflow = { ...wf, schedule };
     const body = {
-      json: wf,
+      json: publishableWorkflow,
       name: (wf.name && wf.name.trim() !== "") ? wf.name : "Untitled Workflow",
       owner_wallet: publicKey.toBase58(),
       signature: skip,
+      schedule,
     };
 
     // 2. Llamada a Supabase (IPFS)
@@ -422,7 +433,7 @@ const BottomToolbar: React.FC = () => {
 
     // 4. Lógica de persistencia manual (evita el error de UPSERT)
     // Primero buscamos si ya existe el nombre
-    const safeJson = JSON.parse(JSON.stringify(wf));
+    const safeJson = JSON.parse(JSON.stringify(publishableWorkflow));
 
     const { data: existing } = await supabase
       .from("workflows")
@@ -436,6 +447,7 @@ const BottomToolbar: React.FC = () => {
       const { error } = await supabase.from("workflows").update({
         json: safeJson,
         cid: cid,
+        schedule,
         onchain_signature: signature,
         updated_at: new Date().toISOString(),
       }).eq("id", existing.id);
@@ -446,6 +458,7 @@ const BottomToolbar: React.FC = () => {
         name: body.name,
         json: safeJson,
         cid: cid,
+        schedule,
         onchain_signature: signature,
         owner_wallet: publicKey.toBase58(),
       });
@@ -512,13 +525,22 @@ const BottomToolbar: React.FC = () => {
             <div className="flex items-center gap-1 px-2 py-0 text-muted-foreground">
               <Clock className="h-4 w-4 shrink-0" />
               <select
+                value={executionFrequency}
+                onChange={(event) => persistExecutionFrequency(event.target.value)}
                 className="h-10 w-[8.5rem] border-none bg-transparent text-base focus:outline-none sm:w-auto sm:text-sm"
                 aria-label="Frecuencia de ejecución"
+                title="Frecuencia con la que se ejecutará el workflow publicado on-chain"
               >
-                <option>Every 15 minutes</option>
-                <option>Every hour</option>
-                <option>Every day</option>
-                <option>Manual only</option>
+                <option value="30s">30 segundos</option>
+                <option value="1m">1 minuto</option>
+                <option value="2m">2 minutos</option>
+                <option value="5m">5 minutos</option>
+                <option value="15m">15 minutos</option>
+                <option value="30m">30 minutos</option>
+                <option value="1h">1 hora</option>
+                <option value="6h">6 horas</option>
+                <option value="24h">1 día</option>
+                <option value="manual">Manual</option>
               </select>
             </div>
           </div>

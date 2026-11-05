@@ -3,7 +3,7 @@ import {
   Sparkles, Webhook, ArrowLeftRight, type LucideIcon,
 } from "lucide-react";
 
-import { getSettings } from "@/lib/workflowStore";
+import { getSettings, getExecutionFrequency, setExecutionFrequency } from "@/lib/workflowStore";
 
 export type TriggerType = "price_monitor" | "schedule" | "webhook" | "dexscreener_pair";
 export type StepType =
@@ -12,6 +12,7 @@ export type StepType =
 
 export interface Workflow {
   name: string;
+  schedule?: string;
   trigger: { type: TriggerType; params: Record<string, any> };
   steps: { type: StepType; params: Record<string, any> }[];
 }
@@ -101,6 +102,9 @@ const START_Y = 300;
 export function workflowToNodes(wf: Workflow): FlowNode[] {
   const nodes: FlowNode[] = [];
   let idx = 0;
+  if (wf.schedule) {
+    setExecutionFrequency(wf.schedule, { sync: false });
+  }
   const settings = getSettings();
   const globalWallet = settings?.recipientWallet || "";
 
@@ -169,6 +173,7 @@ export function nodesToWorkflow(name: string, nodes: FlowNode[]): Workflow | nul
   if (first.module.kind !== "trigger") return null;
   return {
     name,
+    schedule: getExecutionFrequency(),
     trigger: {
       type: first.module.type as TriggerType,
       params: { ...first.params, _pos: { x: first.x, y: first.y } },
