@@ -94,7 +94,7 @@ const NotificationCenter: React.FC = () => {
         aria-label="Cerrar notificaciones"
       />
 
-      <div className="absolute inset-x-2 bottom-[calc(0.5rem+env(safe-area-inset-bottom))] flex max-h-[72dvh] flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-4 sm:top-[calc(4.75rem+env(safe-area-inset-top))] sm:w-[380px]">
+      <div className="absolute inset-x-2 top-[calc(4.3rem+env(safe-area-inset-top))] flex max-h-[72dvh] flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl sm:inset-x-auto sm:right-4 sm:top-[calc(4.75rem+env(safe-area-inset-top))] sm:w-[380px]">
         <div className="flex items-center gap-2 border-b border-border/40 px-4 py-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
             <Bell className="h-4 w-4 text-primary" />
