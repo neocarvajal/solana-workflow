@@ -14,6 +14,7 @@ import {
   getScenarioName,
   setFlowNodes,
   setScenarioName,
+  setWorkflowId,
   subscribeWorkflow,
 } from "@/lib/workflowStore";
 
@@ -46,6 +47,7 @@ const MobileWorkflowMenu: React.FC = () => {
 
   const handleNew = () => {
     setOpen(false);
+    setWorkflowId(null);
     setFlowNodes([]);
     setScenarioName("New Scenario");
     setName("New Scenario");

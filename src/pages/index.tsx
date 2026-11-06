@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { useRouter } from 'next/router';
 import type { Workflow } from "@/lib/workflow";
 import { workflowToNodes } from "@/lib/workflow";
-import { setFlowNodes, setScenarioName, getSettings } from "@/lib/workflowStore";
+import { setFlowNodes, setScenarioName, setWorkflowId, getSettings } from "@/lib/workflowStore";
 
 const EXAMPLES = [
   "Si el precio de SOL sube por arriba de $60, transfiere 1 USDC a mi recipient",
@@ -74,6 +74,9 @@ const Landing: React.FC = () => {
       const wf = data.workflow as Workflow;
 
       const nodes = workflowToNodes(wf);
+      // A generated workflow is always a new identity; never reuse the
+      // workflow_id of the one that was previously open.
+      setWorkflowId(null);
       setFlowNodes(nodes);
       setScenarioName(wf.name || "My Scenario");
 
@@ -88,6 +91,7 @@ const Landing: React.FC = () => {
 
   const startEmpty = () => {
     if (!ensureWalletConnected()) return;
+    setWorkflowId(null);
     setFlowNodes([]);
     setScenarioName("New Scenario");
     router.push("/dashboard");

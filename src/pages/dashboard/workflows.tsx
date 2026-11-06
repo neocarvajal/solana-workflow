@@ -4,7 +4,8 @@ import { workflowToNodes } from "@/lib/workflow";
 import Link from "next/link";
 import { useRouter } from 'next/router';
 import { useWallet } from "@solana/wallet-adapter-react";
-import { Folder, Search, Trash2, Edit, Play, Calendar, Link as LinkIcon } from "lucide-react";
+import { Folder, Search, Trash2, Edit, Play, Calendar, Link as LinkIcon, ShieldCheck } from "lucide-react";
+import { executionModeLabel } from "@/lib/schedule";
 import Sidebar from "@/components/Sidebar";
 import DeleteWorkflowModal from '@/components/DeleteConfirmationDialog';
 import { toast } from 'sonner';
@@ -197,6 +198,16 @@ const WorkflowDashboard: React.FC = () => {
                     </div>
 
                     <h3 className="text-lg font-bold mb-1 truncate">{wf.name}</h3>
+
+                    <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
+                        <ShieldCheck className="h-3 w-3" />
+                        {executionModeLabel(wf.workflow?.executionMode || wf.executionMode)}
+                      </span>
+                      <span className="rounded-md bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                        {wf.workflow?.schedule === "manual" ? "Manual" : wf.workflow?.schedule || "15m"}
+                      </span>
+                    </div>
 
                     <div className="flex items-center gap-4 text-xs text-muted-foreground mb-6">
                       <div className="flex items-center gap-1">

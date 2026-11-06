@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { Plus, LayoutDashboard } from 'lucide-react';
 import OnchainWorkflowsSheet from './OnchainWorkflowsSheet';
 import SettingsDialog from './SettingsDialog';
-import { getScenarioName, setScenarioName, subscribeWorkflow, setFlowNodes } from '@/lib/workflowStore';
+import { getScenarioName, setScenarioName, subscribeWorkflow, setFlowNodes, setWorkflowId } from '@/lib/workflowStore';
 
 const Header: React.FC = () => {
   const [name, setName] = useState(getScenarioName());
@@ -25,6 +25,7 @@ const Header: React.FC = () => {
   };
 
   const handleNew = () => {
+    setWorkflowId(null);
     setFlowNodes([]);
     setScenarioName("New Scenario");
     router.push("/dashboard");

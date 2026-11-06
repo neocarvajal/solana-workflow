@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Play, ZoomIn, ZoomOut, Clock, Upload, Loader2 } from 'lucide-react';
+import { Save, Play, ZoomIn, ZoomOut, Clock, Upload, Loader2, ShieldCheck } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Buffer } from 'buffer';
 import { Connection, Transaction, VersionedTransaction } from '@solana/web3.js';
@@ -10,7 +10,14 @@ import {
   getFlowNodes, getCanvasScale, setCanvasScale, subscribeScale, getScenarioName,
   setRunningNodeId, setAnimatingLineIndex, setErrorNodeId, saveWorkflow, saveLocalOnly, getSavedWorkflows,
   getExecutionFrequency, setExecutionFrequency as persistExecutionFrequency, subscribeExecutionFrequency,
+  getExecutionMode, setExecutionMode as persistExecutionMode, subscribeExecutionMode,
+  getWorkflowId, setWorkflowId,
 } from '@/lib/workflowStore';
+import {
+  EXECUTION_MODE_OPTIONS,
+  scheduleToSeconds,
+  type ExecutionMode,
+} from '@/lib/schedule';
 
 import { FlowNode } from "@/lib/workflow";
 import { supabase } from '@/integrations/supabase/client';
@@ -26,6 +33,7 @@ const BottomToolbar: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [scale, setScale] = useState(getCanvasScale());
   const [executionFrequency, setExecutionFrequency] = useState(getExecutionFrequency());
+  const [executionMode, setExecutionMode] = useState<ExecutionMode>(getExecutionMode());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [lastTxData, setLastTxData] = useState<{ signature: string; actionType: string; blockhash?: string } | null>(null);
   const { publicKey, connected, sendTransaction } = useWallet();
@@ -41,6 +49,11 @@ const BottomToolbar: React.FC = () => {
 
   useEffect(() => {
     const unsub = subscribeExecutionFrequency((value) => setExecutionFrequency(value));
+    return () => { unsub(); };
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeExecutionMode((value) => setExecutionMode(value));
     return () => { unsub(); };
   }, []);
 
@@ -63,6 +76,7 @@ const BottomToolbar: React.FC = () => {
 
     if (found) {
       setEditingId(found.pinataId || found.id);
+      setWorkflowId(found.workflow.workflowId || found.workflowId || found.id);
       setScenarioName(found.name);
       setFlowNodes(workflowToNodes(found.workflow));
     } else {
@@ -92,6 +106,9 @@ const BottomToolbar: React.FC = () => {
       wf.name = getScenarioName();
     }
     wf.schedule = getExecutionFrequency();
+    wf.scheduleSeconds = scheduleToSeconds(wf.schedule);
+    wf.executionMode = getExecutionMode();
+    wf.workflowId = getWorkflowId();
 
     const saved = getSavedWorkflows(walletAddress);
     // FIX: Search using actual storage record properties
@@ -119,7 +136,6 @@ const BottomToolbar: React.FC = () => {
             "skip",
             editingId
           );
-          saveLocalOnly(wf.name, wf, walletAddress);
           if (result.id) setEditingId(result.id);
           return result;
         }
@@ -407,13 +423,32 @@ const BottomToolbar: React.FC = () => {
     // 1. Preparación de datos segura
     const skip = "skip";
     const schedule = getExecutionFrequency();
-    const publishableWorkflow = { ...wf, schedule };
+    const executionMode = getExecutionMode();
+    const scheduleSeconds = scheduleToSeconds(schedule);
+    const workflowId = getWorkflowId();
+    const owner = publicKey.toBase58();
+    const workflowName = (wf.name && wf.name.trim() !== "") ? wf.name : "Untitled Workflow";
+    const automationStatus = executionMode === "notify" && schedule !== "manual" ? "active" : "inactive";
+    const nextRunAt = automationStatus === "active"
+      ? new Date(Date.now() + scheduleSeconds * 1000).toISOString()
+      : null;
+    const publishableWorkflow = {
+      ...wf,
+      name: workflowName,
+      schedule,
+      scheduleSeconds,
+      executionMode,
+      workflowId,
+    };
     const body = {
       json: publishableWorkflow,
-      name: (wf.name && wf.name.trim() !== "") ? wf.name : "Untitled Workflow",
-      owner_wallet: publicKey.toBase58(),
+      name: workflowName,
+      owner_wallet: owner,
       signature: skip,
       schedule,
+      workflow_id: workflowId,
+      execution_mode: executionMode,
+      schedule_seconds: scheduleSeconds,
     };
 
     // 2. Llamada a Supabase (IPFS)
@@ -423,52 +458,79 @@ const BottomToolbar: React.FC = () => {
       throw new Error(errorBody.error?.message || pinErr.message || "IPFS Pinning failed");
     }
     const cid = pin?.cid;
+    if (!cid) throw new Error("IPFS did not return a CID");
 
     // 3. Publicación On-Chain
     const prev = getOnchainMeta();
     const version = (prev.version ?? 0) + 1;
     const connection = new Connection("https://api.devnet.solana.com", "confirmed");
-    const { signature } = await publishWorkflowMemo({ sendTransaction, publicKey }, { name: body.name, cid, version });
+    const { signature } = await publishWorkflowMemo({ sendTransaction, publicKey }, { name: workflowName, cid, version });
     setOnchainMeta({ cid, signature, version });
 
-    // 4. Lógica de persistencia manual (evita el error de UPSERT)
-    // Primero buscamos si ya existe el nombre
+    // 4. Persistencia: pin-to-ipfs ya crea/actualiza la fila por (owner_wallet, workflow_id).
+    // Usamos su id para evitar duplicados y aplicamos la firma real de la publicación.
     const safeJson = JSON.parse(JSON.stringify(publishableWorkflow));
+    const automationRow = {
+      json: safeJson,
+      cid,
+      schedule,
+      schedule_seconds: scheduleSeconds,
+      execution_mode: executionMode,
+      workflow_id: workflowId,
+      automation_status: automationStatus,
+      next_run_at: nextRunAt,
+      onchain_signature: signature,
+      updated_at: new Date().toISOString(),
+    };
 
-    const { data: existing } = await supabase
-      .from("workflows")
-      .select("id")
-      .eq("name", body.name)
-      .maybeSingle();
+    let rowId = typeof pin?.id === "string" ? pin.id : undefined;
+
+    if (!rowId) {
+      const { data: byWorkflow } = await supabase
+        .from("workflows")
+        .select("id")
+        .eq("owner_wallet", owner)
+        .eq("workflow_id", workflowId)
+        .maybeSingle();
+      rowId = byWorkflow?.id;
+    }
+
+    if (!rowId) {
+      const { data: byName } = await supabase
+        .from("workflows")
+        .select("id")
+        .eq("owner_wallet", owner)
+        .eq("name", workflowName)
+        .maybeSingle();
+      rowId = byName?.id;
+    }
 
     let dbError;
-    if (existing) {
-      // Si existe, hacemos UPDATE por ID
-      const { error } = await supabase.from("workflows").update({
-        json: safeJson,
-        cid: cid,
-        schedule,
-        onchain_signature: signature,
-        updated_at: new Date().toISOString(),
-      }).eq("id", existing.id);
+    if (rowId) {
+      const { error } = await supabase
+        .from("workflows")
+        .update(automationRow)
+        .eq("id", rowId);
       dbError = error;
     } else {
-      // Si no existe, hacemos INSERT
       const { error } = await supabase.from("workflows").insert({
-        name: body.name,
-        json: safeJson,
-        cid: cid,
-        schedule,
-        onchain_signature: signature,
-        owner_wallet: publicKey.toBase58(),
+        ...automationRow,
+        name: workflowName,
+        owner_wallet: owner,
       });
       dbError = error;
     }
 
     if (dbError) throw new Error(`DB Error: ${dbError.message}`);
 
+    if (executionMode === "vault_transfer" || executionMode === "vault_dca" || executionMode === "subscription") {
+      toast.info("Modo de fondos guardado", {
+        description: "La ejecución automática queda inactiva hasta desplegar y configurar la bóveda on-chain.",
+      });
+    }
+
     toast.success("Published on-chain", {
-      description: `CID: ${cid.slice(0, 8)}... · v${version}`,
+      description: `CID: ${cid.slice(0, 8)}... · v${version} · ${automationStatus === "active" ? "cron activo" : "sin cron"}`,
       action: { label: "View", onClick: () => window.open(solexplorerUrl(signature), "_blank") },
     });
   } catch (e: any) {
@@ -541,6 +603,25 @@ const BottomToolbar: React.FC = () => {
                 <option value="6h">6 horas</option>
                 <option value="24h">1 día</option>
                 <option value="manual">Manual</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1 rounded-full bg-muted/50">
+            <div className="flex items-center gap-1 px-2 py-0 text-muted-foreground">
+              <ShieldCheck className="h-4 w-4 shrink-0" />
+              <select
+                value={executionMode}
+                onChange={(event) => persistExecutionMode(event.target.value)}
+                className="h-10 w-[9.5rem] border-none bg-transparent text-base focus:outline-none sm:w-auto sm:text-sm"
+                aria-label="Modo de ejecución"
+                title="Define si el cron solo avisa o si puede mover fondos desde una bóveda autorizada"
+              >
+                {EXECUTION_MODE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

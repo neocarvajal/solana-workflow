@@ -1,5 +1,11 @@
 import type { Workflow, FlowNode, ModuleDef } from "./workflow";
 import { nodesToWorkflow, workflowToNodes } from "./workflow";
+import {
+  DEFAULT_EXECUTION_MODE,
+  normalizeExecutionMode,
+  scheduleToSeconds,
+  type ExecutionMode,
+} from "./schedule";
 import { supabase } from "@/integrations/supabase/client";
 
 /* ── Workflow (derived from nodes) ─────────────────────────── */
@@ -146,6 +152,91 @@ export function subscribeExecutionFrequency(listener: FrequencyListener) {
   return () => frequencyListeners.delete(listener);
 }
 
+/* ── Automation mode ──────────────────────────────────────── */
+const EXECUTION_MODE_KEY = "solflows_execution_mode";
+type ExecutionModeListener = (value: ExecutionMode) => void;
+const executionModeListeners = new Set<ExecutionModeListener>();
+let executionMode: ExecutionMode | null = null;
+
+export function getExecutionMode(): ExecutionMode {
+  if (executionMode) return executionMode;
+  try {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(EXECUTION_MODE_KEY);
+      if (saved) {
+        executionMode = normalizeExecutionMode(saved);
+        return executionMode;
+      }
+    }
+  } catch { }
+  executionMode = DEFAULT_EXECUTION_MODE;
+  return executionMode;
+}
+
+export function setExecutionMode(
+  value: string,
+  options: { sync?: boolean } = {},
+) {
+  const next = normalizeExecutionMode(value);
+  executionMode = next;
+  try {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(EXECUTION_MODE_KEY, next);
+    }
+  } catch { }
+  executionModeListeners.forEach((listener) => listener(next));
+  if (options.sync !== false) syncWorkflow();
+}
+
+export function subscribeExecutionMode(listener: ExecutionModeListener) {
+  executionModeListeners.add(listener);
+  return () => executionModeListeners.delete(listener);
+}
+
+/* ── Stable workflow identifier ───────────────────────────── */
+const WORKFLOW_ID_KEY = "solflows_workflow_id";
+let currentWorkflowId: string | null = null;
+
+export function getWorkflowId(): string {
+  if (currentWorkflowId) return currentWorkflowId;
+  try {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(WORKFLOW_ID_KEY);
+      if (saved) {
+        currentWorkflowId = saved;
+        return saved;
+      }
+    }
+  } catch { }
+  currentWorkflowId = crypto.randomUUID();
+  try {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(WORKFLOW_ID_KEY, currentWorkflowId);
+    }
+  } catch { }
+  return currentWorkflowId;
+}
+
+export function setWorkflowId(value: string | null | undefined) {
+  currentWorkflowId = value?.trim() ? value : crypto.randomUUID();
+  try {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(WORKFLOW_ID_KEY, currentWorkflowId);
+    }
+  } catch { }
+}
+
+function withAutomationMeta(wf: Workflow): Workflow {
+  const schedule = wf.schedule || getExecutionFrequency();
+  return {
+    ...wf,
+    schedule,
+    scheduleSeconds: wf.scheduleSeconds ?? scheduleToSeconds(schedule),
+    executionMode: wf.executionMode || getExecutionMode(),
+    workflowId: wf.workflowId || getWorkflowId(),
+  };
+}
+
 /* ── Scale / Zoom State ──────────────────────── */
 type ScaleListener = (scale: number) => void;
 let canvasScale = 1;
@@ -222,6 +313,8 @@ export interface SavedWorkflow {
   workflow: Workflow;
   ownerWallet: string;
   cid?: string;
+  workflowId?: string;
+  executionMode?: ExecutionMode;
 }
 
 export function getSavedWorkflows(walletAddress: string): SavedWorkflow[] {
@@ -257,13 +350,21 @@ export async function saveWorkflow(
   existingPinataId?: string
 ) {
   try {
+    const enrichedWorkflow = withAutomationMeta(wf);
+    const workflowId = enrichedWorkflow.workflowId!;
+    const schedule = enrichedWorkflow.schedule!;
+
     // Always pin the workflow via the 'pin-to-ipfs' function.
     const endpoint = 'pin-to-ipfs';
     const body = {
-      json: wf,
+      json: enrichedWorkflow,
       name,
       owner_wallet: walletAddress,
       signature,
+      schedule,
+      workflow_id: workflowId,
+      execution_mode: enrichedWorkflow.executionMode!,
+      schedule_seconds: enrichedWorkflow.scheduleSeconds!,
     };
 
     // Attempt to pin to IPFS. If it fails, fallback to local-only storage.
@@ -289,9 +390,11 @@ export async function saveWorkflow(
         pinataId: undefined,
         name,
         created: Date.now(),
-        workflow: wf,
+        workflow: enrichedWorkflow,
         ownerWallet: walletAddress,
         cid: undefined,
+        workflowId,
+        executionMode: enrichedWorkflow.executionMode,
       });
       localStorage.setItem(SAVED_WORKFLOWS_KEY, JSON.stringify(saved));
       return fallbackResult;
@@ -310,9 +413,11 @@ export async function saveWorkflow(
         saved[index] = {
           ...saved[index],
           name,
-          workflow: wf,
+          workflow: enrichedWorkflow,
           cid: result.cid,
           pinataId: result.id || saved[index].pinataId,
+          workflowId,
+          executionMode: enrichedWorkflow.executionMode,
         };
         if (oldPinataId && oldPinataId !== result.id) {
           supabase
@@ -328,9 +433,11 @@ export async function saveWorkflow(
           pinataId: result.id,
           name,
           created: Date.now(),
-          workflow: wf,
+          workflow: enrichedWorkflow,
           ownerWallet: walletAddress,
           cid: result.cid,
+          workflowId,
+          executionMode: enrichedWorkflow.executionMode,
         });
       }
     } else {
@@ -340,9 +447,11 @@ export async function saveWorkflow(
         pinataId: result.id,
         name,
         created: Date.now(),
-        workflow: wf,
+        workflow: enrichedWorkflow,
         ownerWallet: walletAddress,
         cid: result.cid,
+        workflowId,
+        executionMode: enrichedWorkflow.executionMode,
       });
     }
 
@@ -360,8 +469,18 @@ export function saveLocalOnly(name: string, wf: Workflow, walletAddress: string)
     const raw = localStorage.getItem(SAVED_WORKFLOWS_KEY);
     const saved: SavedWorkflow[] = raw ? JSON.parse(raw) : [];
     const id = `wf-${Date.now()}`;
+    const enrichedWorkflow = withAutomationMeta(wf);
 
-    saved.push({ id, name, created: Date.now(), workflow: wf, ownerWallet: walletAddress, cid: undefined });
+    saved.push({
+      id,
+      name,
+      created: Date.now(),
+      workflow: enrichedWorkflow,
+      ownerWallet: walletAddress,
+      cid: undefined,
+      workflowId: enrichedWorkflow.workflowId,
+      executionMode: enrichedWorkflow.executionMode,
+    });
     localStorage.setItem(SAVED_WORKFLOWS_KEY, JSON.stringify(saved));
   } catch (e) {
     console.error("Failed to save workflow locally", e);
@@ -378,7 +497,9 @@ export async function updateWorkflow(
   const SAVED_WORKFLOWS_KEY = "solflows_saved_workflows";
 
   // Extraemos el JSON limpio del workflow sin capas intermedias
-  const cleanWorkflowJson = updatedData.workflow ? updatedData.workflow : updatedData;
+  const cleanWorkflowJson = withAutomationMeta(
+    updatedData.workflow ? updatedData.workflow : updatedData,
+  );
 
   // 1. Recuperamos el registro actual del LocalStorage para capturar los IDs viejos antes de sobreescribirlos
   const raw = localStorage.getItem(SAVED_WORKFLOWS_KEY);
@@ -412,7 +533,9 @@ export async function updateWorkflow(
     ownerWallet: walletAddress,
     workflow: cleanWorkflowJson,
     cid: result.cid,
-    pinataId: result.id || result.pinataId
+    pinataId: result.id || result.pinataId,
+    workflowId: cleanWorkflowJson.workflowId,
+    executionMode: cleanWorkflowJson.executionMode,
   };
 
   // (No longer needed) oldPinataId was captured earlier for cleanup.

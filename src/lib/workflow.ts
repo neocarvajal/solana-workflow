@@ -3,7 +3,16 @@ import {
   Sparkles, Webhook, ArrowLeftRight, type LucideIcon,
 } from "lucide-react";
 
-import { getSettings, getExecutionFrequency, setExecutionFrequency } from "@/lib/workflowStore";
+import {
+  getSettings,
+  getExecutionFrequency,
+  setExecutionFrequency,
+  getExecutionMode,
+  setExecutionMode,
+  getWorkflowId,
+  setWorkflowId,
+} from "@/lib/workflowStore";
+import { scheduleToSeconds, type ExecutionMode } from "@/lib/schedule";
 
 export type TriggerType = "price_monitor" | "schedule" | "webhook" | "dexscreener_pair";
 export type StepType =
@@ -13,6 +22,9 @@ export type StepType =
 export interface Workflow {
   name: string;
   schedule?: string;
+  scheduleSeconds?: number;
+  executionMode?: ExecutionMode;
+  workflowId?: string;
   trigger: { type: TriggerType; params: Record<string, any> };
   steps: { type: StepType; params: Record<string, any> }[];
 }
@@ -105,6 +117,12 @@ export function workflowToNodes(wf: Workflow): FlowNode[] {
   if (wf.schedule) {
     setExecutionFrequency(wf.schedule, { sync: false });
   }
+  if (wf.executionMode) {
+    setExecutionMode(wf.executionMode, { sync: false });
+  }
+  if (wf.workflowId) {
+    setWorkflowId(wf.workflowId);
+  }
   const settings = getSettings();
   const globalWallet = settings?.recipientWallet || "";
 
@@ -171,9 +189,13 @@ export function nodesToWorkflow(name: string, nodes: FlowNode[]): Workflow | nul
   if (nodes.length === 0) return null;
   const [first, ...rest] = nodes;
   if (first.module.kind !== "trigger") return null;
+  const schedule = getExecutionFrequency();
   return {
     name,
-    schedule: getExecutionFrequency(),
+    schedule,
+    scheduleSeconds: scheduleToSeconds(schedule),
+    executionMode: getExecutionMode(),
+    workflowId: getWorkflowId(),
     trigger: {
       type: first.module.type as TriggerType,
       params: { ...first.params, _pos: { x: first.x, y: first.y } },

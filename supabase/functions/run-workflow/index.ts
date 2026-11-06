@@ -28,6 +28,9 @@ async function getDexPair(addr: string) {
 type Step = { type: string; params: Record<string, any> };
 type Workflow = {
   name: string;
+  schedule?: string;
+  executionMode?: string;
+  workflowId?: string;
   trigger: { type: string; params: Record<string, any> };
   steps: Step[];
 };
@@ -38,6 +41,13 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const workflow: Workflow = body.workflow;
     const workflowId: string | undefined = body.workflowId;
+    const executionMode: string = body.executionMode || workflow?.executionMode || "manual";
+    const notifyOnly = Boolean(body.notifyOnly) || executionMode === "notify" || executionMode === "manual";
+    const financialAutomation =
+      executionMode === "vault_transfer" ||
+      executionMode === "vault_dca" ||
+      executionMode === "subscription";
+    const scheduledFor: string | undefined = body.scheduledFor;
 
     if (!workflow) {
       return new Response(JSON.stringify({ error: "workflow required" }), {
@@ -107,12 +117,61 @@ Deno.serve(async (req) => {
       for (const step of workflow.steps) {
         try {
           if (step.type === "send_transaction") {
-            logs.push({
-              step: "send_transaction",
-              simulated: true,
-              payload: { to: step.params.to, amount: step.params.amount, asset: step.params.asset || "SOL" },
-              note: "Transaction simulated — wallet signing pending integration.",
-            });
+            const payload = { to: step.params.to, amount: step.params.amount, asset: step.params.asset || "SOL" };
+            if (financialAutomation) {
+              logs.push({
+                step: "send_transaction",
+                skipped: true,
+                reason: "vault_execution_not_configured",
+                executionMode,
+                payload,
+                note: "La bóveda on-chain todavía no está desplegada; no se movieron fondos.",
+              });
+            } else if (notifyOnly) {
+              logs.push({
+                step: "send_transaction",
+                skipped: true,
+                reason: "requires_user_signature",
+                executionMode,
+                payload,
+                note: "El cron no puede firmar por el usuario. Transferencia pendiente de aprobación.",
+              });
+            } else {
+              logs.push({
+                step: "send_transaction",
+                simulated: true,
+                payload,
+                note: "Transaction simulated — wallet signing pending integration.",
+              });
+            }
+          } else if (step.type === "swap") {
+            const payload = { from: step.params.from, to: step.params.to, amount: step.params.amount };
+            if (financialAutomation) {
+              logs.push({
+                step: "swap",
+                skipped: true,
+                reason: "vault_execution_not_configured",
+                executionMode,
+                payload,
+                note: "La bóveda on-chain todavía no está desplegada; no se movieron fondos.",
+              });
+            } else if (notifyOnly) {
+              logs.push({
+                step: "swap",
+                skipped: true,
+                reason: "requires_user_signature",
+                executionMode,
+                payload,
+                note: "El cron no puede firmar el swap. Pendiente de aprobación.",
+              });
+            } else {
+              logs.push({
+                step: "swap",
+                simulated: true,
+                payload,
+                note: "Swap simulated — wallet signing pending integration.",
+              });
+            }
           } else if (step.type === "send_alert") {
             const alert = await deliverAlert({
               channel: step.params.channel || "app",
@@ -165,7 +224,9 @@ Deno.serve(async (req) => {
         workflow_id: workflowId,
         status: triggered ? "executed" : "skipped",
         trigger_data: triggerData,
-        output: { logs },
+        output: { logs, executionMode, notifyOnly, scheduledFor },
+        execution_mode: executionMode,
+        scheduled_for: scheduledFor || null,
       });
     }
 

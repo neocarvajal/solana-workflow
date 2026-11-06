@@ -1,1 +1,5 @@
 project_id = "hessksbxjcfkmujiqhnr"
+
+[functions.dispatch-due-workflows]
+# Auth is enforced inside the function with x-cron-secret from Supabase Vault.
+verify_jwt = false
