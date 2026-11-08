@@ -1,0 +1,36 @@
+[package]
+name = "solana-flows-vault"
+version = "0.1.0"
+description = "Bounded per-workflow vault for Solana Workflow automation"
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "solana_flows_vault"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+
+[dependencies]
+anchor-lang = "1.1.2"
+solana-sha256-hasher = { version = "3.1.0", features = ["sha2"] }
+
+[dev-dependencies]
+litesvm = "0.10.0"
+solana-clock = "3.2.1"
+solana-message = "3.0.1"
+solana-rent = "3.1.0"
+solana-transaction = "3.0.2"
+solana-signer = "3.0.0"
+solana-keypair = "3.0.1"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

@@ -60,3 +60,6 @@ bun.lockb
 
 # Anchor
 anchor/
+target/
+.anchor/
+test-ledger/

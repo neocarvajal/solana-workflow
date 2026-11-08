@@ -1,0 +1,22 @@
+skip_local_validator = true
+
+[toolchain]
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+solana_flows_vault = "dB4W6X19PphXLpSPZfe6ZjQkpBHpfHFDDeUddEGdqQA"
+
+[programs.devnet]
+solana_flows_vault = "dB4W6X19PphXLpSPZfe6ZjQkpBHpfHFDDeUddEGdqQA"
+
+[provider]
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "cargo test"
+
+[hooks]
