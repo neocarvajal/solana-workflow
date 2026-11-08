@@ -25,17 +25,17 @@ export const EXECUTION_MODE_OPTIONS: {
   {
     value: "vault_transfer",
     label: "Bóveda: transferencia",
-    description: "Transferencia recurrente desde una bóveda con límites on-chain.",
+    description: "Transferencia recurrente desde una bóveda devnet con límites on-chain (pendiente de auditoría).",
   },
   {
     value: "vault_dca",
     label: "Bóveda: DCA",
-    description: "Compra recurrente con salida mínima protegida por la bóveda.",
+    description: "Compra recurrente con salida mínima protegida por la bóveda (planificado).",
   },
   {
     value: "subscription",
     label: "Suscripción",
-    description: "Pago recurrente SPL/Token-2022 mediante Solana Subscriptions.",
+    description: "Pago recurrente SPL/Token-2022 mediante Solana Subscriptions (planificado).",
   },
 ];
 

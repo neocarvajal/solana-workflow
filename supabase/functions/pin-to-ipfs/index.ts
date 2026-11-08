@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
       parsed.data.execution_mode || json.executionMode || (schedule === "manual" ? "manual" : "notify"),
     );
     const scheduleSeconds = parsed.data.schedule_seconds ?? scheduleToSeconds(schedule);
-    const automationStatus = executionMode === "notify" && schedule !== "manual" ? "active" : "inactive";
+    const automationStatus = schedule !== "manual" ? "active" : "inactive";
     const nextRunAt = automationStatus === "active"
       ? new Date(Date.now() + scheduleSeconds * 1000).toISOString()
       : null;
@@ -174,20 +174,27 @@ Deno.serve(async (req) => {
       workflowId,
     };
 
-    // 2. Verificación de firma
-    if (signature !== "skip") {
-      const message = new TextEncoder().encode("Autorizo guardar este workflow");
-      const signatureUint8 = bs58.decode(signature);
-      const publicKeyUint8 = bs58.decode(owner_wallet);
+    // 2. Verificación de firma ligada a wallet + workflow
+    if (!signature || signature === "skip") {
+      return new Response(JSON.stringify({ error: "Wallet signature required" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-      const isValid = nacl.sign.detached.verify(message, signatureUint8, publicKeyUint8);
+    const message = new TextEncoder().encode(
+      `Autorizo guardar este workflow\nWallet: ${owner_wallet}\nWorkflow: ${workflowId}`,
+    );
+    const signatureUint8 = bs58.decode(signature);
+    const publicKeyUint8 = bs58.decode(owner_wallet);
 
-      if (!isValid) {
-        return new Response(JSON.stringify({ error: "Invalid signature" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    const isValid = nacl.sign.detached.verify(message, signatureUint8, publicKeyUint8);
+
+    if (!isValid) {
+      return new Response(JSON.stringify({ error: "Invalid signature" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // 3. Subir a Pinata dentro del grupo (carpeta) del wallet.

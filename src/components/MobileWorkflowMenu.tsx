@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import {
   ChevronDown,
   Database,
+  Landmark,
   LayoutDashboard,
   Plus,
   Settings,
@@ -59,7 +60,7 @@ const MobileWorkflowMenu: React.FC = () => {
     router.push(path);
   };
 
-  const openDialog = (eventName: "open-settings" | "open-onchain") => {
+  const openDialog = (eventName: "open-settings" | "open-onchain" | "open-vault") => {
     setOpen(false);
     window.setTimeout(() => window.dispatchEvent(new Event(eventName)), 60);
   };
@@ -158,6 +159,14 @@ const MobileWorkflowMenu: React.FC = () => {
                 >
                   <Settings className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span>Ajustes</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openDialog("open-vault")}
+                  className={actionClass}
+                >
+                  <Landmark className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span>Bóveda y límites</span>
                 </button>
                 <button
                   type="button"

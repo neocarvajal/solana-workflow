@@ -1,6 +1,8 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
+import bs58 from "npm:bs58@6.0.0";
+import nacl from "npm:tweetnacl@1.0.3";
 import { walletGroupName } from "../_shared/pinata.ts";
 
 const Body = z.object({
@@ -9,6 +11,7 @@ const Body = z.object({
   kind: z.enum(["profile", "asset", "document"]).optional(),
   mime_type: z.string().max(120).optional(),
   data_base64: z.string().min(1).max(6_000_000),
+  signature: z.string().min(1),
 });
 
 const PINATA_JWT = Deno.env.get("PINATA_JWT");
@@ -42,8 +45,7 @@ async function pinJson(content: Record<string, unknown>, name: string, groupId: 
 }
 
 async function getOrCreateGroup(
-  // deno-lint-ignore no-explicit-any
-  supabase: any,
+  supabase: SupabaseClient,
   ownerWallet: string,
 ): Promise<string | null> {
   const { data: existing } = await supabase
@@ -85,8 +87,7 @@ async function getOrCreateGroup(
 }
 
 async function refreshManifest(
-  // deno-lint-ignore no-explicit-any
-  supabase: any,
+  supabase: SupabaseClient,
   ownerWallet: string,
   groupId: string | null,
 ): Promise<string | null> {
@@ -133,7 +134,17 @@ Deno.serve(async (req) => {
     if (!parsed.success) return json({ error: parsed.error.flatten() }, 400);
     if (!PINATA_JWT) return json({ error: "PINATA_JWT is not configured" }, 503);
 
-    const { owner_wallet, name, kind, mime_type, data_base64 } = parsed.data;
+    const { owner_wallet, name, kind, mime_type, data_base64, signature } = parsed.data;
+
+    const message = new TextEncoder().encode(
+      `Autorizo subir este asset\nWallet: ${owner_wallet}\nNombre: ${name}\nTipo: ${kind || "asset"}`,
+    );
+    const isValid = nacl.sign.detached.verify(
+      message,
+      bs58.decode(signature),
+      bs58.decode(owner_wallet),
+    );
+    if (!isValid) return json({ error: "Invalid signature" }, 401);
 
     let bytes: Uint8Array;
     try {

@@ -1,8 +1,10 @@
 # solana-flows-vault (Anchor program)
 
-Status: SOL transfer path implemented and covered by LiteSVM tests. Not deployed
-to devnet or audited. Financial automation must remain inactive until the
-program is deployed, verified on devnet, and audited.
+Status: SOL transfer path implemented, deployed to devnet, and covered by
+LiteSVM plus a live devnet smoke test. Not audited. Mainnet and automated
+transfers stay disabled until an external audit is complete.
+
+Devnet program id: `dB4W6X19PphXLpSPZfe6ZjQkpBHpfHFDDeUddEGdqQA`
 
 The first deployment supports SOL only. `execute_transfer_spl`,
 `withdraw_spl`, `record_swap_out`, and Jupiter DCA remain planned; any policy
@@ -58,6 +60,29 @@ workflow cannot drain another.
 - `execute_transfer_sol(amount)` — crank signs. Checks `paused`, expiry, keeper, interval, `max_per_run`, `max_total`, destination, and rent exemption before signing a system transfer from the vault PDA.
 - SPL and DCA instructions are planned; see Rollout.
 
+## Devnet deployment
+
+```bash
+anchor build
+anchor deploy --provider.cluster devnet --program-name solana-flows-vault
+solana program show dB4W6X19PphXLpSPZfe6ZjQkpBHpfHFDDeUddEGdqQA --url devnet
+```
+
+The live smoke test (`node scripts/vault-smoke.mjs`) creates a throwaway owner,
+initializes a policy, deposits SOL, executes a bounded transfer, verifies that
+pausing blocks execution, and withdraws while preserving rent exemption. It is
+devnet-only and spends devnet SOL from `~/.config/solana/id.json` (or
+`ANCHOR_WALLET`). The browser panel in
+`src/components/VaultPanel.tsx` derives the PDAs from
+`owner + SHA-256(workflow_id)` and lets the owner initialize/update the policy,
+deposit, pause, and withdraw on devnet. The frontend can override the program id
+with `NEXT_PUBLIC_VAULT_PROGRAM_ID`.
+
+The Supabase function `execute-vault` is the only crank entrypoint. It is
+disabled unless `VAULT_EXECUTION_ENABLED=true`, requires
+`VAULT_CRANK_SECRET_KEY`, and still enforces every policy check both before and
+on-chain. The flag is intentionally `false` in production until the audit.
+
 ## Tests
 
 ```bash
@@ -88,10 +113,12 @@ and owner-only policy updates.
 
 ## Rollout
 
-1. Completed locally: SOL transfers with LiteSVM tests.
-2. Deploy the program to devnet and add the devnet program id to the client.
-3. Add SPL Token and Token-2022, including ATA ownership checks.
-4. Add a devnet-only UI panel; keep mainnet disabled.
+1. Completed: SOL transfers with LiteSVM tests.
+2. Completed: devnet deployment, live init/deposit/execute/pause/withdraw smoke
+   test, and devnet program id in the browser client.
+3. Completed: devnet-only vault panel and `execute-vault` crank path behind
+   `VAULT_EXECUTION_ENABLED`.
+4. Add SPL Token and Token-2022, including ATA ownership checks.
 5. Add Jupiter CPI only after the transfer path is audited; measure output by
    vault balance delta and enforce a user-provided `min_out`.
-6. External audit before mainnet.
+6. External audit, then enable `VAULT_EXECUTION_ENABLED` and open mainnet.

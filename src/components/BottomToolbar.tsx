@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Save, Play, ZoomIn, ZoomOut, Clock, Upload, Loader2, ShieldCheck } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Buffer } from 'buffer';
+import bs58 from 'bs58';
 import { Connection, Transaction, VersionedTransaction } from '@solana/web3.js';
 import { connection, publishWorkflowMemo,solexplorerUrl } from '@/lib/solana';
 import { workflowToNodes, nodesToWorkflow } from "@/lib/workflow";
@@ -41,6 +42,17 @@ const BottomToolbar: React.FC = () => {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const router = useRouter();
   const wallet = useWallet();
+
+  const signSavePayload = async (owner: string, workflowId: string) => {
+    if (!wallet.signMessage) {
+      throw new Error("Tu wallet no permite firmar mensajes; no se puede guardar en la nube.");
+    }
+    const message = new TextEncoder().encode(
+      `Autorizo guardar este workflow\nWallet: ${owner}\nWorkflow: ${workflowId}`,
+    );
+    const signature = await wallet.signMessage(message);
+    return bs58.encode(signature);
+  };
 
   useEffect(() => {
     const unsub = subscribeScale((s) => setScale(s));
@@ -110,6 +122,14 @@ const BottomToolbar: React.FC = () => {
     wf.executionMode = getExecutionMode();
     wf.workflowId = getWorkflowId();
 
+    let saveSignature: string;
+    try {
+      saveSignature = await signSavePayload(walletAddress, wf.workflowId);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo firmar el guardado");
+      return;
+    }
+
     const saved = getSavedWorkflows(walletAddress);
     // FIX: Search using actual storage record properties
     // const existing = saved.find(s => s.id === editingId || (s as any).pinata_file_id === editingId);
@@ -125,7 +145,8 @@ const BottomToolbar: React.FC = () => {
             editingId,
             wf.name,
             wf,
-            walletAddress
+            walletAddress,
+            saveSignature,
           );
           return result;
         } else {
@@ -133,7 +154,7 @@ const BottomToolbar: React.FC = () => {
             wf.name,
             wf,
             walletAddress,
-            "skip",
+            saveSignature,
             editingId
           );
           if (result.id) setEditingId(result.id);
@@ -148,7 +169,7 @@ const BottomToolbar: React.FC = () => {
 
           try {
             if (editingId) {
-              updateWorkflow(editingId, wf.name, wf, walletAddress);
+              updateWorkflow(editingId, wf.name, wf, walletAddress, saveSignature);
             } else {
               saveLocalOnly(wf.name, wf, walletAddress);
             }
@@ -421,14 +442,14 @@ const BottomToolbar: React.FC = () => {
     setPublishing(true);
     try {
     // 1. Preparación de datos segura
-    const skip = "skip";
     const schedule = getExecutionFrequency();
     const executionMode = getExecutionMode();
     const scheduleSeconds = scheduleToSeconds(schedule);
     const workflowId = getWorkflowId();
     const owner = publicKey.toBase58();
+    const saveSignature = await signSavePayload(owner, workflowId);
     const workflowName = (wf.name && wf.name.trim() !== "") ? wf.name : "Untitled Workflow";
-    const automationStatus = executionMode === "notify" && schedule !== "manual" ? "active" : "inactive";
+    const automationStatus = schedule !== "manual" ? "active" : "inactive";
     const nextRunAt = automationStatus === "active"
       ? new Date(Date.now() + scheduleSeconds * 1000).toISOString()
       : null;
@@ -444,7 +465,7 @@ const BottomToolbar: React.FC = () => {
       json: publishableWorkflow,
       name: workflowName,
       owner_wallet: owner,
-      signature: skip,
+      signature: saveSignature,
       schedule,
       workflow_id: workflowId,
       execution_mode: executionMode,
@@ -525,7 +546,7 @@ const BottomToolbar: React.FC = () => {
 
     if (executionMode === "vault_transfer" || executionMode === "vault_dca" || executionMode === "subscription") {
       toast.info("Modo de fondos guardado", {
-        description: "La ejecución automática queda inactiva hasta desplegar y configurar la bóveda on-chain.",
+        description: "El cron seguirá evaluando el workflow y enviando alertas. El movimiento automático de fondos seguirá desactivado hasta completar la auditoría; configura los límites en el panel Bóveda.",
       });
     }
 

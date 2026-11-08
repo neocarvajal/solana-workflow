@@ -1,6 +1,7 @@
 -- Automation scheduler, execution modes and fund-policy tables.
--- The cron only claims workflows that are explicitly active. Financial modes stay
--- inactive until the on-chain vault is deployed and its policy is registered.
+-- The cron claims every explicitly active non-manual workflow. `run-workflow`
+-- still decides whether a financial step is allowed to sign; on-chain vault
+-- policy checks are the security boundary.
 
 begin;
 

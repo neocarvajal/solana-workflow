@@ -78,6 +78,8 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           workflow: row.workflow_json,
           workflowId: row.id,
+          stableWorkflowId: row.workflow_id,
+          ownerWallet: row.owner_wallet,
           executionMode: row.execution_mode,
           notifyOnly: row.execution_mode === "notify" || row.execution_mode === "manual",
           scheduledFor: row.scheduled_for,
@@ -113,6 +115,13 @@ Deno.serve(async (req) => {
           status,
           error: errorMessage,
           logs: output,
+          tx_signature:
+            output &&
+            typeof output === "object" &&
+            "txSignature" in output &&
+            typeof (output as { txSignature?: unknown }).txSignature === "string"
+              ? (output as { txSignature: string }).txSignature
+              : null,
           finished_at: new Date().toISOString(),
         },
         { onConflict: "workflow_id,scheduled_for" },

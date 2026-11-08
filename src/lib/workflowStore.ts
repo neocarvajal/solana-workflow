@@ -492,7 +492,8 @@ export async function updateWorkflow(
   id: string,          // -> editingId
   name: string,        // -> wf.name
   updatedData: any,    // -> wf
-  walletAddress: string // -> walletAddress
+  walletAddress: string, // -> walletAddress
+  signature: string
 ) {
   const SAVED_WORKFLOWS_KEY = "solflows_saved_workflows";
 
@@ -517,7 +518,7 @@ export async function updateWorkflow(
     name,
     cleanWorkflowJson,
     walletAddress,
-    "skip",
+    signature,
     oldPinataId
   );
 

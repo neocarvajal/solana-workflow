@@ -40,7 +40,10 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const workflow: Workflow = body.workflow;
-    const workflowId: string | undefined = body.workflowId;
+    const workflowId: string | undefined = body.workflowId || workflow?.workflowId;
+    const stableWorkflowId: string | undefined =
+      body.stableWorkflowId || workflow?.workflowId || body.workflowId;
+    const ownerWallet: string | undefined = body.ownerWallet || body.owner_wallet;
     const executionMode: string = body.executionMode || workflow?.executionMode || "manual";
     const notifyOnly = Boolean(body.notifyOnly) || executionMode === "notify" || executionMode === "manual";
     const financialAutomation =
@@ -48,6 +51,9 @@ Deno.serve(async (req) => {
       executionMode === "vault_dca" ||
       executionMode === "subscription";
     const scheduledFor: string | undefined = body.scheduledFor;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const vaultExecutionEnabled = Deno.env.get("VAULT_EXECUTION_ENABLED") === "true";
 
     if (!workflow) {
       return new Response(JSON.stringify({ error: "workflow required" }), {
@@ -58,6 +64,7 @@ Deno.serve(async (req) => {
     const logs: any[] = [];
     let triggered = false;
     let triggerData: any = {};
+    let vaultTransferExecuted = false;
 
     const t = workflow.trigger;
     if (t.type === "price_monitor") {
@@ -119,14 +126,115 @@ Deno.serve(async (req) => {
           if (step.type === "send_transaction") {
             const payload = { to: step.params.to, amount: step.params.amount, asset: step.params.asset || "SOL" };
             if (financialAutomation) {
-              logs.push({
-                step: "send_transaction",
-                skipped: true,
-                reason: "vault_execution_not_configured",
-                executionMode,
-                payload,
-                note: "La bóveda on-chain todavía no está desplegada; no se movieron fondos.",
-              });
+              const asset = String(step.params.asset || "SOL").toUpperCase();
+              const amountSol = Number(step.params.amount);
+              const amountLamports = Math.round(amountSol * 1_000_000_000);
+              const requestedDestination = step.params.to
+                ? String(step.params.to)
+                : undefined;
+
+              if (executionMode !== "vault_transfer") {
+                logs.push({
+                  step: "send_transaction",
+                  skipped: true,
+                  reason: "execution_mode_not_implemented",
+                  executionMode,
+                  payload,
+                  note: "Este modo de fondos todavía no tiene una ruta de ejecución.",
+                });
+              } else if (!vaultExecutionEnabled) {
+                logs.push({
+                  step: "send_transaction",
+                  skipped: true,
+                  reason: "vault_execution_disabled",
+                  executionMode,
+                  payload,
+                  note: "La bóveda está desplegada en devnet, pero el movimiento de fondos sigue desactivado hasta completar la auditoría.",
+                });
+              } else if (!ownerWallet || !stableWorkflowId) {
+                logs.push({
+                  step: "send_transaction",
+                  skipped: true,
+                  reason: "owner_or_workflow_missing",
+                  executionMode,
+                  payload,
+                  note: "No se puede derivar la bóveda sin owner y workflow_id.",
+                });
+              } else if (vaultTransferExecuted) {
+                logs.push({
+                  step: "send_transaction",
+                  skipped: true,
+                  reason: "only_one_vault_transfer_per_run",
+                  executionMode,
+                  payload,
+                  note: "Solo se permite una transferencia de bóveda por ejecución.",
+                });
+              } else if (asset !== "SOL") {
+                logs.push({
+                  step: "send_transaction",
+                  skipped: true,
+                  reason: "unsupported_asset",
+                  executionMode,
+                  payload,
+                  note: "Esta versión de la bóveda solo transfiere SOL.",
+                });
+              } else if (!Number.isSafeInteger(amountLamports) || amountLamports <= 0) {
+                logs.push({
+                  step: "send_transaction",
+                  skipped: true,
+                  reason: "invalid_amount",
+                  executionMode,
+                  payload,
+                  note: "El monto debe ser un número positivo en SOL.",
+                });
+              } else if (!supabaseUrl || !serviceKey) {
+                logs.push({
+                  step: "send_transaction",
+                  skipped: true,
+                  reason: "vault_server_not_configured",
+                  executionMode,
+                  payload,
+                });
+              } else {
+                const response = await fetch(`${supabaseUrl}/functions/v1/execute-vault`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${serviceKey}`,
+                  },
+                  body: JSON.stringify({
+                    owner_wallet: ownerWallet,
+                    workflow_id: stableWorkflowId,
+                    amount_lamports: amountLamports,
+                    destination: requestedDestination,
+                  }),
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || !result.ok) {
+                  logs.push({
+                    step: "send_transaction",
+                    executed: false,
+                    reason: "vault_execution_failed",
+                    status: response.status,
+                    error: result.error || "execute-vault failed",
+                    executionMode,
+                    payload,
+                  });
+                } else {
+                  vaultTransferExecuted = true;
+                  logs.push({
+                    step: "send_transaction",
+                    executed: true,
+                    signature: result.signature,
+                    policy: result.policy,
+                    vault: result.vault,
+                    destination: result.destination,
+                    amount_lamports: result.amount_lamports,
+                    executionMode,
+                    payload,
+                  });
+                }
+              }
             } else if (notifyOnly) {
               logs.push({
                 step: "send_transaction",
@@ -150,10 +258,10 @@ Deno.serve(async (req) => {
               logs.push({
                 step: "swap",
                 skipped: true,
-                reason: "vault_execution_not_configured",
+                reason: "vault_swap_not_implemented",
                 executionMode,
                 payload,
-                note: "La bóveda on-chain todavía no está desplegada; no se movieron fondos.",
+                note: "La ruta DCA/swap de la bóveda todavía no está implementada.",
               });
             } else if (notifyOnly) {
               logs.push({
@@ -216,21 +324,35 @@ Deno.serve(async (req) => {
       }
     }
 
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    if (workflowId && SUPABASE_URL && SERVICE_KEY) {
-      const sb = createClient(SUPABASE_URL, SERVICE_KEY);
+    const txSignature =
+      logs.find(
+        (entry) =>
+          entry?.step === "send_transaction" &&
+          entry?.executed === true &&
+          typeof entry?.signature === "string",
+      )?.signature || null;
+
+    if (workflowId && supabaseUrl && serviceKey) {
+      const sb = createClient(supabaseUrl, serviceKey);
       await sb.from("workflow_runs").insert({
         workflow_id: workflowId,
         status: triggered ? "executed" : "skipped",
         trigger_data: triggerData,
-        output: { logs, executionMode, notifyOnly, scheduledFor },
+        output: {
+          logs,
+          executionMode,
+          notifyOnly,
+          scheduledFor,
+          vaultTransferExecuted,
+          txSignature,
+        },
         execution_mode: executionMode,
         scheduled_for: scheduledFor || null,
+        tx_signature: txSignature,
       });
     }
 
-    return new Response(JSON.stringify({ triggered, triggerData, logs }), {
+    return new Response(JSON.stringify({ triggered, triggerData, logs, txSignature }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

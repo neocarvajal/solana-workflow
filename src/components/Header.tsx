@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { Plus, LayoutDashboard } from 'lucide-react';
 import OnchainWorkflowsSheet from './OnchainWorkflowsSheet';
 import SettingsDialog from './SettingsDialog';
+import VaultPanel from './VaultPanel';
 import { getScenarioName, setScenarioName, subscribeWorkflow, setFlowNodes, setWorkflowId } from '@/lib/workflowStore';
 
 const Header: React.FC = () => {
@@ -72,6 +73,7 @@ const Header: React.FC = () => {
         </button>
 
         <SettingsDialog />
+        <VaultPanel />
         <OnchainWorkflowsSheet />
       </div>
     </div>
