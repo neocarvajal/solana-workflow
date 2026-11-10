@@ -1,3 +1,8 @@
+## Commit messages
+
+- All Git commit messages for this project must be written in English only.
+- This project-level rule overrides any global guidance to write commits in Spanish for this repository.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 ## This is NOT the Next.js you know
