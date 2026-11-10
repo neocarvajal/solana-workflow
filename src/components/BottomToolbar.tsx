@@ -14,6 +14,7 @@ import {
   getExecutionFrequency, setExecutionFrequency as persistExecutionFrequency, subscribeExecutionFrequency,
   getExecutionMode, setExecutionMode as persistExecutionMode, subscribeExecutionMode,
   getWorkflowId, setWorkflowId,
+  getScheduledRunState, subscribeScheduledRun, type ScheduledRunState,
 } from '@/lib/workflowStore';
 import {
   EXECUTION_MODE_OPTIONS,
@@ -38,6 +39,7 @@ const BottomToolbar: React.FC = () => {
   const [executionMode, setExecutionMode] = useState<ExecutionMode>(getExecutionMode());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [lastTxData, setLastTxData] = useState<{ signature: string; actionType: string; blockhash?: string } | null>(null);
+  const [scheduledRun, setScheduledRun] = useState<ScheduledRunState>(getScheduledRunState());
   const { publicKey, connected, sendTransaction } = useWallet();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -67,6 +69,11 @@ const BottomToolbar: React.FC = () => {
 
   useEffect(() => {
     const unsub = subscribeExecutionMode((value) => setExecutionMode(value));
+    return () => { unsub(); };
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeScheduledRun((value) => setScheduledRun(value));
     return () => { unsub(); };
   }, []);
 
@@ -594,18 +601,38 @@ const BottomToolbar: React.FC = () => {
             </button>
             <button
               onClick={runSimulation}
-              disabled={isRunning}
+              disabled={isRunning || scheduledRun.status === "running"}
               className="flex min-h-10 shrink-0 items-center gap-1 rounded-md px-2 py-2 text-sm text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+              title={
+                scheduledRun.status === "running"
+                  ? "El cron está ejecutando este workflow"
+                  : "Ejecutar el workflow manualmente"
+              }
             >
-              {isRunning ? (
+              {isRunning || scheduledRun.status === "running" ? (
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
               ) : (
                 <Play className="h-4 w-4 text-emerald-400 fill-emerald-400/20" />
               )}
               <span className="whitespace-nowrap">
-                {isRunning ? "Ejecutando..." : "Ejecutar"}
+                {isRunning || scheduledRun.status === "running" ? "Ejecutando..." : "Ejecutar"}
               </span>
             </button>
+            {(scheduledRun.status === "queued" || scheduledRun.status === "running") && (
+              <span
+                className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2 text-[11px] font-medium text-primary"
+                title={
+                  scheduledRun.workflowName
+                    ? `${scheduledRun.workflowName} · ${scheduledRun.status === "queued" ? "esperando al cron" : "ejecución programada en curso"}`
+                    : undefined
+                }
+              >
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span className="whitespace-nowrap">
+                  {scheduledRun.status === "queued" ? "Programado" : "On-chain"}
+                </span>
+              </span>
+            )}
             <button
               onClick={publishOnchain}
               disabled={publishing}

@@ -295,6 +295,31 @@ export function subscribeAnimatingLine(l: AnimatingLineListener) {
   return () => animatingLineListeners.delete(l);
 }
 
+/* ── Scheduled execution state ─────────────── */
+export type ScheduledRunStatus = "idle" | "queued" | "running" | "success" | "error";
+
+export interface ScheduledRunState {
+  status: ScheduledRunStatus;
+  workflowName?: string;
+  scheduledFor?: string | null;
+  message?: string | null;
+  updatedAt?: number;
+}
+
+type ScheduledRunListener = (state: ScheduledRunState) => void;
+let scheduledRunState: ScheduledRunState = { status: "idle" };
+const scheduledRunListeners = new Set<ScheduledRunListener>();
+
+export function getScheduledRunState() { return scheduledRunState; }
+export function setScheduledRunState(state: ScheduledRunState) {
+  scheduledRunState = { ...state, updatedAt: Date.now() };
+  scheduledRunListeners.forEach((l) => l(scheduledRunState));
+}
+export function subscribeScheduledRun(l: ScheduledRunListener) {
+  scheduledRunListeners.add(l);
+  return () => scheduledRunListeners.delete(l);
+}
+
 export const normalizeParams = (module: ModuleDef, params: Record<string, any> = {}) => {
   return {
     ...(module.defaultParams || {}),
