@@ -73,7 +73,7 @@ function fieldClass(extra = "") {
   return `min-h-11 w-full rounded-xl border border-border/50 bg-background/70 px-3 py-2.5 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 sm:text-sm ${extra}`;
 }
 
-const VaultPanel: React.FC = () => {
+const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }) => {
   const wallet = useWallet();
   const { publicKey } = wallet;
   const [open, setOpen] = useState(false);
@@ -322,16 +322,18 @@ const VaultPanel: React.FC = () => {
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <button
-          className="flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-border px-2.5 py-2 text-xs hover:bg-muted sm:px-3 sm:text-sm"
-          title="Bóveda con límites on-chain"
-          aria-label="Abrir bóveda"
-        >
-          <Landmark className="h-4 w-4" />
-          <span className="hidden sm:inline">Bóveda</span>
-        </button>
-      </SheetTrigger>
+      {!hideTrigger && (
+        <SheetTrigger asChild>
+          <button
+            className="flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-border px-2.5 py-2 text-xs hover:bg-muted sm:px-3 sm:text-sm"
+            title="Bóveda con límites on-chain"
+            aria-label="Abrir bóveda"
+          >
+            <Landmark className="h-4 w-4" />
+            <span className="hidden sm:inline">Bóveda</span>
+          </button>
+        </SheetTrigger>
+      )}
 
       <SheetContent className="w-full overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:w-[480px] sm:max-w-[480px] sm:p-6">
         <SheetHeader>

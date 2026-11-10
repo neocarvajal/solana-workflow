@@ -5,29 +5,25 @@ import Link from "next/link";
 import { useRouter } from 'next/router';
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Folder, Search, Trash2, Edit, Play, Calendar, Link as LinkIcon, ShieldCheck } from "lucide-react";
-import { executionModeLabel, scheduleToSeconds } from "@/lib/schedule";
+import { executionModeLabel } from "@/lib/schedule";
 import Sidebar from "@/components/Sidebar";
 import DeleteWorkflowModal from '@/components/DeleteConfirmationDialog';
 import { Switch } from "@/components/ui/switch";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  fetchAutomationRows,
+  findAutomation,
+  indexAutomation,
+  setAutomationActive,
+  updateAutomationIndex,
+  type AutomationIndex,
+  type WorkflowAutomationRow,
+} from "@/lib/automation";
 import { toast } from 'sonner';
-
-type AutomationRow = {
-  id: string;
-  workflow_id: string | null;
-  cid: string | null;
-  name: string;
-  enabled: boolean;
-  automation_status: string;
-  schedule: string;
-  execution_mode: string;
-  onchain_signature: string | null;
-};
 
 const WorkflowDashboard: React.FC = () => {
   const [workflows, setWorkflows] = useState<SavedWorkflow[]>([]);
   const [search, setSearch] = useState("");
-  const [automation, setAutomation] = useState<Record<string, AutomationRow>>({});
+  const [automation, setAutomation] = useState<AutomationIndex>({});
   const [toggling, setToggling] = useState<string | null>(null);
   const router = useRouter();
   
@@ -69,27 +65,12 @@ const WorkflowDashboard: React.FC = () => {
 
     let cancelled = false;
     const loadAutomation = async () => {
-      const { data, error } = await supabase
-        .from("workflows")
-        .select("id,workflow_id,cid,name,enabled,automation_status,schedule,execution_mode,onchain_signature")
-        .eq("owner_wallet", walletAddress);
-
-      if (cancelled) return;
-      if (error) {
+      try {
+        const rows = await fetchAutomationRows(walletAddress);
+        if (!cancelled) setAutomation(indexAutomation(rows));
+      } catch (error) {
         console.error("Could not load workflow automation status", error);
-        return;
       }
-
-      const map: Record<string, AutomationRow> = {};
-      ((data || []) as AutomationRow[]).forEach((row) => {
-        const signature = String(row.onchain_signature || "").trim();
-        // Ignore legacy rows that stored the old "skip" bypass: they were
-        // pinned to IPFS but never published on-chain.
-        if (!signature || signature === "skip") return;
-        if (row.workflow_id) map[`wf:${row.workflow_id}`] = row;
-        if (row.cid) map[`cid:${row.cid}`] = row;
-      });
-      setAutomation(map);
     };
 
     void loadAutomation();
@@ -98,71 +79,28 @@ const WorkflowDashboard: React.FC = () => {
     };
   }, [walletAddress]);
 
-  const automationFor = (wf: SavedWorkflow): AutomationRow | null => {
+  const automationFor = (wf: SavedWorkflow): WorkflowAutomationRow | null => {
     const workflowId = wf.workflowId || wf.workflow?.workflowId;
-    if (workflowId && automation[`wf:${workflowId}`]) {
-      return automation[`wf:${workflowId}`];
-    }
     const cid = wf.cid || (wf.workflow as { cid?: string } | undefined)?.cid;
-    if (cid && automation[`cid:${cid}`]) {
-      return automation[`cid:${cid}`];
-    }
-    return null;
+    return findAutomation(automation, workflowId, cid);
   };
 
   const handleToggleWorkflow = async (
     wf: SavedWorkflow,
-    row: AutomationRow,
+    row: WorkflowAutomationRow,
     nextActive: boolean,
   ) => {
     if (!walletAddress || toggling) return;
 
-    const schedule = wf.workflow?.schedule || row.schedule || "manual";
-    const seconds = scheduleToSeconds(schedule);
-    if (nextActive && (schedule === "manual" || seconds <= 0)) {
-      toast.error("Selecciona una frecuencia distinta de manual en el editor para activar este workflow.");
-      return;
-    }
-
     setToggling(row.id);
     try {
-      const now = new Date();
-      const update = nextActive
-        ? {
-            enabled: true,
-            automation_status: "active",
-            next_run_at: new Date(now.getTime() + Math.max(seconds, 30) * 1000).toISOString(),
-            failure_count: 0,
-            last_error: null,
-            lease_until: null,
-            claimed_by: null,
-            updated_at: now.toISOString(),
-          }
-        : {
-            enabled: false,
-            automation_status: "inactive",
-            next_run_at: null,
-            lease_until: null,
-            claimed_by: null,
-            updated_at: now.toISOString(),
-          };
-
-      const { error } = await supabase
-        .from("workflows")
-        .update(update)
-        .eq("id", row.id)
-        .eq("owner_wallet", walletAddress);
-      if (error) throw error;
-
-      setAutomation((previous) => {
-        const next = { ...previous };
-        Object.keys(next).forEach((key) => {
-          if (next[key].id === row.id) {
-            next[key] = { ...next[key], ...update };
-          }
-        });
-        return next;
+      const updated = await setAutomationActive({
+        row,
+        ownerWallet: walletAddress,
+        nextActive,
+        schedule: wf.workflow?.schedule || row.schedule,
       });
+      setAutomation((previous) => updateAutomationIndex(previous, updated));
 
       toast.success(nextActive ? `"${wf.name}" activado` : `"${wf.name}" desactivado`, {
         description: nextActive

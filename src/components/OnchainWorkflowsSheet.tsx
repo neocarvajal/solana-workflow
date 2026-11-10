@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Database, ExternalLink, Loader2, Download, RefreshCw } from "lucide-react";
@@ -14,18 +14,33 @@ import {
   setScenarioName,
   setWorkflowId,
 } from "@/lib/workflowStore";
+import {
+  fetchAutomationRows,
+  findAutomation,
+  indexAutomation,
+  setAutomationActive,
+  updateAutomationIndex,
+  type AutomationIndex,
+} from "@/lib/automation";
+import { Switch } from "@/components/ui/switch";
 import { workflowToNodes, type Workflow } from "@/lib/workflow";
 import { toast } from "sonner";
 
-const OnchainWorkflowsSheet: React.FC = () => {
+interface OnchainWorkflowsSheetProps {
+  hideTrigger?: boolean;
+}
+
+const OnchainWorkflowsSheet: React.FC<OnchainWorkflowsSheetProps> = ({ hideTrigger = false }) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [entries, setEntries] = useState<OnchainEntry[]>([]);
   const [loadingCid, setLoadingCid] = useState<string | null>(null);
+  const [automation, setAutomation] = useState<AutomationIndex>({});
+  const [toggling, setToggling] = useState<string | null>(null);
   const { publicKey } = useWallet();
   const router = useRouter();
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!publicKey) {
       toast.error("Connect your wallet first");
       return;
@@ -33,22 +48,72 @@ const OnchainWorkflowsSheet: React.FC = () => {
 
     setLoading(true);
     try {
-      const list = await listOnchainWorkflows(publicKey);
+      const owner = publicKey.toBase58();
+      const [list, rows] = await Promise.all([
+        listOnchainWorkflows(publicKey),
+        fetchAutomationRows(owner).catch((error) => {
+          console.error("Could not load workflow automation status", error);
+          return [];
+        }),
+      ]);
       setEntries(list);
+      setAutomation(indexAutomation(rows));
     } catch (e: any) {
       toast.error(e?.message || "Failed to fetch from chain");
     } finally {
       setLoading(false);
     }
-  };
+  }, [publicKey]);
 
-  useEffect(() => { if (open) load(); /* eslint-disable-next-line */ }, [open]);
+  useEffect(() => {
+    if (open) void load();
+  }, [open, load]);
 
   useEffect(() => {
     const openSheet = () => setOpen(true);
     window.addEventListener("open-onchain", openSheet);
     return () => window.removeEventListener("open-onchain", openSheet);
   }, []);
+
+  const toggleEntry = async (
+    entry: OnchainEntry,
+    nextActive: boolean,
+  ) => {
+    if (!publicKey || toggling) return;
+
+    const owner = publicKey.toBase58();
+    const row = findAutomation(automation, null, entry.payload.cid);
+    if (!row) return;
+
+    setToggling(row.id);
+    try {
+      const updated = await setAutomationActive({
+        row,
+        ownerWallet: owner,
+        nextActive,
+        schedule: row.schedule,
+      });
+      setAutomation((previous) => updateAutomationIndex(previous, updated));
+      toast.success(
+        nextActive
+          ? `"${entry.payload.name}" activado`
+          : `"${entry.payload.name}" desactivado`,
+        {
+          description: nextActive
+            ? "El cron volverá a ejecutarlo según su frecuencia."
+            : "El cron dejará de ejecutarlo hasta que lo actives de nuevo.",
+        },
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo cambiar el estado del workflow",
+      );
+    } finally {
+      setToggling(null);
+    }
+  };
 
   const loadOne = async (e: OnchainEntry) => {
     if (!publicKey) {
@@ -120,12 +185,14 @@ const OnchainWorkflowsSheet: React.FC = () => {
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <button className="flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-border px-2.5 py-2 text-xs hover:bg-muted sm:px-3 sm:text-sm">
-          <Database className="h-4 w-4" />
-          On-chain
-        </button>
-      </SheetTrigger>
+      {!hideTrigger && (
+        <SheetTrigger asChild>
+          <button className="flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-border px-2.5 py-2 text-xs hover:bg-muted sm:px-3 sm:text-sm">
+            <Database className="h-4 w-4" />
+            On-chain
+          </button>
+        </SheetTrigger>
+      )}
       <SheetContent className="w-full overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:w-[420px] sm:max-w-[420px] sm:p-6">
         <SheetHeader>
           <SheetTitle className="flex items-center justify-between gap-2">
@@ -152,7 +219,13 @@ const OnchainWorkflowsSheet: React.FC = () => {
               No published workflows for this wallet yet. Build a flow and click <b>Publish on-chain</b>.
             </div>
           )}
-          {entries.map((e) => (
+          {entries.map((e) => {
+            const row = findAutomation(automation, null, e.payload.cid);
+            const isActive = Boolean(
+              row?.enabled && row?.automation_status === "active",
+            );
+
+            return (
             <div key={e.signature} className="border border-border rounded-lg p-3 bg-card">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -175,6 +248,44 @@ const OnchainWorkflowsSheet: React.FC = () => {
                   <ExternalLink className="h-4 w-4" />
                 </a>
               </div>
+
+              {row && (
+                <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-border/60 px-2.5 py-1.5">
+                  <span
+                    className={`inline-flex items-center gap-1 text-[11px] font-medium ${
+                      isActive ? "text-emerald-400" : "text-amber-300"
+                    }`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        isActive ? "bg-emerald-400" : "bg-amber-300"
+                      }`}
+                    />
+                    {isActive ? "Activo · cron" : "Inactivo · cron"}
+                  </span>
+                  <Switch
+                    checked={isActive}
+                    onCheckedChange={(checked) => void toggleEntry(e, checked)}
+                    disabled={
+                      toggling === row.id ||
+                      (row.schedule === "manual" && !isActive)
+                    }
+                    title={
+                      row.schedule === "manual"
+                        ? "Workflow manual: cambia la frecuencia para activarlo"
+                        : isActive
+                          ? "Desactivar workflow"
+                          : "Activar workflow"
+                    }
+                    aria-label={
+                      isActive
+                        ? `Desactivar ${e.payload.name}`
+                        : `Activar ${e.payload.name}`
+                    }
+                  />
+                </div>
+              )}
+
               <button
                 onClick={() => loadOne(e)}
                 disabled={loadingCid === e.payload.cid}
@@ -188,7 +299,8 @@ const OnchainWorkflowsSheet: React.FC = () => {
                 Load into canvas
               </button>
             </div>
-          ))}
+            );
+          })}
         </div>
       </SheetContent>
     </Sheet>

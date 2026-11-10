@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { toast } from 'sonner';
 import {
   Home,
   Users,
@@ -18,6 +17,8 @@ import {
   Menu,
   X
 } from 'lucide-react';
+import OnchainWorkflowsSheet from './OnchainWorkflowsSheet';
+import VaultPanel from './VaultPanel';
 
 interface NavItemProps {
   icon: React.ElementType;
@@ -26,6 +27,7 @@ interface NavItemProps {
   onClick?: () => void;
   hasDropdown?: boolean;
   isExpanded: boolean;
+  disabled?: boolean;
 }
 
 const NavItem: React.FC<NavItemProps> = ({
@@ -34,14 +36,17 @@ const NavItem: React.FC<NavItemProps> = ({
   active = false,
   onClick,
   hasDropdown = false,
-  isExpanded
+  isExpanded,
+  disabled = false
 }) => {
   return (
     <button
       type="button"
-      className={`sidebar-item w-full min-h-10 ${active ? 'active' : ''} cursor-pointer flex items-center text-left ${isExpanded ? 'gap-2 px-3 py-2 justify-start' : 'justify-center py-2.5'}`}
-      onClick={onClick}
-      title={!isExpanded ? label : undefined}
+      disabled={disabled}
+      aria-disabled={disabled}
+      className={`sidebar-item w-full min-h-10 ${active ? 'active' : ''} flex items-center text-left ${disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'} ${isExpanded ? 'gap-2 px-3 py-2 justify-start' : 'justify-center py-2.5'}`}
+      onClick={disabled ? undefined : onClick}
+      title={disabled ? `${label} · Próximamente` : !isExpanded ? label : undefined}
     >
       <Icon className="h-5 w-5 shrink-0" />
       {isExpanded && <span className="flex-1 whitespace-nowrap overflow-hidden text-ellipsis">{label}</span>}
@@ -89,11 +94,6 @@ const Sidebar: React.FC = () => {
     router.push(path);
   };
 
-  const comingSoon = (message: string, mobile = false) => {
-    if (mobile) setMobileOpen(false);
-    toast.info(message);
-  };
-
   const openSheet = (eventName: 'open-vault' | 'open-onchain', mobile = false) => {
     if (mobile) setMobileOpen(false);
     // Let the drawer close before mounting/opening the sheet on top of it.
@@ -104,7 +104,7 @@ const Sidebar: React.FC = () => {
     <>
       <div className="px-3">
         {expanded ? (
-          <div className="mb-1.5 px-2 text-[10px] uppercase tracking-wider font-semibold opacity-50">MY ORGANIZATION</div>
+          <div className="mb-1.5 px-2 text-[10px] uppercase tracking-wider font-semibold opacity-50">SOLANA WORKSPACE</div>
         ) : (
           <hr className="border-white/10 my-3" />
         )}
@@ -129,37 +129,43 @@ const Sidebar: React.FC = () => {
           isExpanded={expanded}
           onClick={() => go('/dashboard/workflows', mobile)}
         />
-      </div>
-
-      {mobile && connected && (
-        <div className="px-3 mt-4">
-          <div className="mb-1.5 px-2 text-[10px] uppercase tracking-wider font-semibold opacity-50">
-            WALLET
-          </div>
-          <NavItem
-            icon={Landmark}
-            label="Bóveda y límites"
-            isExpanded={expanded}
-            onClick={() => openSheet('open-vault', mobile)}
-          />
+        {connected && (
           <NavItem
             icon={Database}
             label="On-chain workflows"
             isExpanded={expanded}
             onClick={() => openSheet('open-onchain', mobile)}
           />
+        )}
+      </div>
+
+      {connected && (
+        <div className="px-3 mt-4">
+          {expanded ? (
+            <div className="mb-1.5 px-2 text-[10px] uppercase tracking-wider font-semibold opacity-50">
+              WALLET
+            </div>
+          ) : (
+            <hr className="border-white/10 my-3" />
+          )}
+          <NavItem
+            icon={Landmark}
+            label="Bóveda y límites"
+            isExpanded={expanded}
+            onClick={() => openSheet('open-vault', mobile)}
+          />
         </div>
       )}
 
       <div className="px-3 mt-4">
         {expanded ? (
-          <div className="mb-1.5 px-2 text-[10px] uppercase tracking-wider font-semibold opacity-50">MY TEAM</div>
+          <div className="mb-1.5 px-2 text-[10px] uppercase tracking-wider font-semibold opacity-50">PRÓXIMAMENTE</div>
         ) : (
           <hr className="border-white/10 my-3" />
         )}
-        <NavItem icon={Users} label="Team" isExpanded={expanded} onClick={() => comingSoon('Team management coming soon!', mobile)} />
-        <NavItem icon={FileCode} label="Templates" isExpanded={expanded} onClick={() => comingSoon('Templates coming soon!', mobile)} />
-        <NavItem icon={Link} label="Connections" isExpanded={expanded} onClick={() => comingSoon('Connections coming soon!', mobile)} />
+        <NavItem icon={Users} label="Team" isExpanded={expanded} disabled />
+        <NavItem icon={FileCode} label="Templates" isExpanded={expanded} disabled />
+        <NavItem icon={Link} label="Connections" isExpanded={expanded} disabled />
       </div>
 
       <div className="mt-4 px-3">
@@ -184,7 +190,7 @@ const Sidebar: React.FC = () => {
             window.dispatchEvent(new Event('open-notifications'));
           }}
         />
-        <NavItem icon={HelpCircle} label="Help" isExpanded={expanded} onClick={() => comingSoon('Help center coming soon!', mobile)} />
+        <NavItem icon={HelpCircle} label="Help" isExpanded={expanded} disabled />
       </div>
     </>
   );
@@ -205,6 +211,8 @@ const Sidebar: React.FC = () => {
 
   return (
     <>
+      <VaultPanel hideTrigger />
+      <OnchainWorkflowsSheet hideTrigger />
       {/* Rail de escritorio */}
       <aside className={`hidden md:flex h-full bg-solana-purple flex-col text-white transition-all duration-300 select-none ${isExpanded ? 'w-64' : 'w-16'}`}>
         {isExpanded ? (
