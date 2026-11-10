@@ -5,14 +5,30 @@ import Link from "next/link";
 import { useRouter } from 'next/router';
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Folder, Search, Trash2, Edit, Play, Calendar, Link as LinkIcon, ShieldCheck } from "lucide-react";
-import { executionModeLabel } from "@/lib/schedule";
+import { executionModeLabel, scheduleToSeconds } from "@/lib/schedule";
 import Sidebar from "@/components/Sidebar";
 import DeleteWorkflowModal from '@/components/DeleteConfirmationDialog';
+import { Switch } from "@/components/ui/switch";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from 'sonner';
+
+type AutomationRow = {
+  id: string;
+  workflow_id: string | null;
+  cid: string | null;
+  name: string;
+  enabled: boolean;
+  automation_status: string;
+  schedule: string;
+  execution_mode: string;
+  onchain_signature: string | null;
+};
 
 const WorkflowDashboard: React.FC = () => {
   const [workflows, setWorkflows] = useState<SavedWorkflow[]>([]);
   const [search, setSearch] = useState("");
+  const [automation, setAutomation] = useState<Record<string, AutomationRow>>({});
+  const [toggling, setToggling] = useState<string | null>(null);
   const router = useRouter();
   
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -44,6 +60,121 @@ const WorkflowDashboard: React.FC = () => {
       setWorkflows([]);
     }
   }, [walletAddress]);
+
+  useEffect(() => {
+    if (!walletAddress) {
+      setAutomation({});
+      return;
+    }
+
+    let cancelled = false;
+    const loadAutomation = async () => {
+      const { data, error } = await supabase
+        .from("workflows")
+        .select("id,workflow_id,cid,name,enabled,automation_status,schedule,execution_mode,onchain_signature")
+        .eq("owner_wallet", walletAddress);
+
+      if (cancelled) return;
+      if (error) {
+        console.error("Could not load workflow automation status", error);
+        return;
+      }
+
+      const map: Record<string, AutomationRow> = {};
+      ((data || []) as AutomationRow[]).forEach((row) => {
+        const signature = String(row.onchain_signature || "").trim();
+        // Ignore legacy rows that stored the old "skip" bypass: they were
+        // pinned to IPFS but never published on-chain.
+        if (!signature || signature === "skip") return;
+        if (row.workflow_id) map[`wf:${row.workflow_id}`] = row;
+        if (row.cid) map[`cid:${row.cid}`] = row;
+      });
+      setAutomation(map);
+    };
+
+    void loadAutomation();
+    return () => {
+      cancelled = true;
+    };
+  }, [walletAddress]);
+
+  const automationFor = (wf: SavedWorkflow): AutomationRow | null => {
+    const workflowId = wf.workflowId || wf.workflow?.workflowId;
+    if (workflowId && automation[`wf:${workflowId}`]) {
+      return automation[`wf:${workflowId}`];
+    }
+    const cid = wf.cid || (wf.workflow as { cid?: string } | undefined)?.cid;
+    if (cid && automation[`cid:${cid}`]) {
+      return automation[`cid:${cid}`];
+    }
+    return null;
+  };
+
+  const handleToggleWorkflow = async (
+    wf: SavedWorkflow,
+    row: AutomationRow,
+    nextActive: boolean,
+  ) => {
+    if (!walletAddress || toggling) return;
+
+    const schedule = wf.workflow?.schedule || row.schedule || "manual";
+    const seconds = scheduleToSeconds(schedule);
+    if (nextActive && (schedule === "manual" || seconds <= 0)) {
+      toast.error("Selecciona una frecuencia distinta de manual en el editor para activar este workflow.");
+      return;
+    }
+
+    setToggling(row.id);
+    try {
+      const now = new Date();
+      const update = nextActive
+        ? {
+            enabled: true,
+            automation_status: "active",
+            next_run_at: new Date(now.getTime() + Math.max(seconds, 30) * 1000).toISOString(),
+            failure_count: 0,
+            last_error: null,
+            lease_until: null,
+            claimed_by: null,
+            updated_at: now.toISOString(),
+          }
+        : {
+            enabled: false,
+            automation_status: "inactive",
+            next_run_at: null,
+            lease_until: null,
+            claimed_by: null,
+            updated_at: now.toISOString(),
+          };
+
+      const { error } = await supabase
+        .from("workflows")
+        .update(update)
+        .eq("id", row.id)
+        .eq("owner_wallet", walletAddress);
+      if (error) throw error;
+
+      setAutomation((previous) => {
+        const next = { ...previous };
+        Object.keys(next).forEach((key) => {
+          if (next[key].id === row.id) {
+            next[key] = { ...next[key], ...update };
+          }
+        });
+        return next;
+      });
+
+      toast.success(nextActive ? `"${wf.name}" activado` : `"${wf.name}" desactivado`, {
+        description: nextActive
+          ? "El cron volverá a ejecutarlo según su frecuencia."
+          : "El cron dejará de ejecutarlo hasta que lo actives de nuevo.",
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo cambiar el estado del workflow");
+    } finally {
+      setToggling(null);
+    }
+  };
 
   const handleEdit = (wf: SavedWorkflow) => {
     setScenarioName(wf.name);
@@ -175,7 +306,12 @@ const WorkflowDashboard: React.FC = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
-                {filtered.map((wf) => (
+                {filtered.map((wf) => {
+                  const row = automationFor(wf);
+                  const schedule = wf.workflow?.schedule || row?.schedule || "manual";
+                  const isActive = Boolean(row?.enabled && row?.automation_status === "active");
+
+                  return (
                   <div
                     key={wf.id}
                     className="group flex h-full cursor-pointer flex-col rounded-2xl border border-border/50 bg-card p-4 transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 sm:p-5"
@@ -185,15 +321,37 @@ const WorkflowDashboard: React.FC = () => {
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-purple-cyan text-white">
                         <Folder className="h-5 w-5" />
                       </div>
-                      <div className="flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
-                        <button
-                          onClick={(e) => handleDelete(wf.id, e)}
-                          className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-red-400/10 hover:text-red-400"
-                          title="Delete"
-                          aria-label={`Eliminar ${wf.name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                      <div className="flex items-center gap-2">
+                        {row && (
+                          <div
+                            className="flex items-center gap-1.5"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <Switch
+                              checked={isActive}
+                              onCheckedChange={(checked) => void handleToggleWorkflow(wf, row, checked)}
+                              disabled={toggling === row.id || (schedule === "manual" && !isActive)}
+                              title={
+                                schedule === "manual"
+                                  ? "Workflow manual: cambia la frecuencia para activarlo"
+                                  : isActive
+                                    ? "Desactivar workflow"
+                                    : "Activar workflow"
+                              }
+                              aria-label={isActive ? `Desactivar ${wf.name}` : `Activar ${wf.name}`}
+                            />
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+                          <button
+                            onClick={(e) => handleDelete(wf.id, e)}
+                            className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-red-400/10 hover:text-red-400"
+                            title="Delete"
+                            aria-label={`Eliminar ${wf.name}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -207,6 +365,22 @@ const WorkflowDashboard: React.FC = () => {
                       <span className="rounded-md bg-muted px-2 py-1 text-[11px] text-muted-foreground">
                         {wf.workflow?.schedule === "manual" ? "Manual" : wf.workflow?.schedule || "15m"}
                       </span>
+                      {row && (
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium ${
+                            isActive
+                              ? "bg-emerald-400/10 text-emerald-400"
+                              : "bg-amber-400/10 text-amber-300"
+                          }`}
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              isActive ? "bg-emerald-400" : "bg-amber-300"
+                            }`}
+                          />
+                          {isActive ? "Activo" : "Inactivo"}
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-4 text-xs text-muted-foreground mb-6">
@@ -247,7 +421,8 @@ const WorkflowDashboard: React.FC = () => {
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
 
                 {filtered.length === 0 && (
                   <div className="col-span-full py-12 text-center text-muted-foreground">
