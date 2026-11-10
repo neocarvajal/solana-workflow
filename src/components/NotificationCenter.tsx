@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom";
+import { useWallet } from "@solana/wallet-adapter-react";
 import {
   AlertTriangle,
   Bell,
@@ -19,7 +20,9 @@ import {
   clearNotifications,
   markAllNotificationsRead,
   markNotificationRead,
+  setNotificationWallet,
   subscribeNotifications,
+  syncNotifications,
   type AppNotification,
 } from "@/lib/notificationStore";
 
@@ -55,6 +58,8 @@ function relativeTime(timestamp: number) {
 }
 
 const NotificationCenter: React.FC = () => {
+  const { publicKey } = useWallet();
+  const walletAddress = publicKey?.toBase58() ?? null;
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<AppNotification[]>([]);
@@ -65,7 +70,32 @@ const NotificationCenter: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const openCenter = () => setOpen(true);
+    setNotificationWallet(walletAddress);
+  }, [walletAddress]);
+
+  useEffect(() => {
+    if (!walletAddress) return;
+
+    void syncNotifications();
+    const interval = window.setInterval(() => {
+      void syncNotifications();
+    }, 15_000);
+    const onFocus = () => {
+      void syncNotifications();
+    };
+
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [walletAddress]);
+
+  useEffect(() => {
+    const openCenter = () => {
+      setOpen(true);
+      void syncNotifications();
+    };
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
     };

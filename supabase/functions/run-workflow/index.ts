@@ -1,6 +1,6 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { deliverAlert } from "../_shared/alerts.ts";
+import { deliverAlert, resolveAlertMessage } from "../_shared/alerts.ts";
 
 const COIN_IDS: Record<string, string> = {
   SOL: "solana", BONK: "bonk", JUP: "jupiter-exchange-solana", WIF: "dogwifcoin", USDC: "usd-coin",
@@ -54,6 +54,7 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const vaultExecutionEnabled = Deno.env.get("VAULT_EXECUTION_ENABLED") === "true";
+    const sb = supabaseUrl && serviceKey ? createClient(supabaseUrl, serviceKey) : null;
 
     if (!workflow) {
       return new Response(JSON.stringify({ error: "workflow required" }), {
@@ -281,6 +282,11 @@ Deno.serve(async (req) => {
               });
             }
           } else if (step.type === "send_alert") {
+            const variables = {
+              ...triggerData,
+              trigger: triggerData,
+              workflow: workflow.name,
+            };
             const alert = await deliverAlert({
               channel: step.params.channel || "app",
               title: step.params.title,
@@ -289,20 +295,62 @@ Deno.serve(async (req) => {
               chatId: step.params.chatId,
               webhookUrl: step.params.webhookUrl,
               phone: step.params.phone,
-              variables: {
-                ...triggerData,
-                trigger: triggerData,
-                workflow: workflow.name,
-              },
+              ownerWallet,
+              variables,
             });
+            if (!alert.ok) throw new Error(alert.message);
+
+            if (alert.channel === "app") {
+              if (!sb) {
+                throw new Error(
+                  "Falta la configuración de Supabase en el servidor; no se puede guardar la notificación in-app.",
+                );
+              }
+              if (!ownerWallet) {
+                throw new Error(
+                  "Falta ownerWallet en la ejecución; no se puede guardar la notificación in-app.",
+                );
+              }
+
+              const title = resolveAlertMessage(
+                String(step.params.title || "").trim() || "Alerta de Solana Workflow",
+                variables,
+                { appendPriceContext: false },
+              ).slice(0, 200);
+              const message = resolveAlertMessage(
+                String(step.params.message || "Trigger fired!"),
+                variables,
+              ).slice(0, 4000);
+
+              const { error: notificationError } = await sb.from("user_notifications").insert({
+                owner_wallet: ownerWallet,
+                workflow_id: stableWorkflowId || workflowId || null,
+                workflow_name: workflow.name,
+                title,
+                message,
+                channel: "app",
+                status: "success",
+                metadata: {
+                  scheduledFor: scheduledFor || null,
+                  trigger: triggerData,
+                },
+              });
+
+              if (notificationError) {
+                throw new Error(
+                  `No se pudo guardar la notificación in-app: ${notificationError.message}`,
+                );
+              }
+            }
+
             logs.push({
               step: "send_alert",
               channel: alert.channel,
               provider: alert.provider,
-              ok: alert.ok,
+              ok: true,
+              persisted: alert.channel === "app",
               message: alert.message,
             });
-            if (!alert.ok) throw new Error(alert.message);
           } else if (step.type === "http_request") {
             const r = await fetch(step.params.url, {
               method: step.params.method || "GET",
@@ -332,8 +380,7 @@ Deno.serve(async (req) => {
           typeof entry?.signature === "string",
       )?.signature || null;
 
-    if (workflowId && supabaseUrl && serviceKey) {
-      const sb = createClient(supabaseUrl, serviceKey);
+    if (workflowId && sb) {
       await sb.from("workflow_runs").insert({
         workflow_id: workflowId,
         status: triggered ? "executed" : "skipped",

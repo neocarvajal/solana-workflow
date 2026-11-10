@@ -63,6 +63,16 @@ through instructions that enforce the user's on-chain policy. The devnet program
 is `dB4W6X19PphXLpSPZfe6ZjQkpBHpfHFDDeUddEGdqQA`; the browser panel derives the
 policy and vault PDAs from `owner + SHA-256(workflow_id)`.
 
+## In-app notifications
+
+The cron cannot write to the browser's `localStorage`. When a `send_alert` step
+uses `channel: "app"`, `run-workflow` inserts a row into
+`public.user_notifications` with the owner wallet, stable workflow UUID, title,
+message and trigger metadata. The notification bell polls that table for the
+connected wallet, shows the unread badge, and persists read/clear actions.
+Inserts are service-role only, so the browser cannot forge alerts for another
+wallet.
+
 ## Per-wallet IPFS space
 
 `pin-to-ipfs` and `upload-user-asset` create a Pinata group per wallet and store

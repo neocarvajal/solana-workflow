@@ -41,6 +41,48 @@ export type Database = {
         }
         Relationships: []
       }
+      user_notifications: {
+        Row: {
+          channel: string
+          created_at: string
+          id: string
+          message: string
+          metadata: Json
+          owner_wallet: string
+          read: boolean
+          status: string
+          title: string
+          workflow_id: string | null
+          workflow_name: string | null
+        }
+        Insert: {
+          channel?: string
+          created_at?: string
+          id?: string
+          message: string
+          metadata?: Json
+          owner_wallet: string
+          read?: boolean
+          status?: string
+          title?: string
+          workflow_id?: string | null
+          workflow_name?: string | null
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          id?: string
+          message?: string
+          metadata?: Json
+          owner_wallet?: string
+          read?: boolean
+          status?: string
+          title?: string
+          workflow_id?: string | null
+          workflow_name?: string | null
+        }
+        Relationships: []
+      }
       user_vaults: {
         Row: {
           created_at: string
