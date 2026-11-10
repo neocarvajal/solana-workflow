@@ -342,6 +342,59 @@ export function getSavedWorkflows(walletAddress: string): SavedWorkflow[] {
 }
 
 
+/**
+ * Upserts the local "My Workflows" record after a publish or an on-chain load.
+ * It does not pin anything; the caller already has the CID from Pinata.
+ */
+export function rememberSavedWorkflow(input: {
+  id?: string;
+  pinataId?: string;
+  name: string;
+  workflow: Workflow;
+  ownerWallet: string;
+  cid?: string;
+  workflowId?: string;
+  executionMode?: ExecutionMode;
+}): SavedWorkflow {
+  const raw = localStorage.getItem(SAVED_WORKFLOWS_KEY);
+  const saved: SavedWorkflow[] = raw ? JSON.parse(raw) : [];
+  const workflowId = input.workflowId || input.workflow.workflowId;
+
+  let index = -1;
+  if (input.id) {
+    index = saved.findIndex((item) => item.id === input.id || item.pinataId === input.id);
+  }
+  if (index === -1 && input.pinataId) {
+    index = saved.findIndex((item) => item.pinataId === input.pinataId);
+  }
+  if (index === -1 && workflowId) {
+    index = saved.findIndex(
+      (item) =>
+        item.ownerWallet === input.ownerWallet &&
+        (item.workflowId === workflowId || item.workflow?.workflowId === workflowId),
+    );
+  }
+
+  const existing = index >= 0 ? saved[index] : undefined;
+  const record: SavedWorkflow = {
+    id: existing?.id || input.id || `wf-${Date.now()}`,
+    pinataId: input.pinataId || existing?.pinataId,
+    name: input.name,
+    created: existing?.created || Date.now(),
+    workflow: { ...input.workflow, workflowId },
+    ownerWallet: input.ownerWallet,
+    cid: input.cid || existing?.cid,
+    workflowId,
+    executionMode:
+      input.executionMode || input.workflow.executionMode || existing?.executionMode,
+  };
+
+  if (index >= 0) saved[index] = record;
+  else saved.push(record);
+  localStorage.setItem(SAVED_WORKFLOWS_KEY, JSON.stringify(saved));
+  return record;
+}
+
 export async function saveWorkflow(
   name: string,
   wf: Workflow,

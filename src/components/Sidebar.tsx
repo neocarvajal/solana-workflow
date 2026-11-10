@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { toast } from 'sonner';
 import {
   Home,
@@ -12,6 +13,8 @@ import {
   Bell,
   HelpCircle,
   ChevronDown,
+  Database,
+  Landmark,
   Menu,
   X
 } from 'lucide-react';
@@ -60,6 +63,7 @@ const Sidebar: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const router = useRouter();
+  const { connected } = useWallet();
 
   const isScenariosActive = router.pathname === '/dashboard';
   const isOrgActive = router.pathname === '/dashboard/workflows';
@@ -88,6 +92,12 @@ const Sidebar: React.FC = () => {
   const comingSoon = (message: string, mobile = false) => {
     if (mobile) setMobileOpen(false);
     toast.info(message);
+  };
+
+  const openSheet = (eventName: 'open-vault' | 'open-onchain', mobile = false) => {
+    if (mobile) setMobileOpen(false);
+    // Let the drawer close before mounting/opening the sheet on top of it.
+    window.setTimeout(() => window.dispatchEvent(new Event(eventName)), 80);
   };
 
   const sections = (expanded: boolean, mobile = false) => (
@@ -120,6 +130,26 @@ const Sidebar: React.FC = () => {
           onClick={() => go('/dashboard/workflows', mobile)}
         />
       </div>
+
+      {mobile && connected && (
+        <div className="px-3 mt-4">
+          <div className="mb-1.5 px-2 text-[10px] uppercase tracking-wider font-semibold opacity-50">
+            WALLET
+          </div>
+          <NavItem
+            icon={Landmark}
+            label="Bóveda y límites"
+            isExpanded={expanded}
+            onClick={() => openSheet('open-vault', mobile)}
+          />
+          <NavItem
+            icon={Database}
+            label="On-chain workflows"
+            isExpanded={expanded}
+            onClick={() => openSheet('open-onchain', mobile)}
+          />
+        </div>
+      )}
 
       <div className="px-3 mt-4">
         {expanded ? (

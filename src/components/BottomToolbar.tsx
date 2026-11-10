@@ -9,7 +9,8 @@ import { workflowToNodes, nodesToWorkflow } from "@/lib/workflow";
 import {
   getWorkflow, getOnchainMeta, setOnchainMeta, setScenarioName, setFlowNodes, updateWorkflow,
   getFlowNodes, getCanvasScale, setCanvasScale, subscribeScale, getScenarioName,
-  setRunningNodeId, setAnimatingLineIndex, setErrorNodeId, saveWorkflow, saveLocalOnly, getSavedWorkflows,
+  setRunningNodeId, setAnimatingLineIndex, setErrorNodeId, saveWorkflow, saveLocalOnly,
+  rememberSavedWorkflow, getSavedWorkflows,
   getExecutionFrequency, setExecutionFrequency as persistExecutionFrequency, subscribeExecutionFrequency,
   getExecutionMode, setExecutionMode as persistExecutionMode, subscribeExecutionMode,
   getWorkflowId, setWorkflowId,
@@ -426,7 +427,10 @@ const BottomToolbar: React.FC = () => {
   };
 
   const publishOnchain = async () => {
-    const wf = getWorkflow();
+    // Rebuild from the canvas so the IPFS JSON always matches what the user
+    // sees, including the latest node parameters and positions.
+    const currentWorkflow = nodesToWorkflow(getScenarioName(), getFlowNodes());
+    const wf = currentWorkflow || getWorkflow();
     if (!wf) {
       toast.error("Build or generate a workflow first");
       return;
@@ -544,13 +548,27 @@ const BottomToolbar: React.FC = () => {
 
     if (dbError) throw new Error(`DB Error: ${dbError.message}`);
 
+    // Keep the local "My Workflows" list in sync with the IPFS/on-chain
+    // publish so the flow can be reopened without loading it from the chain.
+    const savedRecord = rememberSavedWorkflow({
+      id: editingId || undefined,
+      pinataId: typeof pin?.id === "string" ? pin.id : undefined,
+      name: workflowName,
+      workflow: publishableWorkflow,
+      ownerWallet: owner,
+      cid,
+      workflowId,
+      executionMode,
+    });
+    if (!editingId) setEditingId(savedRecord.id);
+
     if (executionMode === "vault_transfer" || executionMode === "vault_dca" || executionMode === "subscription") {
       toast.info("Modo de fondos guardado", {
         description: "El cron seguirá evaluando el workflow y enviando alertas. El movimiento automático de fondos seguirá desactivado hasta completar la auditoría; configura los límites en el panel Bóveda.",
       });
     }
 
-    toast.success("Published on-chain", {
+    toast.success("Guardado en IPFS y publicado on-chain", {
       description: `CID: ${cid.slice(0, 8)}... · v${version} · ${automationStatus === "active" ? "cron activo" : "sin cron"}`,
       action: { label: "View", onClick: () => window.open(solexplorerUrl(signature), "_blank") },
     });

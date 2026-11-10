@@ -53,9 +53,6 @@ const Navbar: React.FC = () => {
       )}
 
       <nav className="flex items-center gap-2 sm:gap-3 md:gap-6 shrink-0">
-        <Link href="/documentation" className="hidden min-h-10 items-center text-sm font-medium text-foreground hover:underline sm:flex">
-          Documentación
-        </Link>
         <NotificationCenter />
         <WalletButton />
       </nav>

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import Link from "next/link";
 import { Sparkles, Loader2, ArrowRight, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -189,6 +190,15 @@ const Landing: React.FC = () => {
             >
               o empieza con un canvas vacío →
             </button>
+          </div>
+
+          <div className="mt-3 flex justify-center">
+            <Link
+              href="/documentation"
+              className="inline-flex min-h-9 items-center text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
+            >
+              Ver documentación
+            </Link>
           </div>
         </div>
       </main>
