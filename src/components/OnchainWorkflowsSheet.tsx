@@ -18,6 +18,7 @@ import {
   fetchAutomationRows,
   findAutomation,
   indexAutomation,
+  mergeOnchainEntries,
   setAutomationActive,
   updateAutomationIndex,
   type AutomationIndex,
@@ -37,6 +38,7 @@ const OnchainWorkflowsSheet: React.FC<OnchainWorkflowsSheetProps> = ({ hideTrigg
   const [loadingCid, setLoadingCid] = useState<string | null>(null);
   const [automation, setAutomation] = useState<AutomationIndex>({});
   const [toggling, setToggling] = useState<string | null>(null);
+  const [chainWarning, setChainWarning] = useState(false);
   const { publicKey } = useWallet();
   const router = useRouter();
 
@@ -47,19 +49,39 @@ const OnchainWorkflowsSheet: React.FC<OnchainWorkflowsSheetProps> = ({ hideTrigg
     }
 
     setLoading(true);
+    setChainWarning(false);
     try {
       const owner = publicKey.toBase58();
-      const [list, rows] = await Promise.all([
+      const [chainResult, rowsResult] = await Promise.allSettled([
         listOnchainWorkflows(publicKey),
-        fetchAutomationRows(owner).catch((error) => {
-          console.error("Could not load workflow automation status", error);
-          return [];
-        }),
+        fetchAutomationRows(owner),
       ]);
-      setEntries(list);
+
+      const rows = rowsResult.status === "fulfilled" ? rowsResult.value : [];
+      if (rowsResult.status === "rejected") {
+        console.error("Could not load workflow automation status", rowsResult.reason);
+      }
+
+      let chainEntries: OnchainEntry[] = [];
+      if (chainResult.status === "fulfilled") {
+        chainEntries = chainResult.value;
+      } else {
+        console.warn("Could not read on-chain history, using saved rows", chainResult.reason);
+        setChainWarning(rows.length > 0);
+      }
+
+      setEntries(mergeOnchainEntries(chainEntries, rows));
       setAutomation(indexAutomation(rows));
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to fetch from chain");
+
+      if (
+        chainResult.status === "rejected" &&
+        chainEntries.length === 0 &&
+        rows.length === 0
+      ) {
+        toast.error("No se pudo leer la cadena ni el historial guardado. Intenta de nuevo.");
+      }
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to fetch from chain");
     } finally {
       setLoading(false);
     }
@@ -176,8 +198,8 @@ const OnchainWorkflowsSheet: React.FC<OnchainWorkflowsSheetProps> = ({ hideTrigg
       toast.success(`"${wf.name}" cargado en el canvas`);
       setOpen(false);
       router.push({ pathname: "/dashboard", query: { id: record.id } });
-    } catch (err: any) {
-      toast.error(err?.message || "Could not fetch from IPFS");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Could not fetch from IPFS");
     } finally {
       setLoadingCid(null);
     }
@@ -213,6 +235,12 @@ const OnchainWorkflowsSheet: React.FC<OnchainWorkflowsSheetProps> = ({ hideTrigg
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Reading wallet history…
             </div>
+          )}
+          {!loading && chainWarning && entries.length > 0 && (
+            <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[11px] text-amber-200">
+              El RPC público no respondió ahora mismo; mostrando el historial guardado. Pulsa
+              actualizar para reintentar la lectura on-chain.
+            </p>
           )}
           {!loading && entries.length === 0 && (
             <div className="text-sm text-muted-foreground p-4 border border-dashed rounded">

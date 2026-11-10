@@ -10,6 +10,7 @@ import Sidebar from "@/components/Sidebar";
 import DeleteWorkflowModal from '@/components/DeleteConfirmationDialog';
 import { Switch } from "@/components/ui/switch";
 import {
+  backfillSavedWorkflows,
   fetchAutomationRows,
   findAutomation,
   indexAutomation,
@@ -20,11 +21,31 @@ import {
 } from "@/lib/automation";
 import { toast } from 'sonner';
 
+function readSavedWorkflows(walletAddress: string): SavedWorkflow[] {
+  const workflowsData = getSavedWorkflows(walletAddress);
+
+  const uniqueWorkflows = workflowsData.reduce((acc: SavedWorkflow[], current) => {
+    const existing = acc.find(item => item.id === current.id);
+
+    if (!existing) {
+      return acc.concat([current]);
+    } else {
+      if (current.cid && !existing.cid) {
+        return acc.map(item => item.id === current.id ? current : item);
+      }
+      return acc;
+    }
+  }, []);
+
+  return [...uniqueWorkflows].sort((a, b) => b.created - a.created);
+}
+
 const WorkflowDashboard: React.FC = () => {
   const [workflows, setWorkflows] = useState<SavedWorkflow[]>([]);
   const [search, setSearch] = useState("");
   const [automation, setAutomation] = useState<AutomationIndex>({});
   const [toggling, setToggling] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
   const router = useRouter();
   
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -35,23 +56,7 @@ const WorkflowDashboard: React.FC = () => {
 
   useEffect(() => {
     if (walletAddress) {
-      const workflowsData = getSavedWorkflows(walletAddress);
-      
-      const uniqueWorkflows = workflowsData.reduce((acc: SavedWorkflow[], current) => {
-        const existing = acc.find(item => item.id === current.id);
-        
-        if (!existing) {
-          return acc.concat([current]);
-        } else {
-          if (current.cid && !existing.cid) {
-            return acc.map(item => item.id === current.id ? current : item);
-          }
-          return acc;
-        }
-      }, []);
-
-      const sorted = [...uniqueWorkflows].sort((a, b) => b.created - a.created);
-      setWorkflows(sorted);
+      setWorkflows(readSavedWorkflows(walletAddress));
     } else {
       setWorkflows([]);
     }
@@ -60,16 +65,29 @@ const WorkflowDashboard: React.FC = () => {
   useEffect(() => {
     if (!walletAddress) {
       setAutomation({});
+      setRestoring(false);
       return;
     }
 
     let cancelled = false;
+    setRestoring(true);
     const loadAutomation = async () => {
       try {
-        const rows = await fetchAutomationRows(walletAddress);
-        if (!cancelled) setAutomation(indexAutomation(rows));
+        const rows = await fetchAutomationRows(walletAddress, { includeUnpublished: true });
+        if (cancelled) return;
+
+        setAutomation(indexAutomation(rows));
+
+        // Recover workflows published by earlier versions but missing from
+        // localStorage, so they show up and can be loaded/toggled again.
+        const restored = backfillSavedWorkflows(rows, walletAddress);
+        if (!cancelled && restored.length > 0) {
+          setWorkflows(readSavedWorkflows(walletAddress));
+        }
       } catch (error) {
         console.error("Could not load workflow automation status", error);
+      } finally {
+        if (!cancelled) setRestoring(false);
       }
     };
 
@@ -162,18 +180,7 @@ const WorkflowDashboard: React.FC = () => {
         loading: 'Deleting workflow from IPFS network...',
         success: () => {
           // Sync state and UI only after successful execution
-          const updatedWorkflows = getSavedWorkflows(walletAddress);
-          const uniqueWorkflows = updatedWorkflows.reduce((acc: SavedWorkflow[], current) => {
-            const existing = acc.find(item => item.id === current.id);
-            if (!existing) return acc.concat([current]);
-            if (current.cid && !existing.cid) {
-              return acc.map(item => item.id === current.id ? current : item);
-            }
-            return acc;
-          }, []);
-          
-          const sorted = [...uniqueWorkflows].sort((a, b) => b.created - a.created);
-          setWorkflows(sorted);
+          setWorkflows(readSavedWorkflows(walletAddress));
           
           return 'Workflow deleted successfully';
         },
@@ -225,6 +232,13 @@ const WorkflowDashboard: React.FC = () => {
                   Please connect your Solana wallet to view and manage your saved workflows.
                 </p>
                 <p className="text-sm font-medium text-primary">Use the "Connect Wallet" button above.</p>
+              </div>
+            ) : restoring && workflows.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/40 bg-muted/20 px-4 py-16 text-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+                <p className="text-sm text-muted-foreground">
+                  Restaurando workflows publicados desde tu historial…
+                </p>
               </div>
             ) : workflows.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/40 bg-muted/20 px-4 py-12 text-center sm:py-24">

@@ -350,7 +350,11 @@ export function getSavedWorkflows(walletAddress: string): SavedWorkflow[] {
     const walletWorkflows = allWorkflows.filter((w) => w.ownerWallet === walletAddress);
     // Deduplicate: if there are both a CID and a local-only entry for the same workflow (by id), keep the one with cid.
     const deduped = walletWorkflows.reduce((acc: SavedWorkflow[], cur) => {
-      const existing = acc.find(item => item.id === cur.id || item.pinataId === cur.pinataId);
+      const existing = acc.find(
+        (item) =>
+          item.id === cur.id ||
+          (Boolean(item.pinataId) && item.pinataId === cur.pinataId),
+      );
       if (!existing) {
         return acc.concat([cur]);
       }
@@ -380,6 +384,7 @@ export function rememberSavedWorkflow(input: {
   cid?: string;
   workflowId?: string;
   executionMode?: ExecutionMode;
+  created?: number;
 }): SavedWorkflow {
   const raw = localStorage.getItem(SAVED_WORKFLOWS_KEY);
   const saved: SavedWorkflow[] = raw ? JSON.parse(raw) : [];
@@ -399,13 +404,18 @@ export function rememberSavedWorkflow(input: {
         (item.workflowId === workflowId || item.workflow?.workflowId === workflowId),
     );
   }
+  if (index === -1 && input.cid) {
+    index = saved.findIndex(
+      (item) => item.ownerWallet === input.ownerWallet && item.cid === input.cid,
+    );
+  }
 
   const existing = index >= 0 ? saved[index] : undefined;
   const record: SavedWorkflow = {
     id: existing?.id || input.id || `wf-${Date.now()}`,
     pinataId: input.pinataId || existing?.pinataId,
     name: input.name,
-    created: existing?.created || Date.now(),
+    created: existing?.created || input.created || Date.now(),
     workflow: { ...input.workflow, workflowId },
     ownerWallet: input.ownerWallet,
     cid: input.cid || existing?.cid,

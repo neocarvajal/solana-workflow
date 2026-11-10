@@ -182,6 +182,17 @@ export async function syncNotifications(): Promise<void> {
   return syncInFlight;
 }
 
+/**
+ * Forces a new server read even when a background poll is already in flight,
+ * so a completed scheduled run can reveal its notification immediately.
+ */
+export async function refreshNotifications(): Promise<void> {
+  if (syncInFlight) {
+    await syncInFlight.catch(() => undefined);
+  }
+  await syncNotifications();
+}
+
 export function addNotification(input: {
   title?: string;
   message: string;

@@ -100,14 +100,53 @@ export async function listOnchainWorkflows(
   owner: PublicKey,
   limit = 30
 ): Promise<OnchainEntry[]> {
-  const sigs = await connection.getSignaturesForAddress(owner, { limit });
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  let sigs;
+  try {
+    sigs = await connection.getSignaturesForAddress(owner, { limit });
+  } catch (error) {
+    // The public devnet RPC throttles aggressively; one short retry usually
+    // succeeds before falling back to the Supabase history in the caller.
+    console.warn("Signature history request failed, retrying once", error);
+    await sleep(900);
+    sigs = await connection.getSignaturesForAddress(owner, { limit });
+  }
   if (sigs.length === 0) return [];
-  const txs = await connection.getParsedTransactions(
-    sigs.map((s) => s.signature),
-    { maxSupportedTransactionVersion: 0 }
-  );
+
+  type SignatureInfo = (typeof sigs)[number];
+  type ParsedTx = Awaited<ReturnType<typeof connection.getParsedTransaction>>;
+  let parsed: { info: SignatureInfo; tx: ParsedTx }[] = [];
+
+  try {
+    const batch = await connection.getParsedTransactions(
+      sigs.map((s) => s.signature),
+      { maxSupportedTransactionVersion: 0 }
+    );
+    parsed = sigs.map((info, i) => ({ info, tx: batch[i] ?? null }));
+  } catch (error) {
+    // A 429 on the batch call must not blank the whole list. Read the most
+    // recent transactions one by one and stop after repeated failures.
+    console.warn("Batch transaction read failed, retrying individually", error);
+    let failures = 0;
+    for (const info of sigs.slice(0, 10)) {
+      try {
+        const tx = await connection.getParsedTransaction(info.signature, {
+          maxSupportedTransactionVersion: 0,
+        });
+        parsed.push({ info, tx });
+        failures = 0;
+      } catch {
+        parsed.push({ info, tx: null });
+        failures += 1;
+        if (failures >= 3) break;
+      }
+      await sleep(250);
+    }
+  }
+
   const out: OnchainEntry[] = [];
-  txs.forEach((tx, i) => {
+  parsed.forEach(({ info, tx }) => {
     if (!tx) return;
     for (const ix of tx.transaction.message.instructions as any[]) {
       const pid = (ix.programId as PublicKey)?.toBase58?.() || ix.programId;
@@ -123,8 +162,8 @@ export async function listOnchainWorkflows(
         const p = JSON.parse(raw);
         if (p?.app === "solflows" && p?.cid) {
           out.push({
-            signature: sigs[i].signature,
-            blockTime: sigs[i].blockTime ?? tx.blockTime ?? null,
+            signature: info.signature,
+            blockTime: info.blockTime ?? tx.blockTime ?? null,
             payload: p,
           });
         }

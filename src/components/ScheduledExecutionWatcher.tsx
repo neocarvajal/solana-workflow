@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { refreshNotifications } from "@/lib/notificationStore";
 import {
   getFlowNodes,
   getRunningNodeId,
@@ -259,6 +260,13 @@ const ScheduledExecutionWatcher: React.FC = () => {
 
       const outcome = await fetchOutcome(row.id, scheduledFor, isCancelled);
       await animation;
+
+      if (cancelled) return;
+
+      // The cron stores the in-app notification before the run result. Pull it
+      // now so the bell updates together with the end of the node animation,
+      // exactly like the manual "Ejecutar" flow.
+      await refreshNotifications().catch(() => undefined);
 
       if (cancelled) return;
 
