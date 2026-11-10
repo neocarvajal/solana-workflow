@@ -679,6 +679,7 @@ export async function deleteWorkflow(
     const wallet = ownerWallet || record?.ownerWallet;
     const targetCid = cid || record?.cid;
     const targetPinataId = pinataFileId || record?.pinataId;
+    const targetWorkflowId = record?.workflowId || record?.workflow?.workflowId;
 
     // 1. SI EXISTE EL ID DE PINATA O EL CID, LE AVISAMOS A LA EDGE FUNCTION
     if (targetPinataId || targetCid) {
@@ -702,7 +703,8 @@ export async function deleteWorkflow(
 
     // 2. Tombstone en Supabase: desactiva el cron y conserva el CID/signature
     // para que el memo on-chain ya publicado deje de listarse en la app.
-    if (wallet) {
+    const isPublishedRecord = Boolean(targetWorkflowId || targetCid);
+    if (wallet && isPublishedRecord) {
       const now = new Date().toISOString();
       const update = {
         enabled: false,
