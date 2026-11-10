@@ -4,7 +4,7 @@ import NotificationCenter from "./NotificationCenter";
 import { useWallet } from "@solana/wallet-adapter-react";
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Menu, Zap } from "lucide-react";
+import { LayoutDashboard, Menu, Zap } from "lucide-react";
 import Header from './Header';
 import MobileWorkflowMenu from './MobileWorkflowMenu';
 
@@ -53,6 +53,17 @@ const Navbar: React.FC = () => {
       )}
 
       <nav className="flex items-center gap-2 sm:gap-3 md:gap-6 shrink-0">
+        {!showMenu && (
+          <Link
+            href="/dashboard"
+            className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-border/60 px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted md:hidden"
+            title="Ir al Dashboard sin crear un workflow nuevo"
+            aria-label="Ir al Dashboard sin crear un workflow nuevo"
+          >
+            <LayoutDashboard className="h-4 w-4 shrink-0" />
+            <span className="hidden min-[380px]:inline">Dashboard</span>
+          </Link>
+        )}
         <NotificationCenter />
         <WalletButton />
       </nav>
