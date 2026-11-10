@@ -18,6 +18,7 @@ import {
   fetchAutomationRows,
   findAutomation,
   indexAutomation,
+  isDeletedAutomation,
   mergeOnchainEntries,
   setAutomationActive,
   updateAutomationIndex,
@@ -54,13 +55,24 @@ const OnchainWorkflowsSheet: React.FC<OnchainWorkflowsSheetProps> = ({ hideTrigg
       const owner = publicKey.toBase58();
       const [chainResult, rowsResult] = await Promise.allSettled([
         listOnchainWorkflows(publicKey),
-        fetchAutomationRows(owner),
+        fetchAutomationRows(owner, { includeDeleted: true }),
       ]);
 
-      const rows = rowsResult.status === "fulfilled" ? rowsResult.value : [];
+      const allRows = rowsResult.status === "fulfilled" ? rowsResult.value : [];
       if (rowsResult.status === "rejected") {
         console.error("Could not load workflow automation status", rowsResult.reason);
       }
+
+      const rows = allRows.filter((row) => !isDeletedAutomation(row));
+      const deleted = allRows.filter(isDeletedAutomation);
+      const deletedCids = new Set(
+        deleted.map((row) => row.cid).filter((value): value is string => Boolean(value)),
+      );
+      const deletedSignatures = new Set(
+        deleted
+          .map((row) => row.onchain_signature)
+          .filter((value): value is string => Boolean(value)),
+      );
 
       let chainEntries: OnchainEntry[] = [];
       if (chainResult.status === "fulfilled") {
@@ -70,7 +82,15 @@ const OnchainWorkflowsSheet: React.FC<OnchainWorkflowsSheetProps> = ({ hideTrigg
         setChainWarning(rows.length > 0);
       }
 
-      setEntries(mergeOnchainEntries(chainEntries, rows));
+      // Merge first so only the newest memo per name survives, then drop the
+      // ones whose tombstoned workflow was deleted by the user.
+      setEntries(
+        mergeOnchainEntries(chainEntries, rows).filter(
+          (entry) =>
+            !deletedCids.has(entry.payload.cid) &&
+            !deletedSignatures.has(entry.signature),
+        ),
+      );
       setAutomation(indexAutomation(rows));
 
       if (

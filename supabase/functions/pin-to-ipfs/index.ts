@@ -106,6 +106,7 @@ async function refreshManifest(
       .from("workflows")
       .select("workflow_id, name, cid, schedule, execution_mode, updated_at")
       .eq("owner_wallet", ownerWallet)
+      .neq("automation_status", "deleted")
       .order("updated_at", { ascending: false });
 
     const { data: assets } = await supabase

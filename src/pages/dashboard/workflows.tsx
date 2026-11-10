@@ -175,7 +175,7 @@ const WorkflowDashboard: React.FC = () => {
 
     // We trigger a promise toast to handle loading, success, and error states elegantly
     toast.promise(
-      deleteWorkflow(id, pinata_file_id, cid),
+      deleteWorkflow(id, pinata_file_id, cid, walletAddress),
       {
         loading: 'Deleting workflow from IPFS network...',
         success: () => {

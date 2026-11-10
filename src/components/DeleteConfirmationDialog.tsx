@@ -64,6 +64,10 @@ const DeleteWorkflowModal: React.FC<DeleteWorkflowModalProps> = ({
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" />
             <span>Local <strong>LocalStorage</strong> data will be cleared immediately from your browser.</span>
           </p>
+          <p className="flex items-start gap-2">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" />
+            <span>The <strong>scheduled cron reference</strong> will be disabled and the workflow removed from <strong>My on-chain workflows</strong>.</span>
+          </p>
         </div>
 
         <DialogFooter className="sm:space-x-3 gap-2 sm:gap-0 mt-2">

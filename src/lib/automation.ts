@@ -29,9 +29,16 @@ export function isPublishedOnchain(
   return signature !== "" && signature !== "skip";
 }
 
+/** Deleted workflows stay as a tombstone so old on-chain memos stay hidden. */
+export function isDeletedAutomation(
+  row: Pick<WorkflowAutomationRow, "automation_status">,
+): boolean {
+  return row.automation_status === "deleted";
+}
+
 export async function fetchAutomationRows(
   ownerWallet: string,
-  options: { includeUnpublished?: boolean } = {},
+  options: { includeUnpublished?: boolean; includeDeleted?: boolean } = {},
 ): Promise<WorkflowAutomationRow[]> {
   const { data, error } = await supabase
     .from("workflows")
@@ -43,7 +50,8 @@ export async function fetchAutomationRows(
 
   if (error) throw error;
   const rows = (data || []) as WorkflowAutomationRow[];
-  return options.includeUnpublished ? rows : rows.filter(isPublishedOnchain);
+  const visible = options.includeDeleted ? rows : rows.filter((row) => !isDeletedAutomation(row));
+  return options.includeUnpublished ? visible : visible.filter(isPublishedOnchain);
 }
 
 export function indexAutomation(rows: WorkflowAutomationRow[]): AutomationIndex {
@@ -227,6 +235,7 @@ export function backfillSavedWorkflows(
   // recently updated one, so repeated publishes do not create duplicates.
   const byName = new Map<string, WorkflowAutomationRow>();
   rows.forEach((row) => {
+    if (isDeletedAutomation(row)) return;
     const current = byName.get(row.name);
     if (!current) {
       byName.set(row.name, row);

@@ -660,16 +660,34 @@ export async function updateWorkflow(
 }
 
 
-export async function deleteWorkflow(id: string, pinataFileId?: string, cid?: string) {
+export async function deleteWorkflow(
+  id: string,
+  pinataFileId?: string,
+  cid?: string,
+  ownerWallet?: string,
+) {
   try {
+    const raw = localStorage.getItem(SAVED_WORKFLOWS_KEY);
+    const saved: SavedWorkflow[] = raw ? JSON.parse(raw) : [];
+    const record = saved.find(
+      (item) =>
+        item.id === id ||
+        (Boolean(pinataFileId) && item.pinataId === pinataFileId) ||
+        (Boolean(cid) && item.cid === cid),
+    );
+
+    const wallet = ownerWallet || record?.ownerWallet;
+    const targetCid = cid || record?.cid;
+    const targetPinataId = pinataFileId || record?.pinataId;
+
     // 1. SI EXISTE EL ID DE PINATA O EL CID, LE AVISAMOS A LA EDGE FUNCTION
-    if (pinataFileId || cid) {
-      console.log(`[FRONTEND] Solicitando borrado en IPFS para file_id: ${pinataFileId} y cid: ${cid}`);
+    if (targetPinataId || targetCid) {
+      console.log(`[FRONTEND] Solicitando borrado en IPFS para file_id: ${targetPinataId} y cid: ${targetCid}`);
 
       const { data: result, error } = await supabase.functions.invoke("delete-ipfs-file", {
         body: {
-          pinata_file_id: pinataFileId,
-          cid: cid,
+          pinata_file_id: targetPinataId,
+          cid: targetCid,
         },
       });
 
@@ -682,13 +700,50 @@ export async function deleteWorkflow(id: string, pinataFileId?: string, cid?: st
       console.warn("[FRONTEND] No se detectaron credenciales de IPFS, se borrará solo localmente.");
     }
 
-    const raw = localStorage.getItem(SAVED_WORKFLOWS_KEY);
-    const saved: SavedWorkflow[] = raw ? JSON.parse(raw) : [];
-    const filtered = saved.filter((w) => w.id !== id);
+    // 2. Tombstone en Supabase: desactiva el cron y conserva el CID/signature
+    // para que el memo on-chain ya publicado deje de listarse en la app.
+    if (wallet) {
+      const now = new Date().toISOString();
+      const update = {
+        enabled: false,
+        automation_status: "deleted",
+        next_run_at: null,
+        lease_until: null,
+        claimed_by: null,
+        last_error: null,
+        updated_at: now,
+      };
+
+      let query = supabase
+        .from("workflows")
+        .update(update)
+        .eq("owner_wallet", wallet);
+
+      // Una tarjeta representa un workflow por nombre; se marcan todas sus
+      // versiones para que el backfill no lo resucite desde una fila antigua.
+      if (record?.name) {
+        query = query.eq("name", record.name);
+      } else if (targetCid) {
+        query = query.eq("cid", targetCid);
+      }
+
+      const { error: tombstoneError } = await query;
+      if (tombstoneError) {
+        console.error("[FRONTEND] No se pudo desactivar el workflow en Supabase:", tombstoneError.message);
+      }
+    }
+
+    const filtered = saved.filter(
+      (item) =>
+        item.id !== id &&
+        (!targetPinataId || item.pinataId !== targetPinataId) &&
+        (!targetCid || item.cid !== targetCid),
+    );
     localStorage.setItem(SAVED_WORKFLOWS_KEY, JSON.stringify(filtered));
     console.log("[FRONTEND] Workflow eliminado del LocalStorage.");
 
   } catch (e) {
     console.error("Failed to execute complete deletion workflow", e);
+    throw e;
   }
 }
