@@ -16,6 +16,8 @@ export interface AppNotification {
   /** Set for on-chain executions so the user can verify the transaction. */
   txSignature?: string;
   explorerUrl?: string;
+  /** Cron run this notification belongs to, used to hand off the bottom toast. */
+  scheduledFor?: string;
   /** Server notifications come from cron runs; the rest are browser-local. */
   source?: "local" | "server";
 }
@@ -31,7 +33,11 @@ type ServerNotificationRow = {
   status: string;
   read: boolean;
   created_at: string;
-  metadata?: { txSignature?: string; explorerUrl?: string } | null;
+  metadata?: {
+    txSignature?: string;
+    explorerUrl?: string;
+    scheduledFor?: string | null;
+  } | null;
 };
 
 const STORAGE_KEY = "solflows_notifications_v1";
@@ -64,6 +70,7 @@ function safeParse(raw: string | null): AppNotification[] {
         workflowName: typeof item.workflowName === "string" ? item.workflowName : undefined,
         txSignature: typeof item.txSignature === "string" ? item.txSignature : undefined,
         explorerUrl: typeof item.explorerUrl === "string" ? item.explorerUrl : undefined,
+        scheduledFor: typeof item.scheduledFor === "string" ? item.scheduledFor : undefined,
         source: item.source === "server" ? ("server" as const) : ("local" as const),
       }))
       .slice(0, MAX_NOTIFICATIONS);
@@ -129,6 +136,7 @@ function rowToNotification(row: ServerNotificationRow): AppNotification {
     workflowId: row.workflow_id || undefined,
     workflowName: row.workflow_name || undefined,
     txSignature: row.metadata?.txSignature || undefined,
+    scheduledFor: row.metadata?.scheduledFor || undefined,
     explorerUrl:
       row.metadata?.explorerUrl ||
       (row.metadata?.txSignature

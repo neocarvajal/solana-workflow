@@ -238,7 +238,25 @@ Deno.serve(async (req) => {
                   }),
                 });
                 const result = await response.json().catch(() => ({}));
-                if (!response.ok || !result.ok) {
+                const minIntervalPending =
+                  response.status === 429 &&
+                  /minimum interval/i.test(String(result.error || ""));
+
+                if (minIntervalPending) {
+                  // The on-chain vault guard only means the previous transfer is
+                  // still inside its minimum interval. This is a normal timing
+                  // skip, not a failed run: the next cron tick will try again as
+                  // soon as that interval has elapsed.
+                  logs.push({
+                    step: "send_transaction",
+                    skipped: true,
+                    reason: "vault_min_interval",
+                    status: response.status,
+                    note: "La bóveda aún está dentro de su intervalo mínimo. No se movieron fondos; se reintentará en el próximo ciclo.",
+                    executionMode,
+                    payload,
+                  });
+                } else if (!response.ok || !result.ok) {
                   logs.push({
                     step: "send_transaction",
                     executed: false,

@@ -2,7 +2,12 @@ import { useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { refreshNotifications } from "@/lib/notificationStore";
+import {
+  getNotifications,
+  refreshNotifications,
+  subscribeNotifications,
+  type AppNotification,
+} from "@/lib/notificationStore";
 import { isFinancialExecutionMode } from "@/lib/schedule";
 import { notifyTxSuccess } from "@/lib/tx-toast";
 import {
@@ -27,6 +32,10 @@ const DUE_POLL_MS = 600;
 const NEAR_DUE_MS = 20_000;
 const CLAIM_TIMEOUT_MS = 90_000;
 const RESULT_TIMEOUT_MS = 90_000;
+/** Give the bottom toast time to be read/clicked before the bell takes over. */
+const TOAST_MIN_VISIBLE_MS = 8_000;
+/** Stop watching for the bell row if the server never persisted one. */
+const BELL_HANDOFF_TIMEOUT_MS = 30_000;
 
 type AutomationRow = {
   id: string;
@@ -54,6 +63,8 @@ type RunLog = {
   step?: string;
   skipped?: boolean;
   reason?: string;
+  status?: number;
+  error?: string;
   executed?: boolean;
   signature?: string;
   amount_lamports?: number;
@@ -61,6 +72,45 @@ type RunLog = {
   payload?: { to?: string; amount?: number; asset?: string };
   note?: string;
 };
+
+/** Identifiers shared by the bottom toast and the persisted bell notification. */
+type BellMatch = {
+  txSignature: string | null;
+  workflowId: string | null;
+  scheduledFor: string;
+  workflowName: string;
+  scheduledAtMs: number;
+};
+
+/**
+ * The cron writes the same run into `user_notifications`. Match by signature
+ * first (unambiguous), then by scheduled time + workflow, then by a tight
+ * workflow-name/time window as a last resort.
+ */
+function notificationMatchesRun(item: AppNotification, match: BellMatch) {
+  if (item.source !== "server") return false;
+  if (match.txSignature && item.txSignature === match.txSignature) return true;
+  if (item.scheduledFor && item.scheduledFor === match.scheduledFor) {
+    if (!match.workflowId || !item.workflowId || item.workflowId === match.workflowId) {
+      return true;
+    }
+  }
+  if (item.workflowName === match.workflowName) {
+    const delta = Math.abs(item.createdAt - match.scheduledAtMs);
+    if (Number.isFinite(delta) && delta <= 3 * 60 * 1000) return true;
+  }
+  return false;
+}
+
+/** The vault's 60s guard is a normal timing skip, not a failed workflow run. */
+function isVaultMinIntervalSkip(log: RunLog) {
+  const reason = String(log.reason || "");
+  const error = String(log.error || "");
+  return (
+    reason === "vault_min_interval" ||
+    (reason === "vault_execution_failed" && /minimum interval/i.test(error))
+  );
+}
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -119,17 +169,29 @@ function describeFinancialOutcome(logs: RunLog[], txSignature: string | null) {
     };
   }
 
+  if (transfer && isVaultMinIntervalSkip(transfer)) {
+    return {
+      status: "skipped" as const,
+      label:
+        "Transferencia omitida: la bóveda aún está dentro de su intervalo mínimo. " +
+        "No se movieron fondos y se reintentará en el próximo ciclo.",
+      txSignature: null,
+    };
+  }
+
   if (transfer?.skipped) {
     const reason =
       transfer.reason === "vault_execution_disabled"
         ? "el ejecutor de la bóveda está pausado en el servidor"
         : transfer.reason === "owner_or_workflow_missing"
           ? "faltan datos de la bóveda para transferir"
-          : transfer.reason === "unsupported_asset"
-            ? "el activo configurado no es compatible con la bóveda"
-            : transfer.reason === "invalid_amount"
-              ? "el monto configurado no es válido"
-              : transfer.reason || "la transferencia fue omitida";
+          : transfer.reason === "vault_min_interval"
+            ? "la bóveda aún está dentro de su intervalo mínimo; se reintentará en el próximo ciclo"
+            : transfer.reason === "unsupported_asset"
+              ? "el activo configurado no es compatible con la bóveda"
+              : transfer.reason === "invalid_amount"
+                ? "el monto configurado no es válido"
+                : transfer.reason || "la transferencia fue omitida";
     return {
       status: "skipped" as const,
       label: `No se movieron fondos: ${reason}`,
@@ -283,6 +345,7 @@ const ScheduledExecutionWatcher: React.FC = () => {
     let pending: string | null = null;
     let queued: { target: string; toastId: string | number; since: number; timedOut: boolean } | null =
       null;
+    const handoffCleanups = new Set<() => void>();
 
     const isCancelled = () => cancelled;
 
@@ -297,6 +360,68 @@ const ScheduledExecutionWatcher: React.FC = () => {
         toast.dismiss(queued.toastId);
         queued = null;
       }
+    };
+
+    /**
+     * The bottom toast is the first, primary confirmation. Once the same run
+     * shows up as a bell notification, the toast can step aside. Nothing is
+     * deleted from the notification center - only the transient toast closes.
+     */
+    const handOffToastToBell = (
+      toastId: string | number,
+      shownAt: number,
+      match: BellMatch,
+    ) => {
+      if (cancelled) return;
+
+      const hasMatch = (items: AppNotification[]) =>
+        items.some(
+          (item) => item.source === "server" && notificationMatchesRun(item, match),
+        );
+
+      let unsubscribe: (() => void) | null = null;
+      let watchTimeout: number | undefined;
+      let dismissTimeout: number | undefined;
+      let active = true;
+
+      const cleanup = () => {
+        active = false;
+        unsubscribe?.();
+        if (watchTimeout !== undefined) window.clearTimeout(watchTimeout);
+        if (dismissTimeout !== undefined) window.clearTimeout(dismissTimeout);
+        handoffCleanups.delete(cleanup);
+      };
+
+      handoffCleanups.add(cleanup);
+
+      const onMatched = () => {
+        if (!active || cancelled) return;
+        unsubscribe?.();
+        if (watchTimeout !== undefined) window.clearTimeout(watchTimeout);
+        const remaining = Math.max(0, TOAST_MIN_VISIBLE_MS - (Date.now() - shownAt));
+        const close = () => {
+          if (!cancelled) toast.dismiss(toastId);
+          cleanup();
+        };
+        if (remaining > 0) {
+          dismissTimeout = window.setTimeout(close, remaining + 25);
+        } else {
+          close();
+        }
+      };
+
+      if (hasMatch(getNotifications())) {
+        onMatched();
+        return;
+      }
+
+      // If the server never persisted a row, leave the toast as-is so the
+      // user still has the explorer link instead of losing both confirmations.
+      watchTimeout = window.setTimeout(cleanup, BELL_HANDOFF_TIMEOUT_MS);
+      unsubscribe = subscribeNotifications((items) => {
+        if (!active || cancelled) return;
+        if (hasMatch(items)) onMatched();
+      });
     };
 
     const runVisualExecution = async (row: AutomationRow, scheduledFor: string, quick: boolean) => {
@@ -349,12 +474,8 @@ const ScheduledExecutionWatcher: React.FC = () => {
 
       if (cancelled) return;
 
-      // The cron stores the in-app notification before the run result. Pull it
-      // now so the bell updates together with the end of the node animation,
-      // exactly like the manual "Ejecutar" flow.
-      await refreshNotifications().catch(() => undefined);
-
-      if (cancelled) return;
+      const toastShownAt = Date.now();
+      let handoffMatch: BellMatch | null = null;
 
       if (!outcome) {
         resetIdle();
@@ -363,10 +484,7 @@ const ScheduledExecutionWatcher: React.FC = () => {
           description:
             "La ejecución no devolvió un resultado en 90 s. Revisa la actividad y las notificaciones.",
         });
-        return;
-      }
-
-      if (outcome.status === "error") {
+      } else if (outcome.status === "error") {
         setScheduledRunState({
           status: "error",
           workflowName: row.name,
@@ -379,33 +497,51 @@ const ScheduledExecutionWatcher: React.FC = () => {
             setScheduledRunState({ status: "idle" });
           }
         }, 8000);
-        return;
-      }
-
-      setScheduledRunState({
-        status: "success",
-        workflowName: row.name,
-        scheduledFor,
-        message: outcome.label,
-      });
-      const outcomeTitle =
-        outcome.status === "skipped"
-          ? `"${row.name}" evaluado`
-          : `"${row.name}" ejecutado`;
-
-      if (outcome.txSignature) {
-        notifyTxSuccess(outcomeTitle, outcome.txSignature, {
-          id: toastId,
-          description: outcome.label,
-        });
       } else {
-        toast.success(outcomeTitle, { id: toastId, description: outcome.label });
-      }
-      setTimeout(() => {
-        if (!cancelled && getScheduledRunState().status === "success") {
-          setScheduledRunState({ status: "idle" });
+        setScheduledRunState({
+          status: "success",
+          workflowName: row.name,
+          scheduledFor,
+          message: outcome.label,
+        });
+        const outcomeTitle =
+          outcome.status === "skipped"
+            ? `"${row.name}" evaluado`
+            : `"${row.name}" ejecutado`;
+
+        if (outcome.txSignature) {
+          notifyTxSuccess(outcomeTitle, outcome.txSignature, {
+            id: toastId,
+            description: outcome.label,
+          });
+        } else {
+          toast.success(outcomeTitle, { id: toastId, description: outcome.label });
         }
-      }, 8000);
+
+        handoffMatch = {
+          txSignature: outcome.txSignature ?? null,
+          workflowId: row.workflow_id,
+          scheduledFor,
+          workflowName: row.name,
+          scheduledAtMs: new Date(scheduledFor).getTime(),
+        };
+
+        setTimeout(() => {
+          if (!cancelled && getScheduledRunState().status === "success") {
+            setScheduledRunState({ status: "idle" });
+          }
+        }, 8000);
+      }
+
+      // The cron stores the in-app notification for the run. Pull it now so the
+      // bell updates together with the end of the node animation, exactly like
+      // the manual "Ejecutar" flow. The bottom toast stays first and only
+      // steps aside once that same entry is available in the bell.
+      await refreshNotifications().catch(() => undefined);
+
+      if (handoffMatch && !cancelled) {
+        handOffToastToBell(toastId, toastShownAt, handoffMatch);
+      }
     };
 
     const loop = async () => {
@@ -514,6 +650,7 @@ const ScheduledExecutionWatcher: React.FC = () => {
 
     return () => {
       cancelled = true;
+      handoffCleanups.forEach((cleanup) => cleanup());
       if (queued) toast.dismiss(queued.toastId);
       setScheduledRunState({ status: "idle" });
       setRunningNodeId(null);
