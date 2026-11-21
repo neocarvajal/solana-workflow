@@ -14,6 +14,7 @@ import {
 import { notifyTxSuccess } from '@/lib/tx-toast';
 import { useVaultReady } from '@/lib/useVaultReady';
 import MainnetPublishWarning from './MainnetPublishWarning';
+import ThemeToggle from './ThemeToggle';
 import { Switch } from '@/components/ui/switch';
 import {
   fetchAutomationRows,
@@ -909,51 +910,42 @@ const BottomToolbar: React.FC = () => {
               </span>
             </button>
 
-            <div
-              className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-muted/50 px-2"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <Switch
-                checked={isWorkflowActive}
-                onCheckedChange={(checked) => void handleToggleActivation(checked)}
-                disabled={
-                  !activationRow ||
-                  togglingActivation ||
-                  (executionFrequency === "manual" && !isWorkflowActive)
-                }
-                title={activationTitle}
-                aria-label={isWorkflowActive ? "Desactivar workflow" : "Activar workflow"}
-              />
-              <span className="whitespace-nowrap text-xs text-muted-foreground">
-                {togglingActivation ? "…" : isWorkflowActive ? "Activo" : "Inactivo"}
-              </span>
+            {/* Switch, vault and theme share one compact row on mobile so the
+                canvas keeps as much height as possible. */}
+            <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:shrink-0">
+              <div
+                className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-muted/50 px-2"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <Switch
+                  checked={isWorkflowActive}
+                  onCheckedChange={(checked) => void handleToggleActivation(checked)}
+                  disabled={
+                    !activationRow ||
+                    togglingActivation ||
+                    (executionFrequency === "manual" && !isWorkflowActive)
+                  }
+                  title={activationTitle}
+                  aria-label={isWorkflowActive ? "Desactivar workflow" : "Activar workflow"}
+                />
+                <span className="whitespace-nowrap text-xs text-muted-foreground">
+                  {togglingActivation ? "…" : isWorkflowActive ? "Activo" : "Inactivo"}
+                </span>
+              </div>
+
+              <button
+                onClick={() => window.dispatchEvent(new Event("open-vault"))}
+                disabled={!vaultReady}
+                className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-full border border-border px-2.5 py-1.5 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent sm:flex-none"
+                title={vaultDisabledTitle}
+                aria-label="Abrir bóveda"
+              >
+                <Landmark className="h-4 w-4" />
+                <span className="whitespace-nowrap">Bóveda</span>
+              </button>
+
+              <ThemeToggle inline />
             </div>
-
-            <button
-              onClick={() => window.dispatchEvent(new Event("open-vault"))}
-              disabled={!vaultReady}
-              className="hidden min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-border px-2.5 py-1.5 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent sm:flex"
-              title={vaultDisabledTitle}
-              aria-label="Abrir bóveda y límites"
-            >
-              <Landmark className="h-4 w-4" />
-              <span className="whitespace-nowrap">Bóveda y límites</span>
-            </button>
-          </div>
-
-          {/* On mobile the vault gets its own full-width row so no horizontal
-              dragging is needed to reach it. */}
-          <div className="flex w-full sm:hidden">
-            <button
-              onClick={() => window.dispatchEvent(new Event("open-vault"))}
-              disabled={!vaultReady}
-              className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-muted/30"
-              title={vaultDisabledTitle}
-              aria-label="Abrir bóveda y límites"
-            >
-              <Landmark className="h-4 w-4" />
-              <span>Bóveda y límites</span>
-            </button>
           </div>
 
           <div className="flex w-full min-w-0 items-stretch gap-2 sm:contents">
@@ -1001,7 +993,8 @@ const BottomToolbar: React.FC = () => {
           </div>
           </div>
 
-          <div className="flex w-full items-center justify-center gap-2 sm:ml-auto sm:w-auto sm:justify-end">
+          {/* On mobile the zoom controls float over the canvas instead. */}
+          <div className="hidden items-center justify-end gap-2 sm:ml-auto sm:flex">
             <button
               onClick={() => setCanvasScale(scale - 0.1)}
               className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition-colors hover:bg-muted"

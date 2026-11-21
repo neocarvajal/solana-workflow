@@ -1,5 +1,6 @@
 import type { AppProps } from "next/app";
 import Head from "next/head";
+import { useRouter } from "next/router";
 import { useMemo } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -29,6 +30,11 @@ const WalletProvider = OriginalWalletProvider as React.ComponentType<any>;
 const queryClient = new QueryClient();
 
 export default function App({ Component, pageProps }: AppProps) {
+  const router = useRouter();
+  // On /dashboard the theme toggle lives in the bottom toolbar next to the
+  // vault button; elsewhere it stays as a floating shortcut.
+  const showFloatingThemeToggle = router.pathname !== "/dashboard";
+
   // La dapp usa la red seleccionada en el indicador de conexión. La clave del
   // proveedor se re crea al cambiar de red para que todos los hooks vean el RPC nuevo.
   const cluster = useCluster();
@@ -59,7 +65,7 @@ export default function App({ Component, pageProps }: AppProps) {
             <TooltipProvider>
               <Toaster />
               <Sonner />
-              <ThemeToggle />
+              {showFloatingThemeToggle && <ThemeToggle />}
               <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground antialiased supports-[height:100dvh]:h-[100dvh]">
                 <Navbar />
                 <div className="flex min-h-0 flex-1 flex-col">

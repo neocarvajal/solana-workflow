@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import NodeSettingsModal from "./NodeSettingsModal";
-import { Plus, Sparkles, Search, Zap, Wrench, X } from "lucide-react";
+import { Plus, Sparkles, Search, Zap, Wrench, X, ZoomIn, ZoomOut } from "lucide-react";
 import DraggableNode from "./DraggableNode";
 import type { FlowNode, ModuleDef } from "@/lib/workflow";
 import { STEP_MODULES, ALL_MODULES } from "@/lib/workflow";
@@ -463,6 +463,30 @@ const DraggableCanvas: React.FC = () => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Mobile zoom controls float at the bottom-right of the canvas so the
+          bottom toolbar stays compact. */}
+      <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1 rounded-full border border-border/60 bg-background/90 p-1 shadow-lg backdrop-blur-sm sm:hidden">
+        <button
+          type="button"
+          onClick={() => setCanvasScale(scale - 0.1)}
+          className="flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted"
+          title="Alejar"
+          aria-label="Alejar"
+        >
+          <ZoomOut className="h-4 w-4" />
+        </button>
+        <span className="w-10 text-center font-mono text-[11px]">{Math.round(scale * 100)}%</span>
+        <button
+          type="button"
+          onClick={() => setCanvasScale(scale + 0.1)}
+          className="flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted"
+          title="Acercar"
+          aria-label="Acercar"
+        >
+          <ZoomIn className="h-4 w-4" />
+        </button>
       </div>
 
       {settingsNode && (
