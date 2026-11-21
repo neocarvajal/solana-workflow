@@ -3,6 +3,7 @@ import { X, Trash2, Loader2, Send, AlertTriangle, Landmark } from "lucide-react"
 import { toast } from "sonner";
 import type { FlowNode } from "@/lib/workflow";
 import { sendAlert } from "@/lib/alerts";
+import { useVaultReady } from "@/lib/useVaultReady";
 
 /* ── Per-module field definitions ────────────────────────────── */
 interface FieldDef {
@@ -245,6 +246,7 @@ const NodeSettingsModal: React.FC<{
   onDelete?: (id: string) => void;
   vaultRequired?: boolean;
 }> = ({ node, onSave, onClose, onDelete, vaultRequired = false }) => {
+  const vaultReady = useVaultReady();
 
   const mergeParams = (nodeParams: any) => {
     const defaults = node.module.defaultParams || {};
@@ -360,23 +362,29 @@ const NodeSettingsModal: React.FC<{
           <div className="mx-4 mt-3 flex items-start gap-2 rounded-xl border border-amber-500/50 bg-amber-500/10 p-3 text-xs text-amber-900 shadow-sm dark:border-amber-500/30 dark:text-amber-200">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <div className="min-w-0 flex-1">
-              <p className="font-medium text-amber-900 dark:text-amber-100">Configura la bóveda antes de publicar</p>
+              <p className="font-medium text-amber-900 dark:text-amber-100">
+                {vaultReady
+                  ? "Configura la bóveda para este workflow"
+                  : "Publica el workflow antes de configurar la bóveda"}
+              </p>
               <p className="mt-0.5">
-                Este workflow mueve fondos en la ejecución on-chain. Crea la bóveda y ajusta el destino y los límites en el panel. La simulación del canvas no usa esos fondos.
+                {vaultReady
+                  ? "Este workflow mueve fondos en la ejecución on-chain. Crea la bóveda y ajusta el destino y los límites en el panel. La simulación del canvas no usa esos fondos."
+                  : "Publica el workflow on-chain para fijar su identificador; así la bóveda no quedará inaccesible. Después ajusta el destino y los límites en el panel."}
               </p>
               <button
                 type="button"
                 onClick={() => {
                   onClose();
                   window.setTimeout(
-                    () => window.dispatchEvent(new Event("open-vault")),
+                    () => window.dispatchEvent(new Event(vaultReady ? "open-vault" : "publish-workflow")),
                     80,
                   );
                 }}
                 className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-amber-600/50 px-3 py-1.5 font-medium text-amber-900 transition-colors hover:bg-amber-500/15 dark:border-amber-400/50 dark:text-amber-100 dark:hover:bg-amber-400/10"
               >
                 <Landmark className="h-3.5 w-3.5" />
-                Abrir bóveda y límites
+                {vaultReady ? "Abrir bóveda y límites" : "Publicar on-chain"}
               </button>
             </div>
           </div>

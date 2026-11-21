@@ -57,9 +57,25 @@ export async function fetchAutomationRows(
 
 export function indexAutomation(rows: WorkflowAutomationRow[]): AutomationIndex {
   const map: AutomationIndex = {};
+  const recency = (row: WorkflowAutomationRow) => {
+    const value = row.updated_at || row.created_at;
+    const time = value ? new Date(value).getTime() : 0;
+    return Number.isFinite(time) ? time : 0;
+  };
+
   rows.forEach((row) => {
-    if (row.workflow_id) map[`wf:${row.workflow_id}`] = row;
-    if (row.cid) map[`cid:${row.cid}`] = row;
+    const timestamp = recency(row);
+    const put = (key: string) => {
+      const current = map[key];
+      // `fetchAutomationRows` returns newest first; a plain assignment would
+      // leave the OLDEST row in the index. Republishing keeps the same CID and
+      // workflow id, so a stale inactive row could hide the active cron row.
+      if (!current || timestamp > recency(current)) {
+        map[key] = row;
+      }
+    };
+    if (row.workflow_id) put(`wf:${row.workflow_id}`);
+    if (row.cid) put(`cid:${row.cid}`);
   });
   return map;
 }

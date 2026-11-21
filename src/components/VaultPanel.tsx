@@ -469,8 +469,13 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
       {!hideTrigger && (
         <SheetTrigger asChild>
           <button
-            className="flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-border px-2.5 py-2 text-xs hover:bg-muted sm:px-3 sm:text-sm"
-            title="Bóveda con límites on-chain"
+            disabled={!hasPublishedReference}
+            className="flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-border px-2.5 py-2 text-xs hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent sm:px-3 sm:text-sm"
+            title={
+              hasPublishedReference
+                ? "Bóveda con límites on-chain"
+                : "Publica el workflow on-chain para configurar la bóveda"
+            }
             aria-label="Abrir bóveda"
           >
             <Landmark className="h-4 w-4" />

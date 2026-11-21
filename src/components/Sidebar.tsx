@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import OnchainWorkflowsSheet from './OnchainWorkflowsSheet';
 import VaultPanel from './VaultPanel';
+import { useVaultReady } from '@/lib/useVaultReady';
 
 interface NavItemProps {
   icon: React.ElementType;
@@ -28,6 +29,7 @@ interface NavItemProps {
   hasDropdown?: boolean;
   isExpanded: boolean;
   disabled?: boolean;
+  disabledReason?: string;
 }
 
 const NavItem: React.FC<NavItemProps> = ({
@@ -37,7 +39,8 @@ const NavItem: React.FC<NavItemProps> = ({
   onClick,
   hasDropdown = false,
   isExpanded,
-  disabled = false
+  disabled = false,
+  disabledReason = "Próximamente"
 }) => {
   return (
     <button
@@ -46,7 +49,7 @@ const NavItem: React.FC<NavItemProps> = ({
       aria-disabled={disabled}
       className={`sidebar-item w-full min-h-10 ${active ? 'active' : ''} flex items-center text-left ${disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'} ${isExpanded ? 'gap-2 px-3 py-2 justify-start' : 'justify-center py-2.5'}`}
       onClick={disabled ? undefined : onClick}
-      title={disabled ? `${label} · Próximamente` : !isExpanded ? label : undefined}
+      title={disabled ? `${label} · ${disabledReason}` : !isExpanded ? label : undefined}
     >
       <Icon className="h-5 w-5 shrink-0" />
       {isExpanded && <span className="flex-1 whitespace-nowrap overflow-hidden text-ellipsis">{label}</span>}
@@ -69,6 +72,7 @@ const Sidebar: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const router = useRouter();
   const { connected } = useWallet();
+  const vaultReady = useVaultReady();
 
   const isScenariosActive = router.pathname === '/dashboard';
   const isOrgActive = router.pathname === '/dashboard/workflows';
@@ -152,6 +156,8 @@ const Sidebar: React.FC = () => {
             icon={Landmark}
             label="Bóveda y límites"
             isExpanded={expanded}
+            disabled={!vaultReady}
+            disabledReason="Publica el workflow on-chain para configurar la bóveda"
             onClick={() => openSheet('open-vault', mobile)}
           />
         </div>

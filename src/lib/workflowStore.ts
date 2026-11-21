@@ -87,6 +87,22 @@ export function subscribeOnchainMeta(listener: OnchainMetaListener) {
   return () => { onchainMetaListeners.delete(listener); };
 }
 
+/**
+ * The vault PDA is derived from the workflow id, so its configuration must not
+ * open until the workflow has a published on-chain reference. Without one the
+ * vault would be unrecoverable after the session is lost.
+ */
+export function isVaultReady(): boolean {
+  return Boolean(String(getOnchainMeta().signature || "").trim());
+}
+
+export function subscribeVaultReady(listener: (ready: boolean) => void) {
+  const emit = () => listener(isVaultReady());
+  const unsubMeta = subscribeOnchainMeta(emit);
+  const unsubId = subscribeWorkflowId(emit);
+  return () => { unsubMeta(); unsubId(); };
+}
+
 export function subscribeWorkflow(l: Listener) {
   listeners.add(l);
   return () => { listeners.delete(l); };

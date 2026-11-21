@@ -18,12 +18,14 @@ import {
   setWorkflowId,
   subscribeWorkflow,
 } from "@/lib/workflowStore";
+import { useVaultReady } from "@/lib/useVaultReady";
 
 const MobileWorkflowMenu: React.FC = () => {
   const router = useRouter();
   const [name, setName] = useState(getScenarioName());
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const vaultReady = useVaultReady();
 
   useEffect(() => {
     setMounted(true);
@@ -163,7 +165,13 @@ const MobileWorkflowMenu: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => openDialog("open-vault")}
-                  className={actionClass}
+                  disabled={!vaultReady}
+                  className={`${actionClass} disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent`}
+                  title={
+                    vaultReady
+                      ? undefined
+                      : "Publica el workflow on-chain para configurar la bóveda"
+                  }
                 >
                   <Landmark className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span>Bóveda y límites</span>

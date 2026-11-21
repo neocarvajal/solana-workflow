@@ -12,6 +12,7 @@ import {
   supportedAssetLabel,
 } from '@/lib/vaultTokens';
 import { notifyTxSuccess } from '@/lib/tx-toast';
+import { useVaultReady } from '@/lib/useVaultReady';
 import MainnetPublishWarning from './MainnetPublishWarning';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -167,6 +168,10 @@ const BottomToolbar: React.FC = () => {
     onchainMeta && String(onchainMeta.signature || "").trim(),
   );
   const publishMode: "publish" | "update" = hasPublishedReference ? "update" : "publish";
+  const vaultReady = useVaultReady();
+  const vaultDisabledTitle = vaultReady
+    ? "Configurar bóveda y límites"
+    : "Publica el workflow on-chain para configurar la bóveda";
 
   const loadActivation = useCallback(async () => {
     if (!walletAddress) {
@@ -733,6 +738,9 @@ const BottomToolbar: React.FC = () => {
             next_run_at: preservedExecution.next_run_at,
           }
         : {
+            // Keep the UI switch and the cron in sync: the scheduler claims
+            // rows where `enabled` AND `automation_status` are both active.
+            enabled: automationStatus === "active",
             automation_status: automationStatus,
             next_run_at: nextRunAt,
           }),
@@ -923,8 +931,9 @@ const BottomToolbar: React.FC = () => {
 
             <button
               onClick={() => window.dispatchEvent(new Event("open-vault"))}
-              className="hidden min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-border px-2.5 py-1.5 text-sm text-foreground transition-colors hover:bg-muted sm:flex"
-              title="Configurar bóveda y límites"
+              disabled={!vaultReady}
+              className="hidden min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-border px-2.5 py-1.5 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent sm:flex"
+              title={vaultDisabledTitle}
               aria-label="Abrir bóveda y límites"
             >
               <Landmark className="h-4 w-4" />
@@ -937,8 +946,9 @@ const BottomToolbar: React.FC = () => {
           <div className="flex w-full sm:hidden">
             <button
               onClick={() => window.dispatchEvent(new Event("open-vault"))}
-              className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
-              title="Configurar bóveda y límites"
+              disabled={!vaultReady}
+              className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-muted/30"
+              title={vaultDisabledTitle}
               aria-label="Abrir bóveda y límites"
             >
               <Landmark className="h-4 w-4" />
