@@ -480,6 +480,30 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
                         {lamportsToSol(availableLamports)} SOL
                       </span>
                     </div>
+                    {policy && (
+                      <>
+                        <div className="mt-1 flex items-center justify-between gap-3">
+                          <span className="text-muted-foreground">Gastado por la bóveda</span>
+                          <span className="font-mono text-foreground">
+                            {lamportsToSol(policy.totalSpent)} SOL
+                          </span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between gap-3">
+                          <span className="text-muted-foreground">Última ejecución</span>
+                          <span className="font-mono text-foreground">
+                            {Number(policy.lastExecutionAt) > 0
+                              ? new Date(Number(policy.lastExecutionAt) * 1000).toLocaleString()
+                              : "Nunca"}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    {executionEnabled === false && (
+                      <p className="mt-2 rounded-lg border border-amber-600 bg-amber-950 p-2 text-[11px] leading-relaxed text-amber-100">
+                        El cron solo evalúa la condición: no mueve fondos mientras la ejecución
+                        automática esté desactivada. Por eso el saldo disponible no cambia.
+                      </p>
+                    )}
                     {activity.length > 0 && (
                       <div className="mt-2 border-t border-border/40 pt-2">
                         <p className="mb-1 font-medium">Últimas transacciones de la bóveda</p>

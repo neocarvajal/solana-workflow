@@ -6,6 +6,7 @@ import {
   Bell,
   CheckCheck,
   CheckCircle2,
+  ExternalLink,
   Info,
   Mail,
   MessageSquare,
@@ -185,11 +186,18 @@ const NotificationCenter: React.FC = () => {
               const StatusIcon = status.icon;
 
               return (
-                <button
-                  type="button"
+                <div
+                  role="button"
+                  tabIndex={0}
                   key={item.id}
                   onClick={() => markNotificationRead(item.id)}
-                  className={`flex w-full gap-3 border-b border-border/30 px-3 py-3 text-left transition-colors hover:bg-muted/40 ${
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      markNotificationRead(item.id);
+                    }
+                  }}
+                  className={`flex w-full cursor-pointer gap-3 border-b border-border/30 px-3 py-3 text-left transition-colors hover:bg-muted/40 ${
                     item.read ? "" : "bg-primary/5"
                   }`}
                 >
@@ -217,8 +225,20 @@ const NotificationCenter: React.FC = () => {
                     <span className="mt-1.5 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                       {channel.label} · {relativeTime(item.createdAt)}
                     </span>
+                    {item.explorerUrl && (
+                      <a
+                        href={item.explorerUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(event) => event.stopPropagation()}
+                        className="mt-2 inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-muted"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Ver en Explorer
+                      </a>
+                    )}
                   </span>
-                </button>
+                </div>
               );
             })
           )}

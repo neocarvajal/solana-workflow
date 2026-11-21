@@ -11,6 +11,8 @@ export interface AlertPayload {
   ownerWallet?: string;
   /** Trigger data used to resolve {{price}}, {{asset}}, etc. */
   variables?: Record<string, unknown>;
+  /** Set to false when the price that fired the trigger is not useful context. */
+  appendPriceContext?: boolean;
 }
 
 export interface AlertResult {
@@ -523,7 +525,9 @@ export async function deliverAlert(
   }
 
   const variables = payload?.variables;
-  const message = resolveAlertMessage(text(payload?.message), variables).slice(0, MAX_MESSAGE_LENGTH);
+  const message = resolveAlertMessage(text(payload?.message), variables, {
+    appendPriceContext: payload?.appendPriceContext,
+  }).slice(0, MAX_MESSAGE_LENGTH);
   if (!message) {
     return fail(channel, "El mensaje de la alerta está vacío.", 400);
   }

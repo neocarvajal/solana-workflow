@@ -3,6 +3,8 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { refreshNotifications } from "@/lib/notificationStore";
+import { isFinancialExecutionMode } from "@/lib/schedule";
+import { notifyTxSuccess } from "@/lib/tx-toast";
 import {
   getFlowNodes,
   getRunningNodeId,
@@ -45,8 +47,20 @@ type AutomationRow = {
 
 type Outcome =
   | { status: "success"; label: string; txSignature: string | null }
-  | { status: "skipped"; label: string }
-  | { status: "error"; label: string };
+  | { status: "skipped"; label: string; txSignature?: null }
+  | { status: "error"; label: string; txSignature?: null };
+
+type RunLog = {
+  step?: string;
+  skipped?: boolean;
+  reason?: string;
+  executed?: boolean;
+  signature?: string;
+  amount_lamports?: number;
+  destination?: string;
+  payload?: { to?: string; amount?: number; asset?: string };
+  note?: string;
+};
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -80,6 +94,56 @@ function describeTrigger(triggerData: unknown) {
   return "";
 }
 
+function shortAddress(value: string | undefined | null) {
+  if (!value) return "";
+  return value.length > 12 ? `${value.slice(0, 4)}…${value.slice(-4)}` : value;
+}
+
+/**
+ * Financial runs are reported by what happened to the funds, not by the price
+ * that fired the trigger. A run with no signature never moved money.
+ */
+function describeFinancialOutcome(logs: RunLog[], txSignature: string | null) {
+  const transfer = logs.find((entry) => entry?.step === "send_transaction");
+
+  if (transfer?.executed === true) {
+    const amountSol =
+      typeof transfer.amount_lamports === "number"
+        ? transfer.amount_lamports / 1_000_000_000
+        : Number(transfer.payload?.amount || 0);
+    const destination = shortAddress(transfer.destination || transfer.payload?.to);
+    return {
+      status: "success" as const,
+      label: `Transferencia de ${amountSol} SOL${destination ? ` a ${destination}` : ""}`,
+      txSignature: transfer.signature || txSignature,
+    };
+  }
+
+  if (transfer?.skipped) {
+    const reason =
+      transfer.reason === "vault_execution_disabled"
+        ? "el movimiento de fondos de la bóveda sigue desactivado hasta la auditoría"
+        : transfer.reason === "owner_or_workflow_missing"
+          ? "faltan datos de la bóveda para transferir"
+          : transfer.reason === "unsupported_asset"
+            ? "el activo configurado no es compatible con la bóveda"
+            : transfer.reason === "invalid_amount"
+              ? "el monto configurado no es válido"
+              : transfer.reason || "la transferencia fue omitida";
+    return {
+      status: "skipped" as const,
+      label: `No se movieron fondos: ${reason}`,
+      txSignature: null,
+    };
+  }
+
+  return {
+    status: "skipped" as const,
+    label: "El workflow se evaluó; no se registró ninguna transferencia",
+    txSignature: null,
+  };
+}
+
 async function fetchAutomationRow(owner: string, workflowId: string) {
   const { data, error } = await supabase
     .from("workflows")
@@ -99,6 +163,7 @@ async function fetchAutomationRow(owner: string, workflowId: string) {
 async function fetchOutcome(
   rowId: string,
   scheduledFor: string,
+  executionMode: string,
   isCancelled: () => boolean,
 ): Promise<Outcome | null> {
   const targetMs = new Date(scheduledFor).getTime();
@@ -107,7 +172,7 @@ async function fetchOutcome(
   while (!isCancelled() && Date.now() < deadline) {
     const { data: run } = await supabase
       .from("workflow_runs")
-      .select("status,error,trigger_data,tx_signature")
+      .select("status,error,trigger_data,tx_signature,output")
       .eq("workflow_id", rowId)
       .eq("scheduled_for", scheduledFor)
       .order("created_at", { ascending: false })
@@ -120,6 +185,17 @@ async function fetchOutcome(
       }
 
       const detail = describeTrigger(run.trigger_data);
+      const output = run.output && typeof run.output === "object"
+        ? (run.output as { logs?: RunLog[] })
+        : {};
+      const logs = Array.isArray(output.logs) ? output.logs : [];
+      const txSignature = run.tx_signature ?? null;
+
+      if (isFinancialExecutionMode(executionMode)) {
+        const financial = describeFinancialOutcome(logs, txSignature);
+        if (financial.status === "success") return financial;
+        return { status: financial.status, label: financial.label };
+      }
 
       if (run.status === "skipped") {
         return { status: "skipped", label: detail || "La condición del trigger no se cumplió" };
@@ -128,7 +204,7 @@ async function fetchOutcome(
       return {
         status: "success",
         label: detail || "Ejecución completada",
-        txSignature: run.tx_signature ?? null,
+        txSignature,
       };
     }
 
@@ -142,7 +218,12 @@ async function fetchOutcome(
 
     if (fresh?.last_run_at && new Date(fresh.last_run_at).getTime() >= targetMs - 1000) {
       if (fresh.last_error) return { status: "error", label: fresh.last_error };
-      return { status: "success", label: "Ejecución completada", txSignature: null };
+      return isFinancialExecutionMode(executionMode)
+        ? {
+            status: "skipped",
+            label: "El workflow se evaluó; no se registró ninguna transferencia",
+          }
+        : { status: "success", label: "Ejecución completada", txSignature: null };
     }
 
     await sleep(1500);
@@ -258,7 +339,12 @@ const ScheduledExecutionWatcher: React.FC = () => {
           })()
         : animateNodes(isCancelled);
 
-      const outcome = await fetchOutcome(row.id, scheduledFor, isCancelled);
+      const outcome = await fetchOutcome(
+        row.id,
+        scheduledFor,
+        row.execution_mode,
+        isCancelled,
+      );
       await animation;
 
       if (cancelled) return;
@@ -302,12 +388,19 @@ const ScheduledExecutionWatcher: React.FC = () => {
         scheduledFor,
         message: outcome.label,
       });
-      toast.success(
+      const outcomeTitle =
         outcome.status === "skipped"
           ? `"${row.name}" evaluado`
-          : `"${row.name}" ejecutado`,
-        { id: toastId, description: outcome.label },
-      );
+          : `"${row.name}" ejecutado`;
+
+      if (outcome.txSignature) {
+        notifyTxSuccess(outcomeTitle, outcome.txSignature, {
+          id: toastId,
+          description: outcome.label,
+        });
+      } else {
+        toast.success(outcomeTitle, { id: toastId, description: outcome.label });
+      }
       setTimeout(() => {
         if (!cancelled && getScheduledRunState().status === "success") {
           setScheduledRunState({ status: "idle" });

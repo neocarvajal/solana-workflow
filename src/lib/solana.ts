@@ -7,7 +7,11 @@ const CLUSTER = (process.env.NEXT_PUBLIC_SOLANA_CLUSTER || "devnet") as
   "devnet" | "mainnet-beta" | "testnet";
 
 export const SOLANA_CLUSTER = CLUSTER;
-export const connection = new Connection(clusterApiUrl(CLUSTER), "confirmed");
+const RPC_URL =
+  process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
+  process.env.NEXT_PUBLIC_ALCHEMY_HTTP_URL ||
+  clusterApiUrl(CLUSTER);
+export const connection = new Connection(RPC_URL, "confirmed");
 
 const MEMO_PROGRAM_ID = new PublicKey(
   "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
@@ -96,9 +100,55 @@ export async function publishWorkflowMemo(
   return { signature: sig };
 }
 
+const CHAIN_CACHE_TTL_MS = 60_000;
+const chainCache = new Map<string, { entries: OnchainEntry[]; at: number }>();
+const chainInFlight = new Map<string, Promise<OnchainEntry[]>>();
+
+/**
+ * Reads the memo history with a short-lived cache. The public devnet RPC is
+ * slow and rate-limited, so opening the sheet twice must not mean two full
+ * transaction-history scans.
+ */
 export async function listOnchainWorkflows(
   owner: PublicKey,
-  limit = 30
+  limit = 20
+): Promise<OnchainEntry[]> {
+  const key = `${owner.toBase58()}:${limit}`;
+  const cached = chainCache.get(key);
+  if (cached && Date.now() - cached.at < CHAIN_CACHE_TTL_MS) {
+    return cached.entries;
+  }
+  const inFlight = chainInFlight.get(key);
+  if (inFlight) return inFlight;
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("RPC timeout")), 12_000);
+  });
+
+  const request = readOnchainWorkflows(owner, limit)
+    .then((entries) => {
+      chainCache.set(key, { entries, at: Date.now() });
+      return entries;
+    })
+    .catch((error) => {
+      if (cached) return cached.entries;
+      throw error;
+    })
+    .finally(() => {
+      if (timer) clearTimeout(timer);
+    });
+
+  const raced = Promise.race([request, timeout]).finally(() => {
+    chainInFlight.delete(key);
+  });
+  chainInFlight.set(key, raced);
+  return raced;
+}
+
+async function readOnchainWorkflows(
+  owner: PublicKey,
+  limit: number
 ): Promise<OnchainEntry[]> {
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

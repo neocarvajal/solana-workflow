@@ -297,6 +297,7 @@ Deno.serve(async (req) => {
               phone: step.params.phone,
               ownerWallet,
               variables,
+              appendPriceContext: !financialAutomation,
             });
             if (!alert.ok) throw new Error(alert.message);
 
@@ -320,6 +321,7 @@ Deno.serve(async (req) => {
               const message = resolveAlertMessage(
                 String(step.params.message || "Trigger fired!"),
                 variables,
+                { appendPriceContext: !financialAutomation },
               ).slice(0, 4000);
 
               const { error: notificationError } = await sb.from("user_notifications").insert({
@@ -379,6 +381,48 @@ Deno.serve(async (req) => {
           entry?.executed === true &&
           typeof entry?.signature === "string",
       )?.signature || null;
+
+    if (vaultTransferExecuted && txSignature && sb && ownerWallet) {
+      const transferLog = logs.find(
+        (entry) =>
+          entry?.step === "send_transaction" &&
+          entry?.executed === true,
+      );
+      const amountSol =
+        typeof transferLog?.amount_lamports === "number"
+          ? transferLog.amount_lamports / 1_000_000_000
+          : 0;
+      const destination = String(transferLog?.destination || "");
+      const shortDestination = destination
+        ? `${destination.slice(0, 4)}…${destination.slice(-4)}`
+        : "la dirección configurada";
+      const cluster = Deno.env.get("SOLANA_CLUSTER") || "devnet";
+      const clusterQuery = cluster === "mainnet-beta" ? "" : `?cluster=${cluster}`;
+      const explorerUrl = `https://explorer.solana.com/tx/${txSignature}${clusterQuery}`;
+
+      const { error: transferNotificationError } = await sb
+        .from("user_notifications")
+        .insert({
+          owner_wallet: ownerWallet,
+          workflow_id: stableWorkflowId || workflowId || null,
+          workflow_name: workflow.name,
+          title: `Transferencia ejecutada · ${workflow.name}`,
+          message: `${amountSol} SOL enviados a ${shortDestination}\nVer en Explorer: ${explorerUrl}`,
+          channel: "app",
+          status: "success",
+          metadata: {
+            scheduledFor: scheduledFor || null,
+            txSignature,
+            explorerUrl,
+            amountLamports: transferLog?.amount_lamports ?? null,
+            destination: destination || null,
+          },
+        });
+
+      if (transferNotificationError) {
+        console.error("Could not persist the vault transfer notification", transferNotificationError);
+      }
+    }
 
     if (workflowId && sb) {
       await sb.from("workflow_runs").insert({

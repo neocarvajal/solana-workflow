@@ -8,9 +8,10 @@ import { solexplorerUrl } from "@/lib/solana";
 export function notifyTxSuccess(
   message: string,
   signature: string,
-  options?: { description?: string },
+  options?: { description?: string; id?: string | number },
 ) {
   toast.success(message, {
+    id: options?.id,
     duration: Infinity,
     closeButton: true,
     description: options?.description,

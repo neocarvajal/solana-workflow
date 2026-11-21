@@ -12,6 +12,9 @@ export interface AppNotification {
   createdAt: number;
   workflowId?: string;
   workflowName?: string;
+  /** Set for on-chain executions so the user can verify the transaction. */
+  txSignature?: string;
+  explorerUrl?: string;
   /** Server notifications come from cron runs; the rest are browser-local. */
   source?: "local" | "server";
 }
@@ -27,6 +30,7 @@ type ServerNotificationRow = {
   status: string;
   read: boolean;
   created_at: string;
+  metadata?: { txSignature?: string; explorerUrl?: string } | null;
 };
 
 const STORAGE_KEY = "solflows_notifications_v1";
@@ -57,6 +61,8 @@ function safeParse(raw: string | null): AppNotification[] {
         createdAt: Number(item.createdAt) || Date.now(),
         workflowId: typeof item.workflowId === "string" ? item.workflowId : undefined,
         workflowName: typeof item.workflowName === "string" ? item.workflowName : undefined,
+        txSignature: typeof item.txSignature === "string" ? item.txSignature : undefined,
+        explorerUrl: typeof item.explorerUrl === "string" ? item.explorerUrl : undefined,
         source: item.source === "server" ? ("server" as const) : ("local" as const),
       }))
       .slice(0, MAX_NOTIFICATIONS);
@@ -121,6 +127,12 @@ function rowToNotification(row: ServerNotificationRow): AppNotification {
     createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
     workflowId: row.workflow_id || undefined,
     workflowName: row.workflow_name || undefined,
+    txSignature: row.metadata?.txSignature || undefined,
+    explorerUrl:
+      row.metadata?.explorerUrl ||
+      (row.metadata?.txSignature
+        ? `https://explorer.solana.com/tx/${row.metadata.txSignature}?cluster=${process.env.NEXT_PUBLIC_SOLANA_CLUSTER || "devnet"}`
+        : undefined),
     source: "server",
   };
 }
@@ -152,7 +164,7 @@ export async function syncNotifications(): Promise<void> {
     try {
       const { data, error } = await supabase
         .from("user_notifications")
-        .select("id,owner_wallet,workflow_id,workflow_name,title,message,channel,status,read,created_at")
+        .select("id,owner_wallet,workflow_id,workflow_name,title,message,channel,status,read,created_at,metadata")
         .eq("owner_wallet", wallet)
         .order("created_at", { ascending: false })
         .limit(MAX_NOTIFICATIONS);

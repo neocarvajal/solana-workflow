@@ -35,6 +35,7 @@ interface OnchainWorkflowsSheetProps {
 const OnchainWorkflowsSheet: React.FC<OnchainWorkflowsSheetProps> = ({ hideTrigger = false }) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingChain, setLoadingChain] = useState(false);
   const [entries, setEntries] = useState<OnchainEntry[]>([]);
   const [loadingCid, setLoadingCid] = useState<string | null>(null);
   const [automation, setAutomation] = useState<AutomationIndex>({});
@@ -49,61 +50,56 @@ const OnchainWorkflowsSheet: React.FC<OnchainWorkflowsSheetProps> = ({ hideTrigg
       return;
     }
 
+    const owner = publicKey.toBase58();
     setLoading(true);
+    setLoadingChain(true);
     setChainWarning(false);
+
+    let allRows: Awaited<ReturnType<typeof fetchAutomationRows>>;
     try {
-      const owner = publicKey.toBase58();
-      const [chainResult, rowsResult] = await Promise.allSettled([
-        listOnchainWorkflows(publicKey),
-        fetchAutomationRows(owner, { includeDeleted: true }),
-      ]);
+      allRows = await fetchAutomationRows(owner, { includeDeleted: true });
+    } catch (error) {
+      console.error("Could not load workflow automation status", error);
+      toast.error("No se pudo cargar el historial guardado. Intenta de nuevo.");
+      setLoading(false);
+      setLoadingChain(false);
+      return;
+    }
 
-      const allRows = rowsResult.status === "fulfilled" ? rowsResult.value : [];
-      if (rowsResult.status === "rejected") {
-        console.error("Could not load workflow automation status", rowsResult.reason);
-      }
-
-      const rows = allRows.filter((row) => !isDeletedAutomation(row));
-      const deleted = allRows.filter(isDeletedAutomation);
-      const deletedCids = new Set(
-        deleted.map((row) => row.cid).filter((value): value is string => Boolean(value)),
+    const rows = allRows.filter((row) => !isDeletedAutomation(row));
+    const deleted = allRows.filter(isDeletedAutomation);
+    const deletedCids = new Set(
+      deleted.map((row) => row.cid).filter((value): value is string => Boolean(value)),
+    );
+    const deletedSignatures = new Set(
+      deleted
+        .map((row) => row.onchain_signature)
+        .filter((value): value is string => Boolean(value)),
+    );
+    const withoutDeleted = (list: OnchainEntry[]) =>
+      list.filter(
+        (entry) =>
+          !deletedCids.has(entry.payload.cid) &&
+          !deletedSignatures.has(entry.signature),
       );
-      const deletedSignatures = new Set(
-        deleted
-          .map((row) => row.onchain_signature)
-          .filter((value): value is string => Boolean(value)),
-      );
 
-      let chainEntries: OnchainEntry[] = [];
-      if (chainResult.status === "fulfilled") {
-        chainEntries = chainResult.value;
-      } else {
-        console.warn("Could not read on-chain history, using saved rows", chainResult.reason);
-        setChainWarning(rows.length > 0);
-      }
+    // Saved rows come from Supabase and are fast. Show them immediately; chain
+    // history is slower (and rate-limited) so it is merged in when it arrives.
+    setEntries(withoutDeleted(mergeOnchainEntries([], rows)));
+    setAutomation(indexAutomation(rows));
+    setLoading(false);
 
-      // Merge first so only the newest memo per name survives, then drop the
-      // ones whose tombstoned workflow was deleted by the user.
-      setEntries(
-        mergeOnchainEntries(chainEntries, rows).filter(
-          (entry) =>
-            !deletedCids.has(entry.payload.cid) &&
-            !deletedSignatures.has(entry.signature),
-        ),
-      );
-      setAutomation(indexAutomation(rows));
-
-      if (
-        chainResult.status === "rejected" &&
-        chainEntries.length === 0 &&
-        rows.length === 0
-      ) {
+    try {
+      const chainEntries = await listOnchainWorkflows(publicKey);
+      setEntries(withoutDeleted(mergeOnchainEntries(chainEntries, rows)));
+    } catch (error) {
+      console.warn("Could not read on-chain history, using saved rows", error);
+      setChainWarning(rows.length > 0);
+      if (rows.length === 0) {
         toast.error("No se pudo leer la cadena ni el historial guardado. Intenta de nuevo.");
       }
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Failed to fetch from chain");
     } finally {
-      setLoading(false);
+      setLoadingChain(false);
     }
   }, [publicKey]);
 
@@ -253,7 +249,12 @@ const OnchainWorkflowsSheet: React.FC<OnchainWorkflowsSheetProps> = ({ hideTrigg
         <div className="mt-4 space-y-2">
           {loading && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Reading wallet history…
+              <Loader2 className="h-4 w-4 animate-spin" /> Cargando historial guardado…
+            </div>
+          )}
+          {!loading && loadingChain && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Actualizando historial on-chain…
             </div>
           )}
           {!loading && chainWarning && entries.length > 0 && (
