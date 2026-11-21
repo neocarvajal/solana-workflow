@@ -4,7 +4,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { Buffer } from 'buffer';
 import bs58 from 'bs58';
 import { Transaction, VersionedTransaction } from '@solana/web3.js';
-import { connection, publishWorkflowMemo,solexplorerUrl } from '@/lib/solana';
+import { connection, confirmTransactionOverHttp, publishWorkflowMemo,solexplorerUrl } from '@/lib/solana';
 import { getCluster, isMainnet, type SolanaCluster } from '@/lib/network';
 import {
   isAssetSupportedOnCluster,
@@ -450,7 +450,7 @@ const BottomToolbar: React.FC = () => {
               });
 
               toast.info("Transaction broadcasted! Waiting for confirmation...");
-              await connection.confirmTransaction(signature, "confirmed");
+              await confirmTransactionOverHttp(connection, signature);
 
               desc = `Successfully sent ${targetAmount} ${targetAsset} to ${targetTo.slice(0, 6)}...`;
               stepSignature = signature;

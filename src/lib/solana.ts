@@ -91,6 +91,64 @@ export type OnchainEntry = {
 };
 
 /**
+ * Waits for a signature using HTTP signature statuses only. The WebSocket
+ * subscription behind `confirmTransaction` reports "Transaction was not
+ * confirmed in 30.00 seconds" when the wallet broadcasts through its own RPC
+ * (or the subscription drops), even though the transaction already landed.
+ */
+export async function confirmTransactionOverHttp(
+  connection: Connection,
+  signature: string,
+): Promise<void> {
+  const POLL_INTERVAL_MS = 1_000;
+  const TIMEOUT_MS = 60_000;
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < TIMEOUT_MS) {
+    const { value } = await connection.getSignatureStatuses([signature], {
+      searchTransactionHistory: true,
+    });
+    const status = value[0];
+    if (status) {
+      if (status.err) {
+        throw new Error(
+          `La transacción falló en la red: ${JSON.stringify(status.err)}`,
+        );
+      }
+      if (
+        status.confirmationStatus === "confirmed" ||
+        status.confirmationStatus === "finalized"
+      ) {
+        return;
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  }
+
+  // Some RPCs return a known signature without an explicit commitment level.
+  // If there is no error the transaction landed, so do not report a false failure.
+  const { value } = await connection.getSignatureStatuses([signature], {
+    searchTransactionHistory: true,
+  });
+  if (value[0] && !value[0].err) return;
+  throw new Error(
+    "La transacción fue enviada pero no se pudo confirmar a tiempo. Revisa el explorer antes de reintentar.",
+  );
+}
+
+/** A wallet may throw after broadcasting; the error embeds the signature. */
+function signatureFromError(error: unknown): string | null {
+  if (!error || typeof error !== "object") return null;
+  const direct = (error as { signature?: unknown }).signature;
+  if (typeof direct === "string" && direct.length >= 60) return direct;
+  const message =
+    error instanceof Error
+      ? error.message
+      : String((error as { message?: unknown }).message || "");
+  return message.match(/\b[1-9A-HJ-NP-Za-km-z]{80,100}\b/)?.[0] || null;
+}
+
+/**
  * Publica un flujo de trabajo on-chain usando cualquier Wallet del Wallet Standard
  */
 export async function publishWorkflowMemo(
@@ -118,13 +176,27 @@ export async function publishWorkflowMemo(
   console.log("Program ID:", ix.programId.toBase58());
   
   const active = getConnection();
-  const sig = await sendTransaction(tx, active).catch((err) => {
-    console.error("Detalle del error en Wallet Adapter:", err);
-    throw err;
-  });
+  let sig: string;
+  try {
+    sig = await sendTransaction(tx, active);
+  } catch (error) {
+    // Wallets can broadcast and then fail while waiting for their own
+    // confirmation. If the error carries a signature, verify it on chain
+    // before treating the publication as failed.
+    const suspected = signatureFromError(error);
+    if (suspected) {
+      try {
+        await confirmTransactionOverHttp(active, suspected);
+        return { signature: suspected };
+      } catch {
+        // Keep the original wallet error when reconciliation also fails.
+      }
+    }
+    console.error("Detalle del error en Wallet Adapter:", error);
+    throw error;
+  }
 
-  // Confirmamos la transacción
-  await active.confirmTransaction(sig, "confirmed");
+  await confirmTransactionOverHttp(active, sig);
 
   return { signature: sig };
 }
