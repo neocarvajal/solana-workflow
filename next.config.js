@@ -2,6 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   productionBrowserSourceMaps: false,
+  experimental: {
+    agentUpgrade: 'security',
+  },
   images: {
     remotePatterns: [
       {
