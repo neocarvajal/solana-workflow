@@ -553,7 +553,7 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
               )}
 
               {!policy && !hasPublishedReference && (
-                <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
+                <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/50 bg-amber-500/10 p-3 text-xs text-amber-900 dark:border-amber-500/30 dark:text-amber-200">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
                   <p className="min-w-0 flex-1">
                     Este workflow aún no está publicado on-chain. La bóveda
@@ -563,7 +563,7 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
                   <button
                     type="button"
                     onClick={() => window.dispatchEvent(new Event("publish-workflow"))}
-                    className="rounded-lg border border-amber-400/50 px-3 py-1.5 font-medium transition-colors hover:bg-amber-400/10"
+                    className="rounded-lg border border-amber-600/50 px-3 py-1.5 font-medium text-amber-900 transition-colors hover:bg-amber-500/15 dark:border-amber-400/50 dark:text-amber-100 dark:hover:bg-amber-400/10"
                   >
                     Publicar on-chain
                   </button>
@@ -753,7 +753,7 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
               )}
 
               {executionMode !== "vault_transfer" && (
-                <div className="flex items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
+                <div className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-400/10 p-3 text-xs text-amber-900 dark:border-amber-400/30 dark:text-amber-200">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>
                     El modo actual es <b>{executionModeLabel(executionMode)}</b>. Para usar
