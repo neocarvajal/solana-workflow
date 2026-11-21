@@ -233,7 +233,7 @@ const OnchainWorkflowsSheet: React.FC<OnchainWorkflowsSheetProps> = ({ hideTrigg
       )}
       <SheetContent className="w-full overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:w-[420px] sm:max-w-[420px] sm:p-6">
         <SheetHeader>
-          <SheetTitle className="flex items-center justify-between gap-2">
+          <SheetTitle className="flex items-center justify-between gap-2 pr-8">
             <span className="truncate">My on-chain workflows</span>
             <button
               onClick={load}
