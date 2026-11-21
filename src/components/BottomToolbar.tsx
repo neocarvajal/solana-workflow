@@ -1,11 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { Save, Play, ZoomIn, ZoomOut, Clock, Upload, Loader2, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Save, Play, ZoomIn, ZoomOut, Clock, Upload, Loader2, ShieldCheck, Landmark } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Buffer } from 'buffer';
 import bs58 from 'bs58';
 import { Connection, Transaction, VersionedTransaction } from '@solana/web3.js';
 import { connection, publishWorkflowMemo,solexplorerUrl } from '@/lib/solana';
 import { notifyTxSuccess } from '@/lib/tx-toast';
+import { Switch } from '@/components/ui/switch';
+import {
+  fetchAutomationRows,
+  findAutomation,
+  indexAutomation,
+  setAutomationActive,
+  type WorkflowAutomationRow,
+} from '@/lib/automation';
 import { workflowToNodes, nodesToWorkflow } from "@/lib/workflow";
 import {
   getWorkflow, getOnchainMeta, setOnchainMeta, setScenarioName, setFlowNodes, updateWorkflow,
@@ -26,7 +34,6 @@ import {
 import { FlowNode } from "@/lib/workflow";
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import SettingsDialog from './SettingsDialog';
 import TransactionSuccessModal from './TransactionSuccessModal';
 import { TriggerEngine } from "@/lib/triggerEngine";
 import { sendAlert } from "@/lib/alerts";
@@ -41,6 +48,8 @@ const BottomToolbar: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [lastTxData, setLastTxData] = useState<{ signature: string; actionType: string; blockhash?: string } | null>(null);
   const [scheduledRun, setScheduledRun] = useState<ScheduledRunState>(getScheduledRunState());
+  const [activationRow, setActivationRow] = useState<WorkflowAutomationRow | null>(null);
+  const [togglingActivation, setTogglingActivation] = useState(false);
   const { publicKey, connected, sendTransaction } = useWallet();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -86,6 +95,56 @@ const BottomToolbar: React.FC = () => {
     }
   }, [publicKey]);
 
+  const loadActivation = useCallback(async () => {
+    if (!walletAddress) {
+      setActivationRow(null);
+      return;
+    }
+    try {
+      const rows = await fetchAutomationRows(walletAddress, { includeUnpublished: true });
+      const row = findAutomation(
+        indexAutomation(rows),
+        getWorkflowId(),
+        getOnchainMeta().cid,
+      );
+      setActivationRow(row);
+    } catch (error) {
+      console.error("No se pudo cargar el estado de activación", error);
+      setActivationRow(null);
+    }
+  }, [walletAddress]);
+
+  useEffect(() => {
+    void loadActivation();
+  }, [loadActivation]);
+
+  const handleToggleActivation = async (nextActive: boolean) => {
+    if (!activationRow || !walletAddress || togglingActivation) return;
+    setTogglingActivation(true);
+    try {
+      const updated = await setAutomationActive({
+        row: activationRow,
+        ownerWallet: walletAddress,
+        nextActive,
+        schedule: executionFrequency,
+      });
+      setActivationRow(updated);
+      toast.success(nextActive ? "Workflow activado" : "Workflow desactivado", {
+        description: nextActive
+          ? "El cron volverá a ejecutarlo según su frecuencia."
+          : "El cron dejará de ejecutarlo hasta que lo actives de nuevo.",
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo cambiar el estado del workflow",
+      );
+    } finally {
+      setTogglingActivation(false);
+    }
+  };
+
   useEffect(() => {
     if (!router.isReady || !walletAddress || !router.query.id) {
       return;
@@ -100,6 +159,7 @@ const BottomToolbar: React.FC = () => {
       setWorkflowId(found.workflow.workflowId || found.workflowId || found.id);
       setScenarioName(found.name);
       setFlowNodes(workflowToNodes(found.workflow));
+      void loadActivation();
     } else {
       console.warn("Workflow not found for the provided ID");
     }
@@ -577,6 +637,8 @@ const BottomToolbar: React.FC = () => {
 
     if (dbError) throw new Error(`DB Error: ${dbError.message}`);
 
+    void loadActivation();
+
     // Keep the local "My Workflows" list in sync with the IPFS/on-chain
     // publish so the flow can be reopened without loading it from the chain.
     const savedRecord = rememberSavedWorkflow({
@@ -607,6 +669,17 @@ const BottomToolbar: React.FC = () => {
     setPublishing(false);
   }
   };
+
+  const isWorkflowActive = Boolean(
+    activationRow?.enabled && activationRow?.automation_status === "active",
+  );
+  const activationTitle = !activationRow
+    ? "Publica el workflow on-chain para poder activarlo"
+    : executionFrequency === "manual" && !isWorkflowActive
+      ? "Workflow manual: cambia la frecuencia para activarlo"
+      : isWorkflowActive
+        ? "Desactivar workflow"
+        : "Activar workflow";
 
   return (
     <>
@@ -667,7 +740,38 @@ const BottomToolbar: React.FC = () => {
               </span>
             </button>
 
-            <SettingsDialog listenForOpenEvent />
+            <div
+              className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-muted/50 px-2"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <Switch
+                checked={isWorkflowActive}
+                onCheckedChange={(checked) => void handleToggleActivation(checked)}
+                disabled={
+                  !activationRow ||
+                  togglingActivation ||
+                  (executionFrequency === "manual" && !isWorkflowActive)
+                }
+                title={activationTitle}
+                aria-label={isWorkflowActive ? "Desactivar workflow" : "Activar workflow"}
+              />
+              <span className="whitespace-nowrap text-xs text-muted-foreground">
+                {togglingActivation ? "…" : isWorkflowActive ? "Activo" : "Inactivo"}
+              </span>
+            </div>
+
+            <button
+              onClick={() => window.dispatchEvent(new Event("open-vault"))}
+              className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-border px-2.5 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+              title="Configurar bóveda y límites"
+              aria-label="Abrir bóveda y límites"
+            >
+              <Landmark className="h-4 w-4" />
+              <span className="whitespace-nowrap">
+                <span className="sm:hidden">Bóveda</span>
+                <span className="hidden sm:inline">Bóveda y límites</span>
+              </span>
+            </button>
           </div>
 
           <div className="flex shrink-0 items-center gap-1 rounded-full bg-muted/50">

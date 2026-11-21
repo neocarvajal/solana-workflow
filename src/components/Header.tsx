@@ -70,7 +70,7 @@ const Header: React.FC = () => {
           <span>AI Builder</span>
         </button>
 
-        <SettingsDialog />
+        <SettingsDialog listenForOpenEvent />
       </div>
     </div>
   );

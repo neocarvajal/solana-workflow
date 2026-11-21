@@ -9,7 +9,9 @@ import {
   getCanvasScale, setCanvasScale, subscribeScale,
   subscribeRunningNode, subscribeAnimatingLine,
   subscribeErrorNode, getErrorNodeId, setErrorNodeId,
+  getExecutionMode, subscribeExecutionMode,
 } from "@/lib/workflowStore";
+import { isFinancialExecutionMode } from "@/lib/schedule";
 
 const NODE_RADIUS = 48;
 
@@ -30,6 +32,7 @@ const DraggableCanvas: React.FC = () => {
   const [runningNodeId, setRunningNodeId] = useState<string | null>(null);
   const [errorNodeId, setErrorNodeIdState] = useState<string | null>(getErrorNodeId());
   const [animatingLineIndex, setAnimatingLineIndex] = useState<number>(-1);
+  const [executionMode, setExecutionMode] = useState(getExecutionMode);
 
   /* Canvas pan, wheel zoom & pinch zoom */
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -53,12 +56,14 @@ const DraggableCanvas: React.FC = () => {
     const unsubRunning = subscribeRunningNode((id) => setRunningNodeId(id));
     const unsubError = subscribeErrorNode((id) => setErrorNodeIdState(id));
     const unsubAnimating = subscribeAnimatingLine((idx) => setAnimatingLineIndex(idx));
+    const unsubExecutionMode = subscribeExecutionMode(setExecutionMode);
     return () => {
       unsubNodes();
       unsubScale();
       unsubRunning();
       unsubError();
       unsubAnimating();
+      unsubExecutionMode();
     };
   }, []);
 
@@ -371,6 +376,10 @@ const DraggableCanvas: React.FC = () => {
     return btns;
   };
 
+  const vaultRequiredFor = (node: FlowNode) =>
+    isFinancialExecutionMode(executionMode) &&
+    (node.module.type === "send_transaction" || node.module.type === "swap");
+
   return (
     <div className="relative h-full min-h-0 min-w-0 flex-1 overflow-hidden">
       <div
@@ -400,6 +409,7 @@ const DraggableCanvas: React.FC = () => {
               scale={scale}
               isActive={runningNodeId === node.id && errorNodeId !== node.id}
               hasError={errorNodeId === node.id}
+              vaultRequired={vaultRequiredFor(node)}
               onDrag={onNodeDrag}
               onDoubleClick={onNodeDoubleClick}
               onSettings={openSettings}
@@ -427,6 +437,7 @@ const DraggableCanvas: React.FC = () => {
       {settingsNode && (
         <NodeSettingsModal
           node={settingsNode}
+          vaultRequired={vaultRequiredFor(settingsNode)}
           onSave={(updatedNode) => {
             const list = getFlowNodes().map((n) => (n.id === updatedNode.id ? updatedNode : n));
             setFlowNodes(list);

@@ -1,5 +1,5 @@
 import React, { useRef, useCallback } from "react";
-import { Zap, Settings } from "lucide-react";
+import { Zap, Settings, AlertTriangle } from "lucide-react";
 import type { FlowNode } from "@/lib/workflow";
 
 interface Props {
@@ -9,6 +9,7 @@ interface Props {
   scale: number;
   isActive: boolean;
   hasError: boolean;
+  vaultRequired?: boolean;
   onDrag: (id: string, x: number, y: number) => void;
   onDoubleClick: (node: FlowNode) => void;
   onSettings: (node: FlowNode) => void;
@@ -23,6 +24,7 @@ const DraggableNode: React.FC<Props> = ({
   scale,
   isActive,
   hasError,
+  vaultRequired = false,
   onDrag,
   onDoubleClick,
   onSettings,
@@ -141,6 +143,16 @@ const DraggableNode: React.FC<Props> = ({
           >
             <Settings className="h-4 w-4" />
           </button>
+
+          {vaultRequired && (
+            <div
+              className="absolute -left-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border border-amber-300/60 bg-amber-400/20 text-amber-300 shadow"
+              title="Configura la bóveda y sus límites antes de activar la ejecución on-chain"
+              aria-label="Requiere configurar la bóveda"
+            >
+              <AlertTriangle className="h-3.5 w-3.5" />
+            </div>
+          )}
 
           {isFirst && (
             <div className="absolute -bottom-1 -left-1 flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-card shadow-lg">

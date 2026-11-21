@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, Trash2, Loader2, Send } from "lucide-react";
+import { X, Trash2, Loader2, Send, AlertTriangle, Landmark } from "lucide-react";
 import { toast } from "sonner";
 import type { FlowNode } from "@/lib/workflow";
 import { sendAlert } from "@/lib/alerts";
@@ -243,7 +243,8 @@ const NodeSettingsModal: React.FC<{
   onSave: (updatedNode: FlowNode) => void;
   onClose: () => void;
   onDelete?: (id: string) => void;
-}> = ({ node, onSave, onClose, onDelete }) => {
+  vaultRequired?: boolean;
+}> = ({ node, onSave, onClose, onDelete, vaultRequired = false }) => {
 
   const mergeParams = (nodeParams: any) => {
     const defaults = node.module.defaultParams || {};
@@ -354,6 +355,32 @@ const NodeSettingsModal: React.FC<{
             <X className="h-5 w-5 text-muted-foreground" />
           </button>
         </div>
+
+        {vaultRequired && (
+          <div className="mx-4 mt-3 flex items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">Configura la bóveda antes de publicar</p>
+              <p className="mt-0.5 text-amber-200/80">
+                Este workflow mueve fondos en la ejecución on-chain. Crea la bóveda y ajusta el destino y los límites en el panel. La simulación del canvas no usa esos fondos.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  window.setTimeout(
+                    () => window.dispatchEvent(new Event("open-vault")),
+                    80,
+                  );
+                }}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-amber-300/40 px-2 py-1 font-medium text-amber-100 transition-colors hover:bg-amber-300/10"
+              >
+                <Landmark className="h-3.5 w-3.5" />
+                Abrir bóveda y límites
+              </button>
+            </div>
+          </div>
+        )}
 
         <form
           onSubmit={handleSubmit}

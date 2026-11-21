@@ -12,6 +12,7 @@ export function notifyTxSuccess(
 ) {
   toast.success(message, {
     duration: Infinity,
+    closeButton: true,
     description: options?.description,
     action: {
       label: "Ver en Explorer",
