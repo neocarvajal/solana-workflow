@@ -823,8 +823,8 @@ const BottomToolbar: React.FC = () => {
   return (
     <>
       <div className="z-30 w-full shrink-0 border-t border-border bg-background px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 sm:h-12 sm:px-4 sm:py-0">
-        <div className="flex flex-wrap items-center justify-between gap-2 sm:h-full sm:flex-nowrap">
-          <div className="flex min-w-0 flex-wrap items-center gap-1 sm:flex-nowrap sm:gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:h-full sm:flex-nowrap">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:contents">
             <button
               onClick={handleSave}
               className="flex min-h-10 shrink-0 items-center gap-1 rounded-md px-2 py-2 text-sm text-foreground transition-colors hover:bg-muted"
@@ -983,7 +983,7 @@ const BottomToolbar: React.FC = () => {
           </div>
           </div>
 
-          <div className="flex w-full items-center justify-center gap-1 sm:w-auto sm:justify-end">
+          <div className="flex w-full items-center justify-center gap-2 sm:ml-auto sm:w-auto sm:justify-end">
             <button
               onClick={() => setCanvasScale(scale - 0.1)}
               className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition-colors hover:bg-muted"
