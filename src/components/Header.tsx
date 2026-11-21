@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { Plus, LayoutDashboard } from 'lucide-react';
+import { Database, Plus, LayoutDashboard } from 'lucide-react';
 import SettingsDialog from './SettingsDialog';
 import { getScenarioName, setScenarioName, subscribeWorkflow, setFlowNodes, setWorkflowId } from '@/lib/workflowStore';
 
@@ -40,6 +40,17 @@ const Header: React.FC = () => {
           placeholder="Scenario name..."
           className="text-base sm:text-lg font-semibold bg-transparent border-0 border-b border-transparent hover:border-border focus:border-primary focus:outline-none px-1 py-1 rounded transition-colors w-full min-w-0 sm:w-48 md:w-64"
         />
+
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new Event("open-onchain"))}
+          className="hidden h-10 shrink-0 items-center gap-1.5 rounded-lg border border-border/40 bg-muted/60 px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted sm:inline-flex"
+          title="Open on-chain workflows"
+          aria-label="Open on-chain workflows"
+        >
+          <Database className="h-4 w-4 shrink-0" />
+          <span className="hidden lg:inline">On-chain</span>
+        </button>
       </div>
 
       <div className="flex w-full min-w-0 items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5 sm:w-auto sm:gap-2 md:gap-3">
