@@ -44,7 +44,8 @@ import {
   subscribeExecutionMode,
 } from "@/lib/workflowStore";
 import { executionModeLabel } from "@/lib/schedule";
-import { explorerAddrUrl, shortAddr, solexplorerUrl, solscanUrl, SOLANA_CLUSTER } from "@/lib/solana";
+import { explorerAddrUrl, shortAddr, solexplorerUrl, solscanUrl } from "@/lib/solana";
+import { useCluster } from "@/lib/network";
 import { toast } from "sonner";
 import { notifyTxSuccess } from "@/lib/tx-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -102,7 +103,8 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
   const [executionMode, setExecutionMode] = useState(getExecutionMode);
 
   const policy: VaultPolicy | null = snapshot?.policyData || null;
-  const isDevnet = SOLANA_CLUSTER !== "mainnet-beta";
+  const cluster = useCluster();
+  const isDevnet = cluster !== "mainnet-beta";
 
   const refresh = useCallback(async () => {
     if (!publicKey) {
@@ -274,7 +276,7 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
       setLastSignature(signature);
       setAuthorized(false);
       notifyTxSuccess(
-        policy ? "Límites de la bóveda actualizados" : "Bóveda creada en devnet",
+        policy ? "Límites de la bóveda actualizados" : "Bóveda creada",
         signature,
       );
       await refresh();
@@ -438,11 +440,9 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
               <span>
                 La bóveda solo puede enviar al destino fijo y dentro de los límites que
-                autorices. Solo el ejecutor autorizado por la aplicación puede dispararla
-                y nunca recibe tu llave. En esta fase la ejecución automática de fondos
-                sigue desactivada hasta completar la auditoría; esta configuración es de
-                devnet. La simulación del canvas firma desde tu wallet y no mueve fondos
-                de la bóveda.
+                autorices. El ejecutor de la aplicación firma las transferencias con su
+                propia llave y nunca recibe la tuya. La simulación del canvas firma desde
+                tu wallet y no mueve fondos de la bóveda.
               </span>
             </p>
           </div>
@@ -500,8 +500,8 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
                     )}
                     {executionEnabled === false && (
                       <p className="mt-2 rounded-lg border border-amber-600 bg-amber-950 p-2 text-[11px] leading-relaxed text-amber-100">
-                        El cron solo evalúa la condición: no mueve fondos mientras la ejecución
-                        automática esté desactivada. Por eso el saldo disponible no cambia.
+                        El ejecutor está pausado en el servidor (kill switch): las transferencias
+                        programadas no se envían hasta reactivarlo. Por eso el saldo no cambia.
                       </p>
                     )}
                     {activity.length > 0 && (
@@ -811,9 +811,8 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
                     className="mt-0.5 h-4 w-4 shrink-0 rounded border-border"
                   />
                   <span>
-                    Autorizo explícitamente que el ejecutor autorizado por la aplicación
-                    pueda mover fondos desde esta bóveda, únicamente al destino y dentro
-                    de estos límites on-chain.
+                    Autorizo el destino y los límites on-chain de esta bóveda. El ejecutor
+                    de la aplicación podrá mover fondos únicamente dentro de estos límites.
                   </span>
                 </label>
 

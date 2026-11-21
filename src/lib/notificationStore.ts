@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { solexplorerUrl } from "@/lib/solana";
 
 export type NotificationStatus = "success" | "error" | "info";
 
@@ -131,7 +132,7 @@ function rowToNotification(row: ServerNotificationRow): AppNotification {
     explorerUrl:
       row.metadata?.explorerUrl ||
       (row.metadata?.txSignature
-        ? `https://explorer.solana.com/tx/${row.metadata.txSignature}?cluster=${process.env.NEXT_PUBLIC_SOLANA_CLUSTER || "devnet"}`
+        ? solexplorerUrl(row.metadata.txSignature)
         : undefined),
     source: "server",
   };

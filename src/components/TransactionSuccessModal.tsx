@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { CheckCircle2, ExternalLink, Copy, Terminal } from "lucide-react";
 import { toast } from "sonner";
+import { solexplorerUrl } from "@/lib/solana";
 
 interface TransactionSuccessModalProps {
   isOpen: boolean;
@@ -30,7 +31,7 @@ const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = ({ isOpe
   };
 
   const txSignature = txData.signature || "";
-  const explorerUrl = `https://explorer.solana.com/tx/${txSignature}?cluster=devnet`;
+  const explorerUrl = solexplorerUrl(txSignature);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

@@ -1,17 +1,44 @@
 import {
-  Connection, PublicKey, Transaction, TransactionInstruction, clusterApiUrl,
+  Connection, PublicKey, Transaction, TransactionInstruction,
 } from "@solana/web3.js";
 import bs58 from "bs58";
+import { getCluster, rpcUrlFor, type SolanaCluster } from "@/lib/network";
 
-const CLUSTER = (process.env.NEXT_PUBLIC_SOLANA_CLUSTER || "devnet") as
-  "devnet" | "mainnet-beta" | "testnet";
+const connections = new Map<SolanaCluster, Connection>();
 
-export const SOLANA_CLUSTER = CLUSTER;
-const RPC_URL =
-  process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
-  process.env.NEXT_PUBLIC_ALCHEMY_HTTP_URL ||
-  clusterApiUrl(CLUSTER);
-export const connection = new Connection(RPC_URL, "confirmed");
+/** Returns the RPC connection for the cluster currently selected in the dapp. */
+export function getConnection(cluster: SolanaCluster = getCluster()): Connection {
+  let active = connections.get(cluster);
+  if (!active) {
+    active = new Connection(rpcUrlFor(cluster), "confirmed");
+    connections.set(cluster, active);
+  }
+  return active;
+}
+
+/**
+ * Stable reference for callers that captured `connection` once. Every call is
+ * delegated to the active cluster so switching networks never uses a stale RPC.
+ */
+export const connection: Connection = new Proxy(
+  new Connection(rpcUrlFor(getCluster()), "confirmed"),
+  {
+    get(_target, prop) {
+      const active = getConnection() as unknown as Record<string | symbol, unknown>;
+      const value = active[prop];
+      return typeof value === "function"
+        ? (value as (...args: unknown[]) => unknown).bind(active)
+        : value;
+    },
+    set(_target, prop, value) {
+      (getConnection() as unknown as Record<string | symbol, unknown>)[prop] = value;
+      return true;
+    },
+  },
+);
+
+/** Kept for compatibility; prefer `getCluster()` from `@/lib/network`. */
+export const SOLANA_CLUSTER = getCluster();
 
 const MEMO_PROGRAM_ID = new PublicKey(
   "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
@@ -41,19 +68,20 @@ export function getPhantom(): Phantom | null {
   return w?.solana?.isPhantom ? (w.solana as Phantom) : null;
 }
 
-export function solscanUrl(sig: string) {
-  const c = CLUSTER === "mainnet-beta" ? "" : `?cluster=${CLUSTER}`;
-  return `https://solscan.io/tx/${sig}${c}`;
+function clusterQuery(cluster: SolanaCluster) {
+  return cluster === "mainnet-beta" ? "" : `?cluster=${cluster}`;
 }
 
-export function solexplorerUrl(sig: string) {
-  const c = CLUSTER === "mainnet-beta" ? "" : `?cluster=${CLUSTER}`;
-  return `https://explorer.solana.com/tx/${sig}${c}`;
+export function solscanUrl(sig: string, cluster = getCluster()) {
+  return `https://solscan.io/tx/${sig}${clusterQuery(cluster)}`;
 }
 
-export function explorerAddrUrl(addr: string) {
-  const c = CLUSTER === "mainnet-beta" ? "" : `?cluster=${CLUSTER}`;
-  return `https://solscan.io/account/${addr}${c}`;
+export function solexplorerUrl(sig: string, cluster = getCluster()) {
+  return `https://explorer.solana.com/tx/${sig}${clusterQuery(cluster)}`;
+}
+
+export function explorerAddrUrl(addr: string, cluster = getCluster()) {
+  return `https://solscan.io/account/${addr}${clusterQuery(cluster)}`;
 }
 
 export type OnchainEntry = {
@@ -89,13 +117,14 @@ export async function publishWorkflowMemo(
   console.log("Tx preparada, instrucciones:", tx.instructions.length);
   console.log("Program ID:", ix.programId.toBase58());
   
-  const sig = await sendTransaction(tx, connection).catch((err) => {
+  const active = getConnection();
+  const sig = await sendTransaction(tx, active).catch((err) => {
     console.error("Detalle del error en Wallet Adapter:", err);
     throw err;
   });
 
   // Confirmamos la transacción
-  await connection.confirmTransaction(sig, "confirmed");
+  await active.confirmTransaction(sig, "confirmed");
 
   return { signature: sig };
 }
@@ -113,7 +142,7 @@ export async function listOnchainWorkflows(
   owner: PublicKey,
   limit = 20
 ): Promise<OnchainEntry[]> {
-  const key = `${owner.toBase58()}:${limit}`;
+  const key = `${getCluster()}:${owner.toBase58()}:${limit}`;
   const cached = chainCache.get(key);
   if (cached && Date.now() - cached.at < CHAIN_CACHE_TTL_MS) {
     return cached.entries;

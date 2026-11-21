@@ -122,7 +122,7 @@ function describeFinancialOutcome(logs: RunLog[], txSignature: string | null) {
   if (transfer?.skipped) {
     const reason =
       transfer.reason === "vault_execution_disabled"
-        ? "el movimiento de fondos de la bóveda sigue desactivado hasta la auditoría"
+        ? "el ejecutor de la bóveda está pausado en el servidor"
         : transfer.reason === "owner_or_workflow_missing"
           ? "faltan datos de la bóveda para transferir"
           : transfer.reason === "unsupported_asset"

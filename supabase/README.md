@@ -33,8 +33,9 @@ Set these as Supabase Edge Function secrets:
   requires a wallet signature over `owner_wallet + workflow_id`; the old
   `signature: "skip"` bypass is rejected. `upload-user-asset` also requires a
   wallet signature over `owner_wallet + asset name + kind`.
-- `VAULT_EXECUTION_ENABLED` — must be exactly `true` to allow
-  `execute-vault` to sign. Keep it `false` until the vault is audited.
+- `VAULT_EXECUTION_ENABLED` — operational kill switch. Must be exactly `true`
+  for `execute-vault` to sign. Set it to `false` to pause all automated vault
+  transfers immediately; the dapp and the on-chain policy stay unchanged.
 - `VAULT_CRANK_SECRET_KEY` — funded devnet keypair (base58 or JSON byte array)
   used only as the allowlisted crank. Its public address is returned by the
   public `vault-config` function so the dapp can pin it into every policy. The
@@ -61,7 +62,7 @@ select vault.create_secret('<same value as CRON_SECRET>', 'cron_secret');
 | --- | --- | --- |
 | `manual` | No | Only runs from the app. |
 | `notify` | No | Cron evaluates triggers and delivers alert steps. Financial steps are skipped and logged. |
-| `vault_transfer` | Yes, bounded | Cron is active and sends alerts. Fund movement remains disabled until the devnet vault is audited and `VAULT_EXECUTION_ENABLED` is explicitly enabled. |
+| `vault_transfer` | Yes, bounded | Cron is active. Transfers are signed by the app keeper within the user's on-chain policy. |
 | `vault_dca` | Yes, bounded | Cron is active, but the Jupiter CPI path is not implemented. |
 | `subscription` | Yes, bounded | Cron is active, but Solana Subscriptions integration is not implemented. |
 

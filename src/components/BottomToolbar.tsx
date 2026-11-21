@@ -3,9 +3,11 @@ import { Save, Play, ZoomIn, ZoomOut, Clock, Upload, Loader2, ShieldCheck, Landm
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Buffer } from 'buffer';
 import bs58 from 'bs58';
-import { Connection, Transaction, VersionedTransaction } from '@solana/web3.js';
+import { Transaction, VersionedTransaction } from '@solana/web3.js';
 import { connection, publishWorkflowMemo,solexplorerUrl } from '@/lib/solana';
+import { isMainnet } from '@/lib/network';
 import { notifyTxSuccess } from '@/lib/tx-toast';
+import MainnetPublishWarning from './MainnetPublishWarning';
 import { Switch } from '@/components/ui/switch';
 import {
   fetchAutomationRows,
@@ -39,6 +41,17 @@ import { TriggerEngine } from "@/lib/triggerEngine";
 import { sendAlert } from "@/lib/alerts";
 import { useRouter } from 'next/router';
 
+const MAINNET_ACK_KEY = "solflows_mainnet_publish_warning_ack";
+
+function mainnetWarningAcknowledged(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(MAINNET_ACK_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
 const BottomToolbar: React.FC = () => {
   const [publishing, setPublishing] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -50,6 +63,7 @@ const BottomToolbar: React.FC = () => {
   const [scheduledRun, setScheduledRun] = useState<ScheduledRunState>(getScheduledRunState());
   const [activationRow, setActivationRow] = useState<WorkflowAutomationRow | null>(null);
   const [togglingActivation, setTogglingActivation] = useState(false);
+  const [mainnetWarningOpen, setMainnetWarningOpen] = useState(false);
   const { publicKey, connected, sendTransaction } = useWallet();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -515,7 +529,15 @@ const BottomToolbar: React.FC = () => {
     }
   };
 
-  const publishOnchain = async () => {
+  const publishOnchain = () => {
+    if (isMainnet() && !mainnetWarningAcknowledged()) {
+      setMainnetWarningOpen(true);
+      return;
+    }
+    void performPublish();
+  };
+
+  const performPublish = async () => {
     // Rebuild from the canvas so the IPFS JSON always matches what the user
     // sees, including the latest node parameters and positions.
     const currentWorkflow = nodesToWorkflow(getScenarioName(), getFlowNodes());
@@ -577,7 +599,6 @@ const BottomToolbar: React.FC = () => {
     // 3. Publicación On-Chain
     const prev = getOnchainMeta();
     const version = (prev.version ?? 0) + 1;
-    const connection = new Connection("https://api.devnet.solana.com", "confirmed");
     const { signature } = await publishWorkflowMemo({ sendTransaction, publicKey }, { name: workflowName, cid, version });
     setOnchainMeta({ cid, signature, version });
 
@@ -655,7 +676,7 @@ const BottomToolbar: React.FC = () => {
 
     if (executionMode === "vault_transfer" || executionMode === "vault_dca" || executionMode === "subscription") {
       toast.info("Modo de fondos guardado", {
-        description: "El cron seguirá evaluando el workflow y enviando alertas. El movimiento automático de fondos seguirá desactivado hasta completar la auditoría; configura los límites en el panel Bóveda.",
+        description: "Configura la bóveda y autoriza sus límites para que el cron pueda transferir dentro de ellos.",
       });
     }
 
@@ -842,6 +863,21 @@ const BottomToolbar: React.FC = () => {
         isOpen={isModalOpen}
         onClose={setIsModalOpen}
         txData={lastTxData}
+      />
+      <MainnetPublishWarning
+        open={mainnetWarningOpen}
+        onCancel={() => setMainnetWarningOpen(false)}
+        onConfirm={(dontShowAgain) => {
+          if (dontShowAgain && typeof window !== "undefined") {
+            try {
+              window.localStorage.setItem(MAINNET_ACK_KEY, "true");
+            } catch {
+              // Ignore storage failures; the warning still applies this time.
+            }
+          }
+          setMainnetWarningOpen(false);
+          void performPublish();
+        }}
       />
     </>
   );

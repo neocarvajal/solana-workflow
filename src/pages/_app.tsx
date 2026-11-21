@@ -7,8 +7,6 @@ import {
   WalletProvider as OriginalWalletProvider
 } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
-import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
-import { clusterApiUrl } from "@solana/web3.js";
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,6 +14,7 @@ import { Toaster } from "@/components/ui/toaster";
 import ThemeToggle from '@/components/ThemeToggle';
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import dynamic from 'next/dynamic';
+import { rpcUrlFor, useCluster } from "@/lib/network";
 
 import "../App.css";
 import "../index.css";
@@ -30,13 +29,10 @@ const WalletProvider = OriginalWalletProvider as React.ComponentType<any>;
 const queryClient = new QueryClient();
 
 export default function App({ Component, pageProps }: AppProps) {
-  const network = WalletAdapterNetwork.Devnet;
-
-  // Alchemy es el RPC por defecto; el RPC público queda como fallback.
-  const endpoint = useMemo(
-    () => process.env.NEXT_PUBLIC_ALCHEMY_HTTP_URL || clusterApiUrl(network),
-    [network]
-  );
+  // La dapp usa la red seleccionada en el indicador de conexión. La clave del
+  // proveedor se re crea al cambiar de red para que todos los hooks vean el RPC nuevo.
+  const cluster = useCluster();
+  const endpoint = useMemo(() => rpcUrlFor(cluster), [cluster]);
 
   // Sin adaptadores el modal de wallets aparece vacío, sobre todo en móvil.
   const wallets = useMemo(
@@ -57,7 +53,7 @@ export default function App({ Component, pageProps }: AppProps) {
           content="width=device-width, initial-scale=1, viewport-fit=cover"
         />
       </Head>
-      <ConnectionProvider endpoint={endpoint}>
+      <ConnectionProvider key={cluster} endpoint={endpoint}>
         <WalletProvider wallets={wallets} autoConnect>
           <WalletModalProvider>
             <TooltipProvider>

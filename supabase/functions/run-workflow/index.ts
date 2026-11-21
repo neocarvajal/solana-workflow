@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
                   reason: "vault_execution_disabled",
                   executionMode,
                   payload,
-                  note: "La bóveda está desplegada en devnet, pero el movimiento de fondos sigue desactivado hasta completar la auditoría.",
+                  note: "El ejecutor de la bóveda está pausado en el servidor (kill switch).",
                 });
               } else if (!ownerWallet || !stableWorkflowId) {
                 logs.push({

@@ -1,6 +1,7 @@
 import React from "react";
 import WalletButton from "./WalletButton";
 import NotificationCenter from "./NotificationCenter";
+import NetworkIndicator from "./NetworkIndicator";
 import { useWallet } from "@solana/wallet-adapter-react";
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -64,6 +65,7 @@ const Navbar: React.FC = () => {
             <span className="hidden min-[380px]:inline">Dashboard</span>
           </Link>
         )}
+        <NetworkIndicator />
         <NotificationCenter />
         <WalletButton />
       </nav>

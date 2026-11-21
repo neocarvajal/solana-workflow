@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
       {
         error: "Vault execution is disabled",
         code: "VAULT_EXECUTION_DISABLED",
-        note: "Enable it only after the devnet vault has been audited.",
+        note: "Operational kill switch: vault execution is paused on the server.",
       },
       503,
     );

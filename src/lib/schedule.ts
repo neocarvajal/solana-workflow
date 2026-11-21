@@ -25,7 +25,7 @@ export const EXECUTION_MODE_OPTIONS: {
   {
     value: "vault_transfer",
     label: "Bóveda: transferencia",
-    description: "Transferencia recurrente desde una bóveda devnet con límites on-chain (pendiente de auditoría).",
+    description: "Transferencia recurrente desde la bóveda, dentro de los límites que autorices.",
   },
   {
     value: "vault_dca",

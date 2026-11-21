@@ -1,8 +1,9 @@
 # solana-flows-vault (Anchor program)
 
 Status: SOL transfer path implemented, deployed to devnet, and covered by
-LiteSVM plus a live devnet smoke test. Not audited. Mainnet and automated
-transfers stay disabled until an external audit is complete.
+LiteSVM plus a live devnet smoke test. Automated devnet transfers are enabled
+and bounded by the owner's on-chain policy. The program is not deployed on
+mainnet yet.
 
 Devnet program id: `dB4W6X19PphXLpSPZfe6ZjQkpBHpfHFDDeUddEGdqQA`
 
@@ -81,9 +82,9 @@ deposit, pause, and withdraw on devnet. The frontend can override the program id
 with `NEXT_PUBLIC_VAULT_PROGRAM_ID`.
 
 The Supabase function `execute-vault` is the only crank entrypoint. It is
-disabled unless `VAULT_EXECUTION_ENABLED=true`, requires
-`VAULT_CRANK_SECRET_KEY`, and still enforces every policy check both before and
-on-chain. The flag is intentionally `false` in production until the audit.
+disabled only when the `VAULT_EXECUTION_ENABLED` kill switch is off, requires
+`VAULT_CRANK_SECRET_KEY`, and enforces every policy check both before and
+on-chain. Turning the switch off pauses all automated transfers immediately.
 
 ## Tests
 
@@ -119,9 +120,10 @@ hash mismatch, owner-only policy updates, and rejection of missing keepers.
 1. Completed: SOL transfers with LiteSVM tests.
 2. Completed: devnet deployment, live init/deposit/execute/pause/withdraw smoke
    test, and devnet program id in the browser client.
-3. Completed: devnet-only vault panel and `execute-vault` crank path behind
-   `VAULT_EXECUTION_ENABLED`.
+3. Completed: devnet-only vault panel and `execute-vault` crank path with the
+   `VAULT_EXECUTION_ENABLED` kill switch enabled.
 4. Add SPL Token and Token-2022, including ATA ownership checks.
-5. Add Jupiter CPI only after the transfer path is audited; measure output by
-   vault balance delta and enforce a user-provided `min_out`.
-6. External audit, then enable `VAULT_EXECUTION_ENABLED` and open mainnet.
+5. Add Jupiter CPI with output measured by vault balance delta and a
+   user-provided `min_out`.
+6. Deploy the program and fund a keeper on mainnet before enabling the vault
+   panel there.
