@@ -245,6 +245,10 @@ Deno.serve(async (req) => {
                     reason: "vault_execution_failed",
                     status: response.status,
                     error: result.error || "execute-vault failed",
+                    note: result.note ||
+                      (result.error === "asset_mint_mismatch"
+                        ? "La bóveda autoriza otro activo. Ábrela, selecciona el activo del workflow, guarda los límites y vuelve a activar el cron."
+                        : undefined),
                     executionMode,
                     payload,
                   });
