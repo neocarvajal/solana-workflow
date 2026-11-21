@@ -824,7 +824,7 @@ const BottomToolbar: React.FC = () => {
     <>
       <div className="z-30 w-full shrink-0 border-t border-border bg-background px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 sm:h-12 sm:px-4 sm:py-0">
         <div className="flex flex-wrap items-center justify-between gap-2 sm:h-full sm:flex-nowrap">
-          <div className="flex min-w-0 items-center gap-1 overflow-x-auto no-scrollbar sm:gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-1 sm:flex-nowrap sm:gap-2">
             <button
               onClick={handleSave}
               className="flex min-h-10 shrink-0 items-center gap-1 rounded-md px-2 py-2 text-sm text-foreground transition-colors hover:bg-muted"
@@ -915,25 +915,37 @@ const BottomToolbar: React.FC = () => {
 
             <button
               onClick={() => window.dispatchEvent(new Event("open-vault"))}
-              className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-border px-2.5 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+              className="hidden min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-border px-2.5 py-1.5 text-sm text-foreground transition-colors hover:bg-muted sm:flex"
               title="Configurar bóveda y límites"
               aria-label="Abrir bóveda y límites"
             >
               <Landmark className="h-4 w-4" />
-              <span className="whitespace-nowrap">
-                <span className="sm:hidden">Bóveda</span>
-                <span className="hidden sm:inline">Bóveda y límites</span>
-              </span>
+              <span className="whitespace-nowrap">Bóveda y límites</span>
             </button>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1 rounded-full bg-muted/50">
-            <div className="flex items-center gap-1 px-2 py-0 text-muted-foreground">
+          {/* On mobile the vault gets its own full-width row so no horizontal
+              dragging is needed to reach it. */}
+          <div className="flex w-full sm:hidden">
+            <button
+              onClick={() => window.dispatchEvent(new Event("open-vault"))}
+              className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+              title="Configurar bóveda y límites"
+              aria-label="Abrir bóveda y límites"
+            >
+              <Landmark className="h-4 w-4" />
+              <span>Bóveda y límites</span>
+            </button>
+          </div>
+
+          <div className="flex w-full min-w-0 items-stretch gap-2 sm:contents">
+          <div className="flex min-w-0 flex-1 items-center gap-1 rounded-full bg-muted/50 sm:flex-none">
+            <div className="flex min-w-0 items-center gap-1 px-2 py-0 text-muted-foreground">
               <Clock className="h-4 w-4 shrink-0" />
               <select
                 value={executionFrequency}
                 onChange={(event) => persistExecutionFrequency(event.target.value)}
-                className="h-10 w-[8.5rem] border-none bg-transparent text-base focus:outline-none sm:w-auto sm:text-sm"
+                className="h-10 w-full min-w-0 border-none bg-transparent text-base focus:outline-none sm:w-auto sm:text-sm"
                 aria-label="Frecuencia de ejecución"
                 title="Frecuencia con la que se ejecutará el workflow publicado on-chain"
               >
@@ -951,13 +963,13 @@ const BottomToolbar: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1 rounded-full bg-muted/50">
-            <div className="flex items-center gap-1 px-2 py-0 text-muted-foreground">
+          <div className="flex min-w-0 flex-1 items-center gap-1 rounded-full bg-muted/50 sm:flex-none">
+            <div className="flex min-w-0 items-center gap-1 px-2 py-0 text-muted-foreground">
               <ShieldCheck className="h-4 w-4 shrink-0" />
               <select
                 value={executionMode}
                 onChange={(event) => persistExecutionMode(event.target.value)}
-                className="h-10 w-[9.5rem] border-none bg-transparent text-base focus:outline-none sm:w-auto sm:text-sm"
+                className="h-10 w-full min-w-0 border-none bg-transparent text-base focus:outline-none sm:w-auto sm:text-sm"
                 aria-label="Modo de ejecución"
                 title="Define si el cron solo avisa o si puede mover fondos desde una bóveda autorizada"
               >
@@ -969,8 +981,9 @@ const BottomToolbar: React.FC = () => {
               </select>
             </div>
           </div>
+          </div>
 
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex w-full items-center justify-center gap-1 sm:w-auto sm:justify-end">
             <button
               onClick={() => setCanvasScale(scale - 0.1)}
               className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition-colors hover:bg-muted"
