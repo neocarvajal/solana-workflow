@@ -839,9 +839,12 @@ const BottomToolbar: React.FC = () => {
 
   return (
     <>
-      <div className="z-30 w-full shrink-0 border-t border-border bg-background px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 sm:h-12 sm:px-4 sm:py-0">
-        <div className="flex flex-wrap items-center gap-2 sm:h-full sm:flex-nowrap">
-          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:contents">
+      <div className="relative z-30 w-full shrink-0 border-t border-border bg-background px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 sm:h-12 sm:px-4 sm:py-0">
+        <div className="flex flex-wrap items-center gap-2 sm:grid sm:h-full sm:grid-cols-[1fr_auto_1fr] sm:gap-3">
+          {/* Empty left column balances the selectors on the right so the main
+              action group stays optically centred on desktop. */}
+          <div className="hidden sm:block" aria-hidden="true" />
+          <div className="flex min-w-0 flex-wrap items-center justify-center gap-2 sm:flex-nowrap sm:justify-center">
             <button
               onClick={handleSave}
               className="flex min-h-10 shrink-0 items-center gap-1 rounded-md px-2 py-2 text-sm text-foreground transition-colors hover:bg-muted"
@@ -948,7 +951,7 @@ const BottomToolbar: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex w-full min-w-0 items-stretch gap-2 sm:contents">
+          <div className="flex w-full min-w-0 items-stretch gap-2 sm:w-auto sm:justify-end">
           <div className="flex min-w-0 flex-1 items-center gap-1 rounded-full bg-muted/50 sm:flex-none">
             <div className="flex min-w-0 items-center gap-1 px-2 py-0 text-muted-foreground">
               <Clock className="h-4 w-4 shrink-0" />
@@ -994,7 +997,7 @@ const BottomToolbar: React.FC = () => {
           </div>
 
           {/* On mobile the zoom controls float over the canvas instead. */}
-          <div className="hidden items-center justify-end gap-2 sm:ml-auto sm:flex">
+          <div className="hidden items-center justify-end gap-2 sm:flex">
             <button
               onClick={() => setCanvasScale(scale - 0.1)}
               className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition-colors hover:bg-muted"

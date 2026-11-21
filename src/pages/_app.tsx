@@ -31,9 +31,9 @@ const queryClient = new QueryClient();
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
-  // On /dashboard the theme toggle lives in the bottom toolbar next to the
-  // vault button; elsewhere it stays as a floating shortcut.
-  const showFloatingThemeToggle = router.pathname !== "/dashboard";
+  // On /dashboard mobile the toggle is inline next to Bóveda; on desktop it
+  // floats again like on every other route.
+  const hideThemeToggleOnMobile = router.pathname === "/dashboard";
 
   // La dapp usa la red seleccionada en el indicador de conexión. La clave del
   // proveedor se re crea al cambiar de red para que todos los hooks vean el RPC nuevo.
@@ -65,7 +65,7 @@ export default function App({ Component, pageProps }: AppProps) {
             <TooltipProvider>
               <Toaster />
               <Sonner />
-              {showFloatingThemeToggle && <ThemeToggle />}
+              <ThemeToggle hideOnMobile={hideThemeToggleOnMobile} />
               <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground antialiased supports-[height:100dvh]:h-[100dvh]">
                 <Navbar />
                 <div className="flex min-h-0 flex-1 flex-col">

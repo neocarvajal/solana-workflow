@@ -2,7 +2,13 @@
 import { useState, useEffect } from 'react';
 import { Sun, Moon } from 'lucide-react';
 
-const ThemeToggle = ({ inline = false }: { inline?: boolean }) => {
+const ThemeToggle = ({
+  inline = false,
+  hideOnMobile = false,
+}: {
+  inline?: boolean;
+  hideOnMobile?: boolean;
+}) => {
   // Determine initial theme: saved preference or system setting
   const getInitialTheme = () => {
     if (typeof window === 'undefined') return true; // default to dark on server
@@ -36,8 +42,10 @@ const ThemeToggle = ({ inline = false }: { inline?: boolean }) => {
       onClick={toggleTheme}
       className={
         inline
-          ? "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/60 bg-muted/50 text-foreground transition-colors hover:bg-muted"
-          : "fixed bottom-[calc(10.5rem+env(safe-area-inset-bottom))] right-4 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-muted shadow-lg transition-all duration-300 hover:bg-muted/80 hover:shadow-xl sm:bottom-20 sm:right-8"
+          ? "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/60 bg-muted/50 text-foreground transition-colors hover:bg-muted sm:hidden"
+          : `fixed bottom-[calc(10.5rem+env(safe-area-inset-bottom))] right-4 z-50 h-11 w-11 items-center justify-center rounded-full bg-muted shadow-lg transition-all duration-300 hover:bg-muted/80 hover:shadow-xl sm:bottom-20 sm:right-8 ${
+              hideOnMobile ? "hidden sm:flex" : "flex"
+            }`
       }
       aria-label={
         !mounted
