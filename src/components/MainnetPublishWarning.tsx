@@ -18,6 +18,7 @@ interface MainnetPublishWarningProps {
   assets?: string[];
   supportedAssets?: string;
   cluster?: string;
+  isUpdate?: boolean;
 }
 
 /** One-time confirmation shown before publishing on mainnet or an unsupported asset. */
@@ -29,6 +30,7 @@ const MainnetPublishWarning: React.FC<MainnetPublishWarningProps> = ({
   assets = [],
   supportedAssets = "SOL, USDC",
   cluster = "devnet",
+  isUpdate = false,
 }) => {
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const isAssetWarning = kind === "unsupported_asset";
@@ -51,7 +53,9 @@ const MainnetPublishWarning: React.FC<MainnetPublishWarningProps> = ({
           <DialogDescription className="mt-1 text-sm text-muted-foreground">
             {isAssetWarning
               ? "El workflow usaría fondos que la bóveda no puede transferir en la red seleccionada."
-              : "Publicar aquí usa SOL real y no se puede deshacer."}
+              : isUpdate
+                ? "Actualizar aquí usa SOL real y no se puede deshacer."
+                : "Publicar aquí usa SOL real y no se puede deshacer."}
           </DialogDescription>
         </DialogHeader>
 
@@ -62,7 +66,11 @@ const MainnetPublishWarning: React.FC<MainnetPublishWarningProps> = ({
                 Activos del workflow no soportados en <b>{cluster}</b>:{" "}
                 <b>{assets.join(", ") || "desconocido"}</b>.
               </li>
-              <li>La publicación continuará, pero el paso de fondos no moverá tokens.</li>
+              <li>
+                {isUpdate
+                  ? "La actualización continuará, pero el paso de fondos no moverá tokens."
+                  : "La publicación continuará, pero el paso de fondos no moverá tokens."}
+              </li>
               <li>Activos disponibles aquí: <b>{supportedAssets}</b>.</li>
               <li>
                 Cambia el paso Wallet Transfer o configura la bóveda con un activo
@@ -71,8 +79,16 @@ const MainnetPublishWarning: React.FC<MainnetPublishWarningProps> = ({
             </ul>
           ) : (
             <ul className="list-disc space-y-1.5 pl-4">
-              <li>La publicación firma una transacción: pagarás la comisión de la red.</li>
-              <li>El workflow y su contenido quedan en IPFS y en la cadena de forma permanente.</li>
+              <li>
+                {isUpdate
+                  ? "La actualización firma una transacción: pagarás la comisión de la red."
+                  : "La publicación firma una transacción: pagarás la comisión de la red."}
+              </li>
+              <li>
+                {isUpdate
+                  ? "La nueva versión quedará en IPFS y su referencia se registrará en la cadena de forma permanente."
+                  : "El workflow y su contenido quedan en IPFS y en la cadena de forma permanente."}
+              </li>
               <li>Si configuraste una bóveda con una política activa, el cron podrá mover fondos dentro de los límites que autorizaste.</li>
             </ul>
           )}
@@ -101,7 +117,13 @@ const MainnetPublishWarning: React.FC<MainnetPublishWarningProps> = ({
             onClick={() => onConfirm(dontShowAgain)}
             className="min-h-10 flex-1 rounded-lg bg-gradient-purple-cyan px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
           >
-            {isAssetWarning ? "Entendido, publicar igualmente" : "Entendido, publicar"}
+            {isAssetWarning
+              ? isUpdate
+                ? "Entendido, actualizar igualmente"
+                : "Entendido, publicar igualmente"
+              : isUpdate
+                ? "Entendido, actualizar"
+                : "Entendido, publicar"}
           </button>
         </DialogFooter>
       </DialogContent>

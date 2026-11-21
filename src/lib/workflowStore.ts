@@ -12,11 +12,42 @@ import { supabase } from "@/integrations/supabase/client";
 type Listener = (wf: Workflow | null) => void;
 let currentEditingId: string | null = null;
 let current: Workflow | null = null;
-let onchainMeta: { cid?: string; signature?: string; version?: number } = {};
 const listeners = new Set<Listener>();
 
+/* ── On-chain reference (persisted per workflow) ───────────── */
+const ONCHAIN_META_KEY = "solflows_onchain_meta";
+
+export interface OnchainMeta {
+  cid?: string;
+  signature?: string;
+  version?: number;
+}
+
+let onchainMeta: OnchainMeta = {};
+type OnchainMetaListener = (meta: OnchainMeta) => void;
+const onchainMetaListeners = new Set<OnchainMetaListener>();
+
+function readOnchainMetaMap(): Record<string, OnchainMeta> {
+  try {
+    if (typeof window === "undefined") return {};
+    const raw = window.localStorage.getItem(ONCHAIN_META_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 export function getWorkflow() { return current; }
-export function getOnchainMeta() { return onchainMeta; }
+
+/** Returns the on-chain reference of the workflow currently open in the canvas. */
+export function getOnchainMeta(): OnchainMeta {
+  if (typeof window !== "undefined") {
+    const stored = readOnchainMetaMap()[getWorkflowId()];
+    if (stored) return { ...stored };
+  }
+  return { ...onchainMeta };
+}
 
 export function getEditingId() { return currentEditingId; }
 export function setEditingId(id: string | null) { currentEditingId = id; }
@@ -26,8 +57,34 @@ export function setWorkflow(wf: Workflow | null) {
   listeners.forEach((l) => l(current));
 }
 
-export function setOnchainMeta(meta: typeof onchainMeta) {
-  onchainMeta = meta;
+export function setOnchainMeta(meta: OnchainMeta) {
+  onchainMeta = { ...meta };
+  if (typeof window !== "undefined") {
+    try {
+      const map = readOnchainMetaMap();
+      map[getWorkflowId()] = onchainMeta;
+      window.localStorage.setItem(ONCHAIN_META_KEY, JSON.stringify(map));
+    } catch { }
+  }
+  onchainMetaListeners.forEach((listener) => listener(onchainMeta));
+}
+
+/** Forgets the on-chain reference when a brand-new workflow identity is created. */
+export function clearOnchainMeta() {
+  onchainMeta = {};
+  if (typeof window !== "undefined") {
+    try {
+      const map = readOnchainMetaMap();
+      delete map[getWorkflowId()];
+      window.localStorage.setItem(ONCHAIN_META_KEY, JSON.stringify(map));
+    } catch { }
+  }
+  onchainMetaListeners.forEach((listener) => listener(onchainMeta));
+}
+
+export function subscribeOnchainMeta(listener: OnchainMetaListener) {
+  onchainMetaListeners.add(listener);
+  return () => { onchainMetaListeners.delete(listener); };
 }
 
 export function subscribeWorkflow(l: Listener) {
@@ -231,6 +288,8 @@ export function setWorkflowId(value: string | null | undefined) {
       localStorage.setItem(WORKFLOW_ID_KEY, currentWorkflowId);
     }
   } catch { }
+  // A new identity cannot inherit the published reference of the previous one.
+  if (!value?.trim()) clearOnchainMeta();
   workflowIdListeners.forEach((listener) => listener(currentWorkflowId!));
 }
 

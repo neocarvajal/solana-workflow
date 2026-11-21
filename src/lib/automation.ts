@@ -11,6 +11,7 @@ export type WorkflowAutomationRow = {
   name: string;
   enabled: boolean;
   automation_status: string;
+  next_run_at?: string | null;
   schedule: string;
   execution_mode: string;
   onchain_signature: string | null;

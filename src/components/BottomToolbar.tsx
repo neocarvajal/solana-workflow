@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Save, Play, ZoomIn, ZoomOut, Clock, Upload, Loader2, ShieldCheck, Landmark } from 'lucide-react';
+import { Save, Play, ZoomIn, ZoomOut, Clock, Upload, RefreshCw, Loader2, ShieldCheck, Landmark } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Buffer } from 'buffer';
 import bs58 from 'bs58';
@@ -29,7 +29,7 @@ import {
   rememberSavedWorkflow, getSavedWorkflows,
   getExecutionFrequency, setExecutionFrequency as persistExecutionFrequency, subscribeExecutionFrequency,
   getExecutionMode, setExecutionMode as persistExecutionMode, subscribeExecutionMode,
-  getWorkflowId, setWorkflowId,
+  getWorkflowId, setWorkflowId, subscribeWorkflowId, subscribeOnchainMeta, type OnchainMeta,
   getScheduledRunState, subscribeScheduledRun, type ScheduledRunState,
 } from '@/lib/workflowStore';
 import {
@@ -152,6 +152,21 @@ const BottomToolbar: React.FC = () => {
       setWalletAddress(null);
     }
   }, [publicKey]);
+
+  const [onchainMeta, setOnchainMetaState] = useState<OnchainMeta>(() => getOnchainMeta());
+
+  useEffect(() => {
+    const unsubMeta = subscribeOnchainMeta(setOnchainMetaState);
+    const unsubId = subscribeWorkflowId(() => setOnchainMetaState(getOnchainMeta()));
+    return () => { unsubMeta(); unsubId(); };
+  }, []);
+
+  // A confirmed memo signature means this workflow already has an on-chain
+  // reference; the action then becomes an update of that reference.
+  const hasPublishedReference = Boolean(
+    onchainMeta && String(onchainMeta.signature || "").trim(),
+  );
+  const publishMode: "publish" | "update" = hasPublishedReference ? "update" : "publish";
 
   const loadActivation = useCallback(async () => {
     if (!walletAddress) {
@@ -573,7 +588,7 @@ const BottomToolbar: React.FC = () => {
     }
   };
 
-  const continuePublish = () => {
+  const continuePublish = (mode: "publish" | "update" = publishMode) => {
     const cluster = getCluster();
     const unsupported = findUnsupportedAssets(cluster);
     if (unsupported.length > 0 && !unsupportedAssetsAcknowledged(cluster, unsupported)) {
@@ -581,7 +596,7 @@ const BottomToolbar: React.FC = () => {
       setUnsupportedAssetOpen(true);
       return;
     }
-    void performPublish();
+    void performPublish(mode);
   };
 
   const publishOnchain = () => {
@@ -589,10 +604,10 @@ const BottomToolbar: React.FC = () => {
       setMainnetWarningOpen(true);
       return;
     }
-    continuePublish();
+    continuePublish(publishMode);
   };
 
-  const performPublish = async () => {
+  const performPublish = async (mode: "publish" | "update" = "publish") => {
     // Rebuild from the canvas so the IPFS JSON always matches what the user
     // sees, including the latest node parameters and positions.
     const currentWorkflow = nodesToWorkflow(getScenarioName(), getFlowNodes());
@@ -617,6 +632,40 @@ const BottomToolbar: React.FC = () => {
     const scheduleSeconds = scheduleToSeconds(schedule);
     const workflowId = getWorkflowId();
     const owner = publicKey.toBase58();
+
+    // An update only swaps the on-chain reference (new CID, signature and
+    // version). The existing automation state must survive the new pin.
+    const isUpdate = mode === "update";
+    let preservedExecution: {
+      enabled: boolean;
+      automation_status: string;
+      next_run_at: string | null;
+    } | null = null;
+
+    if (isUpdate) {
+      if (activationRow) {
+        preservedExecution = {
+          enabled: activationRow.enabled,
+          automation_status: activationRow.automation_status,
+          next_run_at: activationRow.next_run_at ?? null,
+        };
+      } else {
+        const { data: existing } = await supabase
+          .from("workflows")
+          .select("enabled,automation_status,next_run_at")
+          .eq("owner_wallet", owner)
+          .eq("workflow_id", workflowId)
+          .maybeSingle();
+        if (existing) {
+          preservedExecution = {
+            enabled: Boolean(existing.enabled),
+            automation_status: String(existing.automation_status || "inactive"),
+            next_run_at: existing.next_run_at ?? null,
+          };
+        }
+      }
+    }
+
     const saveSignature = await signSavePayload(owner, workflowId);
     const workflowName = (wf.name && wf.name.trim() !== "") ? wf.name : "Untitled Workflow";
     const automationStatus = schedule !== "manual" ? "active" : "inactive";
@@ -667,10 +716,18 @@ const BottomToolbar: React.FC = () => {
       schedule_seconds: scheduleSeconds,
       execution_mode: executionMode,
       workflow_id: workflowId,
-      automation_status: automationStatus,
-      next_run_at: nextRunAt,
       onchain_signature: signature,
       updated_at: new Date().toISOString(),
+      ...(isUpdate && preservedExecution
+        ? {
+            enabled: preservedExecution.enabled,
+            automation_status: preservedExecution.automation_status,
+            next_run_at: preservedExecution.next_run_at,
+          }
+        : {
+            automation_status: automationStatus,
+            next_run_at: nextRunAt,
+          }),
     };
 
     let rowId = typeof pin?.id === "string" ? pin.id : undefined;
@@ -735,9 +792,15 @@ const BottomToolbar: React.FC = () => {
       });
     }
 
-    notifyTxSuccess("Guardado en IPFS y publicado on-chain", signature, {
-      description: `CID: ${cid.slice(0, 8)}... · v${version} · ${automationStatus === "active" ? "cron activo" : "sin cron"}`,
-    });
+    notifyTxSuccess(
+      isUpdate ? "Workflow actualizado on-chain" : "Guardado en IPFS y publicado on-chain",
+      signature,
+      {
+        description: isUpdate
+          ? `Nueva referencia v${version} · CID ${cid.slice(0, 8)}... · automatización sin cambios`
+          : `CID: ${cid.slice(0, 8)}... · v${version} · ${automationStatus === "active" ? "cron activo" : "sin cron"}`,
+      },
+    );
   } catch (e: any) {
     console.error("--- PUBLISH ERROR ---", e);
     toast.error(e.message || "Publish failed");
@@ -807,12 +870,26 @@ const BottomToolbar: React.FC = () => {
               onClick={publishOnchain}
               disabled={publishing}
               className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-md bg-gradient-purple-cyan px-2.5 py-1.5 text-sm font-medium text-white transition-all hover:opacity-90 disabled:opacity-60"
-              title="Pin JSON to IPFS and record CID on Solana"
+              title={
+                publishMode === "update"
+                  ? "Actualizar la referencia on-chain de este workflow a la nueva versión"
+                  : "Pin JSON to IPFS and record CID on Solana"
+              }
             >
-              {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {publishing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : publishMode === "update" ? (
+                <RefreshCw className="h-4 w-4" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
               <span className="whitespace-nowrap">
-                <span className="sm:hidden">Publicar</span>
-                <span className="hidden sm:inline">Publicar on-chain</span>
+                <span className="sm:hidden">
+                  {publishMode === "update" ? "Actualizar" : "Publicar"}
+                </span>
+                <span className="hidden sm:inline">
+                  {publishMode === "update" ? "Actualizar workflow on-chain" : "Publicar on-chain"}
+                </span>
               </span>
             </button>
 
@@ -921,6 +998,7 @@ const BottomToolbar: React.FC = () => {
       />
       <MainnetPublishWarning
         open={mainnetWarningOpen}
+        isUpdate={publishMode === "update"}
         onCancel={() => setMainnetWarningOpen(false)}
         onConfirm={(dontShowAgain) => {
           if (dontShowAgain && typeof window !== "undefined") {
@@ -931,12 +1009,13 @@ const BottomToolbar: React.FC = () => {
             }
           }
           setMainnetWarningOpen(false);
-          continuePublish();
+          continuePublish(publishMode);
         }}
       />
       <MainnetPublishWarning
         kind="unsupported_asset"
         open={unsupportedAssetOpen}
+        isUpdate={publishMode === "update"}
         assets={unsupportedAssets}
         cluster={getCluster()}
         supportedAssets={supportedAssetLabel(getCluster())}
@@ -953,7 +1032,7 @@ const BottomToolbar: React.FC = () => {
             }
           }
           setUnsupportedAssetOpen(false);
-          void performPublish();
+          void performPublish(publishMode);
         }}
       />
     </>
