@@ -357,11 +357,11 @@ const NodeSettingsModal: React.FC<{
         </div>
 
         {vaultRequired && (
-          <div className="mx-4 mt-3 flex items-start gap-2 rounded-xl border border-amber-600 bg-amber-950 p-3 text-xs text-amber-100 shadow-sm">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+          <div className="mx-4 mt-3 flex items-start gap-2 rounded-xl border border-amber-500/50 bg-amber-500/10 p-3 text-xs text-amber-900 shadow-sm dark:border-amber-500/30 dark:text-amber-200">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <div className="min-w-0 flex-1">
-              <p className="font-medium text-amber-50">Configura la bóveda antes de publicar</p>
-              <p className="mt-0.5 text-amber-200">
+              <p className="font-medium text-amber-900 dark:text-amber-100">Configura la bóveda antes de publicar</p>
+              <p className="mt-0.5">
                 Este workflow mueve fondos en la ejecución on-chain. Crea la bóveda y ajusta el destino y los límites en el panel. La simulación del canvas no usa esos fondos.
               </p>
               <button
@@ -373,7 +373,7 @@ const NodeSettingsModal: React.FC<{
                     80,
                   );
                 }}
-                className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-amber-400/70 bg-amber-900 px-2 py-1 font-medium text-amber-50 transition-colors hover:bg-amber-800"
+                className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-amber-600/50 px-3 py-1.5 font-medium text-amber-900 transition-colors hover:bg-amber-500/15 dark:border-amber-400/50 dark:text-amber-100 dark:hover:bg-amber-400/10"
               >
                 <Landmark className="h-3.5 w-3.5" />
                 Abrir bóveda y límites
