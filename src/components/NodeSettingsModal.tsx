@@ -2,14 +2,20 @@ import React, { useState, useEffect } from "react";
 import { X, Trash2, Loader2, Send, AlertTriangle, Landmark } from "lucide-react";
 import { toast } from "sonner";
 import type { FlowNode } from "@/lib/workflow";
-import { sendAlert } from "@/lib/alerts";
+import { getSettings } from "@/lib/workflowStore";
+import {
+  alertChannelLabel,
+  fetchAlertChannelHealth,
+  isValidAlertEmail,
+  sendAlert,
+} from "@/lib/alerts";
 import { useVaultReady } from "@/lib/useVaultReady";
 
 /* ── Per-module field definitions ────────────────────────────── */
 interface FieldDef {
   key: string;
   label: string;
-  type: "text" | "number" | "select" | "textarea" | "toggle";
+  type: "text" | "email" | "number" | "select" | "textarea" | "toggle";
   placeholder?: string;
   description?: string;
   options?: { value: string; label: string }[];
@@ -158,10 +164,10 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
     },
     { key: "message", label: "Mensaje", type: "textarea", placeholder: "Current {{asset}} price: {{price}}", description: "Contenido de la alerta. Variables: {{price}}, {{asset}}, {{condition}}, {{value}}, {{timestamp}}. Si no usas {{price}}, se añade el precio del trigger al final." },
     {
-      key: "email", label: "Email destinatario", type: "text",
+      key: "email", label: "Email destinatario", type: "email",
       showWhen: { key: "channel", equals: "email" },
       placeholder: "tu@email.com",
-      description: "Vacío = usar el email configurado en Ajustes",
+      description: "Debe ser válido. Vacío = usar el email configurado en Ajustes",
     },
     {
       key: "chatId", label: "Telegram Chat ID", type: "text",
@@ -269,6 +275,17 @@ const NodeSettingsModal: React.FC<{
     mergeParams(node.params)
   );
   const [testingAlert, setTestingAlert] = useState(false);
+  const [channelHealth, setChannelHealth] = useState<Record<string, unknown> | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetchAlertChannelHealth().then((health) => {
+      if (active) setChannelHealth(health);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const cleanParams = mergeParams(node.params);
@@ -296,6 +313,13 @@ const NodeSettingsModal: React.FC<{
   };
 
   const handleTestAlert = async () => {
+    if (
+      params.channel === "email" &&
+      !isValidAlertEmail(params.email || getSettings().alertEmail)
+    ) {
+      toast.error("Introduce un email válido en el nodo o en Ajustes.");
+      return;
+    }
     setTestingAlert(true);
     try {
       const result = await sendAlert({
@@ -495,6 +519,21 @@ const NodeSettingsModal: React.FC<{
 
           {node.module.type === "send_alert" && (
             <>
+              {params.channel && params.channel !== "app" && channelHealth && (
+                <p
+                  className={`mt-4 rounded-lg border px-3 py-2 text-xs ${
+                    Boolean(channelHealth[String(params.channel)])
+                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                      : "border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200"
+                  }`}
+                >
+                  {Boolean(channelHealth[String(params.channel)])
+                    ? `Proveedor de ${alertChannelLabel(params.channel)} configurado y listo para enviar.`
+                    : params.channel === "email"
+                      ? "Email sin configurar: añade RESEND_API_KEY y ALERT_FROM_EMAIL en Supabase Secrets ( Dashboard → Edge Functions → Secrets )."
+                      : `Proveedor de ${alertChannelLabel(params.channel)} sin configurar en Supabase Secrets.`}
+                </p>
+              )}
               <button
                 type="button"
                 onClick={handleTestAlert}

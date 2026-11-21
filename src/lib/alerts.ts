@@ -33,6 +33,25 @@ export interface AlertResult {
   status?: number;
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+export function isValidAlertEmail(value: unknown): boolean {
+  return EMAIL_RE.test(String(value || "").trim());
+}
+
+/** Which channels have their provider credentials configured in Supabase. */
+export async function fetchAlertChannelHealth(): Promise<Record<string, unknown> | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke("send-alert", {
+      method: "GET",
+    });
+    if (error || !data || typeof data !== "object") return null;
+    return data as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 export function normalizeAlertChannel(value: unknown): AlertChannel {
   const channel = String(value || "").trim().toLowerCase();
   if (channel === "telegram" || channel === "discord" || channel === "email" || channel === "whatsapp") {
@@ -202,6 +221,17 @@ export async function sendAlert(input: AlertInput): Promise<AlertResult> {
     addNotification({
       title: `No se pudo enviar por ${channelName}`,
       message,
+      channel,
+      status: "error",
+    });
+    return { ok: false, channel, message };
+  }
+
+  if (channel === "email" && !isValidAlertEmail(payload.email)) {
+    const message = "Configura un email destinatario válido en el nodo o en Ajustes.";
+    addNotification({
+      title: "No se pudo enviar por Email",
+      message: `${payload.message}\n\n${message}`,
       channel,
       status: "error",
     });
