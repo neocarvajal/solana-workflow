@@ -40,9 +40,11 @@ import {
 } from "@/lib/vault";
 import {
   getExecutionMode,
+  getOnchainMeta,
   getSettings,
   getWorkflowId,
   subscribeExecutionMode,
+  subscribeOnchainMeta,
 } from "@/lib/workflowStore";
 import { executionModeLabel } from "@/lib/schedule";
 import { explorerAddrUrl, shortAddr, solexplorerUrl, solscanUrl } from "@/lib/solana";
@@ -114,6 +116,9 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
   const [depositAmount, setDepositAmount] = useState("0.005");
   const [selectedAsset, setSelectedAsset] = useState<VaultAssetSymbol>("SOL");
   const [executionMode, setExecutionMode] = useState(getExecutionMode);
+  const [hasPublishedReference, setHasPublishedReference] = useState(
+    () => Boolean(getOnchainMeta().signature),
+  );
 
   const policy: VaultPolicy | null = snapshot?.policyData || null;
   const cluster = useCluster();
@@ -174,6 +179,15 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
 
   useEffect(() => {
     const unsubscribe = subscribeExecutionMode(setExecutionMode);
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeOnchainMeta((meta) => {
+      setHasPublishedReference(Boolean(meta?.signature));
+    });
     return () => {
       unsubscribe();
     };
@@ -292,6 +306,16 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
       return;
     }
     setError(null);
+    if (!policy && !hasPublishedReference) {
+      const message =
+        "Publica el workflow on-chain antes de crear la bóveda; de lo contrario quedaría inaccesible.";
+      setError(message);
+      toast.error(message, {
+        description:
+          "Usa «Publicar on-chain» en la barra inferior y vuelve a intentarlo.",
+      });
+      return;
+    }
     setBusy("save");
     try {
       const values = parseForm();
@@ -525,6 +549,24 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
               {error && (
                 <div className="rounded-xl border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-300 shadow-[0_0_24px_rgba(239,68,68,0.12)]">
                   {error}
+                </div>
+              )}
+
+              {!policy && !hasPublishedReference && (
+                <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <p className="min-w-0 flex-1">
+                    Este workflow aún no está publicado on-chain. La bóveda
+                    quedaría inaccesible si se pierde la sesión. Publícalo antes
+                    de crearla.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => window.dispatchEvent(new Event("publish-workflow"))}
+                    className="rounded-lg border border-amber-400/50 px-3 py-1.5 font-medium transition-colors hover:bg-amber-400/10"
+                  >
+                    Publicar on-chain
+                  </button>
                 </div>
               )}
 

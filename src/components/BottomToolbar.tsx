@@ -607,6 +607,14 @@ const BottomToolbar: React.FC = () => {
     continuePublish(publishMode);
   };
 
+  // The vault panel asks for a published workflow before creating a vault so
+  // the PDA can always be recovered from the on-chain reference.
+  useEffect(() => {
+    const publish = () => publishOnchain();
+    window.addEventListener("publish-workflow", publish);
+    return () => window.removeEventListener("publish-workflow", publish);
+  });
+
   const performPublish = async (mode: "publish" | "update" = "publish") => {
     // Rebuild from the canvas so the IPFS JSON always matches what the user
     // sees, including the latest node parameters and positions.

@@ -21,8 +21,17 @@ export const VAULT_PROGRAM_ID = new PublicKey(
 const POLICY_SEED = "vault-policy";
 const VAULT_SEED = "vault";
 const MAX_WORKFLOW_ID_BYTES = 64;
+const MEMO_PROGRAM_ID = new PublicKey(
+  "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+);
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
+
+/** Unique marker so a landed transaction can be recognised after a wallet/RPC error. */
+function makeTxReference(): string {
+  const uuid = globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2);
+  return `solflows-vault:${uuid}`;
+}
 
 export type VaultPolicy = {
   owner: string;
@@ -329,23 +338,69 @@ async function confirmVaultSignature(
   );
 }
 
+/**
+ * Best-effort lookup of a transaction that reached the cluster even when the
+ * wallet or RPC reported an error. The memo reference attached to every vault
+ * transaction makes the match unambiguous.
+ */
+async function findLandedReference(
+  connection: Connection,
+  owner: PublicKey,
+  reference: string,
+): Promise<string | null> {
+  try {
+    const signatures = await connection.getSignaturesForAddress(owner, { limit: 25 });
+    const transactions = await connection.getTransactions(
+      signatures.map((entry) => entry.signature),
+      { commitment: "confirmed", maxSupportedTransactionVersion: 1 },
+    );
+    for (let i = 0; i < transactions.length; i++) {
+      const meta = transactions[i]?.meta;
+      if (!meta || meta.err) continue;
+      if ((meta.logMessages || []).some((line) => line.includes(reference))) {
+        return signatures[i].signature;
+      }
+    }
+  } catch {
+    // Reconciliation is opportunistic; the original error is still reported.
+  }
+  return null;
+}
+
 async function sendVaultTransaction(
   wallet: VaultWallet,
   instructions: TransactionInstruction[],
   connection: Connection,
 ): Promise<string> {
   if (!wallet.publicKey) throw new Error("Conecta tu wallet para firmar");
-  const transaction = new Transaction().add(...instructions);
+  const reference = makeTxReference();
+  const transaction = new Transaction()
+    .add(...instructions)
+    .add(new TransactionInstruction({
+      programId: MEMO_PROGRAM_ID,
+      keys: [{ pubkey: wallet.publicKey, isSigner: true, isWritable: false }],
+      data: Buffer.from(reference, "utf8"),
+    }));
   transaction.feePayer = wallet.publicKey;
   const { blockhash } = await connection.getLatestBlockhash("confirmed");
   transaction.recentBlockhash = blockhash;
 
-  const signature = await wallet.sendTransaction(transaction, connection, {
-    skipPreflight: false,
-    preflightCommitment: "confirmed",
-  });
-  await confirmVaultSignature(connection, signature);
-  return signature;
+  try {
+    const signature = await wallet.sendTransaction(transaction, connection, {
+      skipPreflight: false,
+      preflightCommitment: "confirmed",
+    });
+    await confirmVaultSignature(connection, signature);
+    return signature;
+  } catch (error) {
+    // A wallet may broadcast through its own RPC and then fail while waiting
+    // for its own confirmation, and an RPC can return a transient "Internal
+    // error" for a transaction that already landed. Never report a false
+    // failure when the memo shows the operation succeeded on chain.
+    const landed = await findLandedReference(connection, wallet.publicKey, reference);
+    if (landed) return landed;
+    throw error;
+  }
 }
 
 async function initializeInstruction(args: {
