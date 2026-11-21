@@ -105,8 +105,11 @@ const Landing: React.FC = () => {
       <div className="landing-orb landing-orb-2" />
       <div className="landing-orb landing-orb-3" />
 
-      <main className="relative z-10 flex flex-1 flex-col items-center justify-start overflow-y-auto px-4 py-6 sm:justify-center sm:px-6">
-        <div className="w-full max-w-2xl flex flex-col justify-center">
+      <main className="relative z-10 flex flex-1 flex-col items-center overflow-y-auto px-4 py-6 sm:px-6">
+        {/* `my-auto` centres the card when there is room, but unlike
+            `justify-center` it never clips the heading under the top nav
+            when the viewport is short. */}
+        <div className="my-auto flex w-full max-w-2xl flex-col justify-center">
 
           <div className="flex justify-center mb-4 md:mb-5">
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[11px] font-semibold tracking-wide">

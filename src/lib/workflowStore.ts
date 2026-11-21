@@ -70,12 +70,12 @@ export function setOnchainMeta(meta: OnchainMeta) {
 }
 
 /** Forgets the on-chain reference when a brand-new workflow identity is created. */
-export function clearOnchainMeta() {
+export function clearOnchainMeta(workflowId?: string) {
   onchainMeta = {};
   if (typeof window !== "undefined") {
     try {
       const map = readOnchainMetaMap();
-      delete map[getWorkflowId()];
+      delete map[workflowId || getWorkflowId()];
       window.localStorage.setItem(ONCHAIN_META_KEY, JSON.stringify(map));
     } catch { }
   }
@@ -298,6 +298,18 @@ export function getWorkflowId(): string {
 }
 
 export function setWorkflowId(value: string | null | undefined) {
+  // Capture the previous id before replacing it: clearing after the swap used
+  // to delete the meta of the NEW id and leave the old published one behind.
+  const previousId = currentWorkflowId || (() => {
+    try {
+      return typeof window !== "undefined"
+        ? localStorage.getItem(WORKFLOW_ID_KEY)
+        : null;
+    } catch {
+      return null;
+    }
+  })();
+
   currentWorkflowId = value?.trim() ? value : crypto.randomUUID();
   try {
     if (typeof window !== "undefined") {
@@ -305,7 +317,7 @@ export function setWorkflowId(value: string | null | undefined) {
     }
   } catch { }
   // A new identity cannot inherit the published reference of the previous one.
-  if (!value?.trim()) clearOnchainMeta();
+  if (!value?.trim()) clearOnchainMeta(previousId || undefined);
   workflowIdListeners.forEach((listener) => listener(currentWorkflowId!));
 }
 
