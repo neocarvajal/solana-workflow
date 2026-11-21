@@ -5,6 +5,7 @@ import { Buffer } from 'buffer';
 import bs58 from 'bs58';
 import { Connection, Transaction, VersionedTransaction } from '@solana/web3.js';
 import { connection, publishWorkflowMemo,solexplorerUrl } from '@/lib/solana';
+import { notifyTxSuccess } from '@/lib/tx-toast';
 import { workflowToNodes, nodesToWorkflow } from "@/lib/workflow";
 import {
   getWorkflow, getOnchainMeta, setOnchainMeta, setScenarioName, setFlowNodes, updateWorkflow,
@@ -236,6 +237,7 @@ const BottomToolbar: React.FC = () => {
           await new Promise((r) => setTimeout(r, 1000));
 
           let desc = "Action executed successfully.";
+          let stepSignature: string | null = null;
 
           try {
             if (node.module.type === "send_transaction") {
@@ -318,6 +320,7 @@ const BottomToolbar: React.FC = () => {
               await connection.confirmTransaction(signature, "confirmed");
 
               desc = `Successfully sent ${targetAmount} ${targetAsset} to ${targetTo.slice(0, 6)}...`;
+              stepSignature = signature;
               simulatedTxSnapshot = { signature, actionType: "send_transaction" };
               setLastTxData(simulatedTxSnapshot);
             } else if (node.module.type === "send_alert") {
@@ -391,13 +394,26 @@ const BottomToolbar: React.FC = () => {
               }
 
               // 5. Éxito
-              toast.success("Swap completed successfully!");
               desc = `Swapped ${amount} ${from.slice(0, 4)}... to ${to.slice(0, 4)}...`;
+              if (executeResult.signature) {
+                stepSignature = executeResult.signature;
+                notifyTxSuccess("Swap completado correctamente", executeResult.signature, {
+                  description: desc,
+                });
+              } else {
+                toast.success("Swap completed successfully!", { description: desc });
+              }
               simulatedTxSnapshot = { signature: executeResult.signature, actionType: "swap" };
               setLastTxData(simulatedTxSnapshot);
             }
               // desc = `Swapped ${node.params.amount || 1} ${node.params.from || 'SOL'} for ${node.params.to || 'USDC'} via Jupiter`;
-            toast.success(`Step ${i} completed: ${node.module.name}`, { description: desc });
+            if (stepSignature) {
+              notifyTxSuccess(`Paso ${i} completado: ${node.module.name}`, stepSignature, {
+                description: desc,
+              });
+            } else {
+              toast.success(`Step ${i} completed: ${node.module.name}`, { description: desc });
+            }
           } catch (err: any) {
             if (err.message === "Canceled By User") {
               throw err;
@@ -417,7 +433,13 @@ const BottomToolbar: React.FC = () => {
 
       setRunningNodeId(null);
       setAnimatingLineIndex(-1);
-      toast.success("Workflow simulation completed successfully! 🎉");
+      if (simulatedTxSnapshot?.signature) {
+        notifyTxSuccess("Simulación completada correctamente", simulatedTxSnapshot.signature, {
+          description: "La simulación del canvas firma desde tu wallet y no mueve fondos de la bóveda.",
+        });
+      } else {
+        toast.success("Workflow simulation completed successfully! 🎉");
+      }
       if (simulatedTxSnapshot) setIsModalOpen(true);
 
     } catch (err: any) {
@@ -575,9 +597,8 @@ const BottomToolbar: React.FC = () => {
       });
     }
 
-    toast.success("Guardado en IPFS y publicado on-chain", {
+    notifyTxSuccess("Guardado en IPFS y publicado on-chain", signature, {
       description: `CID: ${cid.slice(0, 8)}... · v${version} · ${automationStatus === "active" ? "cron activo" : "sin cron"}`,
-      action: { label: "View", onClick: () => window.open(solexplorerUrl(signature), "_blank") },
     });
   } catch (e: any) {
     console.error("--- PUBLISH ERROR ---", e);

@@ -44,7 +44,7 @@ export function solscanUrl(sig: string) {
 
 export function solexplorerUrl(sig: string) {
   const c = CLUSTER === "mainnet-beta" ? "" : `?cluster=${CLUSTER}`;
-  return `https://explorer.solana.com//tx/${sig}${c}`;
+  return `https://explorer.solana.com/tx/${sig}${c}`;
 }
 
 export function explorerAddrUrl(addr: string) {

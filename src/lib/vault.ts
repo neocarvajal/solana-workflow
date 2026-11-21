@@ -205,6 +205,25 @@ export function decodeVaultPolicy(data: Uint8Array): VaultPolicy | null {
   };
 }
 
+export type VaultActivity = {
+  signature: string;
+  blockTime: number | null;
+  err: unknown | null;
+};
+
+export async function fetchVaultActivity(
+  vault: PublicKey,
+  limit = 5,
+  connection: Connection = appConnection,
+): Promise<VaultActivity[]> {
+  const signatures = await connection.getSignaturesForAddress(vault, { limit });
+  return signatures.map((entry) => ({
+    signature: entry.signature,
+    blockTime: entry.blockTime ?? null,
+    err: entry.err ?? null,
+  }));
+}
+
 export async function fetchVaultSnapshot(
   owner: PublicKey,
   workflowId: string,

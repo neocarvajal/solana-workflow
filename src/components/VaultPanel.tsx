@@ -28,9 +28,11 @@ import {
   depositVaultSol,
   withdrawVaultSol,
   setVaultPaused,
+  fetchVaultActivity,
   lamportsToSol,
   solToLamports,
   VAULT_PROGRAM_ID,
+  type VaultActivity,
   type VaultPolicy,
   type VaultSnapshot,
   type VaultWallet,
@@ -42,8 +44,9 @@ import {
   subscribeExecutionMode,
 } from "@/lib/workflowStore";
 import { executionModeLabel } from "@/lib/schedule";
-import { explorerAddrUrl, shortAddr, solscanUrl, SOLANA_CLUSTER } from "@/lib/solana";
+import { explorerAddrUrl, shortAddr, solexplorerUrl, solscanUrl, SOLANA_CLUSTER } from "@/lib/solana";
 import { toast } from "sonner";
+import { notifyTxSuccess } from "@/lib/tx-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 function formatTimestamp(seconds: bigint): string {
@@ -92,6 +95,8 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
   const [keeper, setKeeper] = useState("");
   const [keeperPubkey, setKeeperPubkey] = useState<string | null>(null);
   const [keeperError, setKeeperError] = useState<string | null>(null);
+  const [executionEnabled, setExecutionEnabled] = useState<boolean | null>(null);
+  const [activity, setActivity] = useState<VaultActivity[]>([]);
   const [authorized, setAuthorized] = useState(false);
   const [depositAmount, setDepositAmount] = useState("0.005");
   const [executionMode, setExecutionMode] = useState(getExecutionMode);
@@ -111,6 +116,11 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
     try {
       const next = await fetchVaultSnapshot(publicKey, id);
       setSnapshot(next);
+      try {
+        setActivity(await fetchVaultActivity(next.vault));
+      } catch {
+        setActivity([]);
+      }
       if (next.policyData) {
         const current = next.policyData;
         setDestination(current.destination);
@@ -153,10 +163,12 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
         if (!data?.keeper) throw new Error("La aplicación no devolvió un ejecutor");
         if (cancelled) return;
         setKeeperPubkey(String(data.keeper));
+        setExecutionEnabled(data.executionEnabled === true);
         setKeeperError(null);
       } catch (e) {
         if (cancelled) return;
         setKeeperPubkey(null);
+        setExecutionEnabled(null);
         setKeeperError(
           e instanceof Error ? e.message : "No se pudo cargar el ejecutor",
         );
@@ -260,7 +272,10 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
         : await initializeVaultPolicy(args);
       setLastSignature(signature);
       setAuthorized(false);
-      toast.success(policy ? "Límites de la bóveda actualizados" : "Bóveda creada en devnet");
+      notifyTxSuccess(
+        policy ? "Límites de la bóveda actualizados" : "Bóveda creada en devnet",
+        signature,
+      );
       await refresh();
     } catch (e) {
       const message = e instanceof Error ? e.message : "No se pudo guardar la bóveda";
@@ -284,7 +299,7 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
         amountLamports,
       });
       setLastSignature(signature);
-      toast.success(`${depositAmount} SOL depositados en la bóveda`);
+      notifyTxSuccess(`${depositAmount} SOL depositados en la bóveda`, signature);
       await refresh();
     } catch (e) {
       const message = e instanceof Error ? e.message : "No se pudo depositar";
@@ -312,7 +327,7 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
         amountLamports: amount,
       });
       setLastSignature(signature);
-      toast.success(`${lamportsToSol(amount)} SOL devueltos a tu wallet`);
+      notifyTxSuccess(`${lamportsToSol(amount)} SOL devueltos a tu wallet`, signature);
       await refresh();
     } catch (e) {
       const message = e instanceof Error ? e.message : "No se pudo retirar";
@@ -335,7 +350,10 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
         paused: !policy.paused,
       });
       setLastSignature(signature);
-      toast.success(policy.paused ? "Bóveda reactivada" : "Bóveda pausada");
+      notifyTxSuccess(
+        policy.paused ? "Bóveda reactivada" : "Bóveda pausada",
+        signature,
+      );
       await refresh();
     } catch (e) {
       const message = e instanceof Error ? e.message : "No se pudo cambiar el estado";
@@ -404,6 +422,11 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
                 Sin configurar
               </span>
             )}
+            {policy && executionEnabled === false && (
+              <span className="rounded-full bg-amber-400/10 px-2 py-1 font-medium text-amber-300">
+                Ejecución automática desactivada
+              </span>
+            )}
             <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">
               {executionModeLabel(executionMode)}
             </span>
@@ -417,7 +440,8 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
                 autorices. Solo el ejecutor autorizado por la aplicación puede dispararla
                 y nunca recibe tu llave. En esta fase la ejecución automática de fondos
                 sigue desactivada hasta completar la auditoría; esta configuración es de
-                devnet.
+                devnet. La simulación del canvas firma desde tu wallet y no mueve fondos
+                de la bóveda.
               </span>
             </p>
           </div>
@@ -455,6 +479,33 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
                         {lamportsToSol(availableLamports)} SOL
                       </span>
                     </div>
+                    {activity.length > 0 && (
+                      <div className="mt-2 border-t border-border/40 pt-2">
+                        <p className="mb-1 font-medium">Últimas transacciones de la bóveda</p>
+                        <ul className="space-y-1">
+                          {activity.map((item) => (
+                            <li key={item.signature}>
+                              <a
+                                href={solexplorerUrl(item.signature)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex items-center justify-between gap-2 hover:underline"
+                              >
+                                <span className="font-mono text-[10px] text-foreground">
+                                  {shortAddr(item.signature, 8)}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {item.err ? "Fallida" : "Correcta"}
+                                  {item.blockTime
+                                    ? ` · ${new Date(item.blockTime * 1000).toLocaleString()}`
+                                    : ""}
+                                </span>
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t border-border/40 pt-2">
                       <a
                         href={explorerAddrUrl(snapshot.policy.toBase58())}
