@@ -26,6 +26,7 @@ pub fn handle_update_policy(
     min_interval_seconds: i64,
     expires_at: i64,
     keeper: Option<Pubkey>,
+    asset_mint: Pubkey,
 ) -> Result<()> {
     require!(
         destination != Pubkey::default(),
@@ -64,6 +65,14 @@ pub fn handle_update_policy(
     );
 
     let policy = &mut ctx.accounts.policy;
+    // Switching assets changes the unit of every limit, so the spending
+    // counters start over. Keeping them would silently mix lamports and token
+    // base units under the same caps.
+    if policy.asset_mint != asset_mint {
+        policy.asset_mint = asset_mint;
+        policy.total_spent = 0;
+        policy.last_execution_at = 0;
+    }
     policy.destination = destination;
     policy.max_per_run = max_per_run;
     policy.max_total = max_total;
@@ -81,6 +90,8 @@ pub fn handle_update_policy(
         expires_at,
         keeper,
     });
+    // The event keeps the historical layout; asset changes are visible in the
+    // policy account itself and in the new SPL transfer events.
 
     Ok(())
 }

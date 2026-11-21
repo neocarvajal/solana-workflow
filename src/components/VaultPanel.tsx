@@ -27,10 +27,11 @@ import {
   updateVaultPolicy,
   depositVaultSol,
   withdrawVaultSol,
+  depositVaultSpl,
+  withdrawVaultSpl,
   setVaultPaused,
   fetchVaultActivity,
   lamportsToSol,
-  solToLamports,
   VAULT_PROGRAM_ID,
   type VaultActivity,
   type VaultPolicy,
@@ -49,6 +50,17 @@ import { useCluster } from "@/lib/network";
 import { toast } from "sonner";
 import { notifyTxSuccess } from "@/lib/tx-toast";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  assetToBaseUnits,
+  baseUnitsToAmount,
+  findVaultAssetByMint,
+  isAssetSupportedOnCluster,
+  normalizeVaultAsset,
+  supportedAssetLabel,
+  VAULT_ASSET_LIST,
+  VAULT_ASSETS,
+  type VaultAssetSymbol,
+} from "@/lib/vaultTokens";
 
 function formatTimestamp(seconds: bigint): string {
   if (!seconds || Number(seconds) <= 0) return "Nunca";
@@ -100,11 +112,21 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
   const [activity, setActivity] = useState<VaultActivity[]>([]);
   const [authorized, setAuthorized] = useState(false);
   const [depositAmount, setDepositAmount] = useState("0.005");
+  const [selectedAsset, setSelectedAsset] = useState<VaultAssetSymbol>("SOL");
   const [executionMode, setExecutionMode] = useState(getExecutionMode);
 
   const policy: VaultPolicy | null = snapshot?.policyData || null;
   const cluster = useCluster();
   const isDevnet = cluster !== "mainnet-beta";
+  const asset = VAULT_ASSETS[selectedAsset];
+  const assetSupported = isAssetSupportedOnCluster(selectedAsset, cluster);
+  const policyAsset = policy ? findVaultAssetByMint(policy.assetMint) : null;
+  const policyHasUnknownMint = Boolean(
+    policy && policy.assetMint !== PublicKey.default.toBase58() && !policyAsset,
+  );
+  const policyAssetSupported =
+    !policyAsset || isAssetSupportedOnCluster(policyAsset.symbol, cluster);
+  const displayAsset = policyAsset || asset;
 
   const refresh = useCallback(async () => {
     if (!publicKey) {
@@ -125,9 +147,14 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
       }
       if (next.policyData) {
         const current = next.policyData;
+        const policyAsset = findVaultAssetByMint(current.assetMint);
+        if (policyAsset) {
+          setSelectedAsset(policyAsset.symbol);
+          setDepositAmount(policyAsset.symbol === "SOL" ? "0.005" : "1");
+          setMaxPerRun(baseUnitsToAmount(policyAsset.symbol, current.maxPerRun));
+          setMaxTotal(baseUnitsToAmount(policyAsset.symbol, current.maxTotal));
+        }
         setDestination(current.destination);
-        setMaxPerRun(lamportsToSol(current.maxPerRun));
-        setMaxTotal(lamportsToSol(current.maxTotal));
         setIntervalMinutes(String(Number(current.minIntervalSeconds) / 60));
         setExpiry(
           Number(current.expiresAt) > 0 ? toDatetimeLocal(current.expiresAt) : "",
@@ -227,13 +254,16 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
       throw new Error("El ejecutor no es una dirección Solana válida");
     }
 
-    const maxPerRunLamports = solToLamports(maxPerRun);
-    const maxTotalLamports = solToLamports(maxTotal);
-    if (maxPerRunLamports <= 0) throw new Error("El máximo por ejecución debe ser mayor que cero");
-    if (maxTotalLamports < maxPerRunLamports) {
+    if (!assetSupported) {
+      throw new Error(`${selectedAsset} no está disponible en la red seleccionada`);
+    }
+    const maxPerRunBaseUnits = assetToBaseUnits(selectedAsset, maxPerRun);
+    const maxTotalBaseUnits = assetToBaseUnits(selectedAsset, maxTotal);
+    if (maxPerRunBaseUnits <= 0) throw new Error("El máximo por ejecución debe ser mayor que cero");
+    if (maxTotalBaseUnits < maxPerRunBaseUnits) {
       throw new Error("El máximo total no puede ser menor que el máximo por ejecución");
     }
-    if (policy && BigInt(maxTotalLamports) < policy.totalSpent) {
+    if (policy && policyAsset?.symbol === selectedAsset && BigInt(maxTotalBaseUnits) < policy.totalSpent) {
       throw new Error("El nuevo máximo total no puede ser menor que lo ya gastado");
     }
     const expiresAt = expiry
@@ -247,8 +277,9 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
     }
     return {
       destination: destinationKey.toBase58(),
-      maxPerRunLamports,
-      maxTotalLamports,
+      maxPerRunBaseUnits,
+      maxTotalBaseUnits,
+      assetMint: asset.mint,
       minIntervalSeconds: Math.round(Number(intervalMinutes) * 60),
       expiresAt,
       keeper: keeperKey.toBase58(),
@@ -265,10 +296,16 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
     try {
       const values = parseForm();
       const args = {
-        ...values,
         wallet: requireWallet(),
         owner: publicKey,
         workflowId,
+        destination: values.destination,
+        maxPerRunLamports: values.maxPerRunBaseUnits,
+        maxTotalLamports: values.maxTotalBaseUnits,
+        assetMint: values.assetMint,
+        minIntervalSeconds: values.minIntervalSeconds,
+        expiresAt: values.expiresAt,
+        keeper: values.keeper,
       };
       const signature = policy
         ? await updateVaultPolicy(args)
@@ -294,15 +331,24 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
     setError(null);
     setBusy("deposit");
     try {
-      const amountLamports = solToLamports(depositAmount);
-      const signature = await depositVaultSol({
-        wallet: requireWallet(),
-        owner: publicKey,
-        workflowId,
-        amountLamports,
-      });
+      const amountBaseUnits = assetToBaseUnits(selectedAsset, depositAmount);
+      const signature =
+        selectedAsset === "SOL"
+          ? await depositVaultSol({
+              wallet: requireWallet(),
+              owner: publicKey,
+              workflowId,
+              amountLamports: amountBaseUnits,
+            })
+          : await depositVaultSpl({
+              wallet: requireWallet(),
+              owner: publicKey,
+              workflowId,
+              mint: asset.mint,
+              amountBaseUnits,
+            });
       setLastSignature(signature);
-      notifyTxSuccess(`${depositAmount} SOL depositados en la bóveda`, signature);
+      notifyTxSuccess(`${depositAmount} ${selectedAsset} depositados en la bóveda`, signature);
       await refresh();
     } catch (e) {
       const message = e instanceof Error ? e.message : "No se pudo depositar";
@@ -315,22 +361,41 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
 
   const handleWithdraw = async () => {
     if (!publicKey || !snapshot) return;
-    const amount = snapshot.balanceLamports - snapshot.rentExemptionLamports;
+    const amount =
+      selectedAsset === "SOL"
+        ? snapshot.balanceLamports - snapshot.rentExemptionLamports
+        : Number(snapshot.tokenBalanceBaseUnits ?? BigInt(0));
     if (amount <= 0) {
-      setError("La bóveda no tiene fondos por encima del alquiler mínimo");
+      setError(
+        selectedAsset === "SOL"
+          ? "La bóveda no tiene fondos por encima del alquiler mínimo"
+          : `La bóveda no tiene ${selectedAsset} disponible`,
+      );
       return;
     }
     setError(null);
     setBusy("withdraw");
     try {
-      const signature = await withdrawVaultSol({
-        wallet: requireWallet(),
-        owner: publicKey,
-        workflowId,
-        amountLamports: amount,
-      });
+      const signature =
+        selectedAsset === "SOL"
+          ? await withdrawVaultSol({
+              wallet: requireWallet(),
+              owner: publicKey,
+              workflowId,
+              amountLamports: amount,
+            })
+          : await withdrawVaultSpl({
+              wallet: requireWallet(),
+              owner: publicKey,
+              workflowId,
+              mint: asset.mint,
+              amountBaseUnits: amount,
+            });
       setLastSignature(signature);
-      notifyTxSuccess(`${lamportsToSol(amount)} SOL devueltos a tu wallet`, signature);
+      notifyTxSuccess(
+        `${baseUnitsToAmount(selectedAsset, amount)} ${selectedAsset} devueltos a tu wallet`,
+        signature,
+      );
       await refresh();
     } catch (e) {
       const message = e instanceof Error ? e.message : "No se pudo retirar";
@@ -370,6 +435,10 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
   const availableLamports = snapshot
     ? Math.max(0, snapshot.balanceLamports - snapshot.rentExemptionLamports)
     : 0;
+  const availableBaseUnits =
+    selectedAsset === "SOL"
+      ? availableLamports
+      : Number(snapshot?.tokenBalanceBaseUnits ?? BigInt(0));
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -471,13 +540,19 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
                     <div className="mt-2 flex items-center justify-between gap-3">
                       <span className="text-muted-foreground">Saldo de la bóveda</span>
                       <span className="font-mono text-foreground">
-                        {lamportsToSol(snapshot.balanceLamports)} SOL
+                        {policyHasUnknownMint
+                          ? "Activo no reconocido"
+                          : policyAsset || (policy && policy.assetMint !== PublicKey.default.toBase58())
+                            ? `${baseUnitsToAmount(displayAsset.symbol, snapshot.tokenBalanceBaseUnits ?? BigInt(0))} ${displayAsset.symbol}`
+                            : `${lamportsToSol(snapshot.balanceLamports)} SOL`}
                       </span>
                     </div>
                     <div className="mt-1 flex items-center justify-between gap-3">
                       <span className="text-muted-foreground">Disponible para retirar</span>
                       <span className="font-mono text-foreground">
-                        {lamportsToSol(availableLamports)} SOL
+                        {policyHasUnknownMint
+                          ? "—"
+                          : `${baseUnitsToAmount(displayAsset.symbol, availableBaseUnits)} ${displayAsset.symbol}`}
                       </span>
                     </div>
                     {policy && (
@@ -485,7 +560,9 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
                         <div className="mt-1 flex items-center justify-between gap-3">
                           <span className="text-muted-foreground">Gastado por la bóveda</span>
                           <span className="font-mono text-foreground">
-                            {lamportsToSol(policy.totalSpent)} SOL
+                            {policyHasUnknownMint
+                              ? "—"
+                              : `${baseUnitsToAmount(displayAsset.symbol, policy.totalSpent)} ${displayAsset.symbol}`}
                           </span>
                         </div>
                         <div className="mt-1 flex items-center justify-between gap-3">
@@ -574,20 +651,34 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
                     </div>
                     <div>
                       <dt className="text-muted-foreground">Máx. por ejecución</dt>
-                      <dd className="font-mono">{lamportsToSol(policy.maxPerRun)} SOL</dd>
+                      <dd className="font-mono">
+                        {policyHasUnknownMint
+                          ? "—"
+                          : `${baseUnitsToAmount(displayAsset.symbol, policy.maxPerRun)} ${displayAsset.symbol}`}
+                      </dd>
                     </div>
                     <div>
                       <dt className="text-muted-foreground">Máx. total</dt>
-                      <dd className="font-mono">{lamportsToSol(policy.maxTotal)} SOL</dd>
+                      <dd className="font-mono">
+                        {policyHasUnknownMint
+                          ? "—"
+                          : `${baseUnitsToAmount(displayAsset.symbol, policy.maxTotal)} ${displayAsset.symbol}`}
+                      </dd>
                     </div>
                     <div>
                       <dt className="text-muted-foreground">Gastado</dt>
-                      <dd className="font-mono">{lamportsToSol(policy.totalSpent)} SOL</dd>
+                      <dd className="font-mono">
+                        {policyHasUnknownMint
+                          ? "—"
+                          : `${baseUnitsToAmount(displayAsset.symbol, policy.totalSpent)} ${displayAsset.symbol}`}
+                      </dd>
                     </div>
                     <div>
                       <dt className="text-muted-foreground">Restante</dt>
                       <dd className="font-mono">
-                        {lamportsToSol(policy.maxTotal - policy.totalSpent)} SOL
+                        {policyHasUnknownMint
+                          ? "—"
+                          : `${baseUnitsToAmount(displayAsset.symbol, policy.maxTotal - policy.totalSpent)} ${displayAsset.symbol}`}
                       </dd>
                     </div>
                     <div>
@@ -603,10 +694,17 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
                       <dd>{formatTimestamp(policy.lastExecutionAt)}</dd>
                     </div>
                   </dl>
-                  {policy.assetMint !== PublicKey.default.toBase58() && (
+                  {policyHasUnknownMint && (
                     <p className="mt-2 flex items-start gap-1.5 text-[11px] text-amber-300">
                       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      Esta política usa un mint no soportado por esta versión.
+                      Esta política usa un mint que no está en el registro de activos de la
+                      bóveda. Solo se pueden mover fondos de los activos soportados.
+                    </p>
+                  )}
+                  {policyAsset && !policyAssetSupported && (
+                    <p className="mt-2 flex items-start gap-1.5 text-[11px] text-amber-300">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      {policyAsset.symbol} no tiene un mint SPL válido en la red seleccionada.
                     </p>
                   )}
                 </div>
@@ -622,11 +720,51 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
                 </div>
               )}
 
+              <div className="rounded-xl border border-border/50 bg-card p-3">
+                <label className="mb-1.5 block text-xs font-medium text-muted-foreground" htmlFor="vault-asset">
+                  Activo de la bóveda
+                </label>
+                <select
+                  id="vault-asset"
+                  value={selectedAsset}
+                  onChange={(event) => {
+                    const next = normalizeVaultAsset(event.target.value) || "SOL";
+                    setSelectedAsset(next);
+                    setDepositAmount(next === "SOL" ? "0.005" : "1");
+                    if (policyAsset?.symbol !== next) {
+                      setMaxPerRun(next === "SOL" ? "0.01" : "1");
+                      setMaxTotal(next === "SOL" ? "0.1" : "10");
+                    }
+                  }}
+                  className={fieldClass()}
+                >
+                  {VAULT_ASSET_LIST.map((item) => {
+                    const supported = isAssetSupportedOnCluster(item.symbol, cluster);
+                    return (
+                      <option key={item.symbol} value={item.symbol} disabled={!supported}>
+                        {item.symbol}
+                        {supported ? "" : " (sin mint en esta red)"}
+                      </option>
+                    );
+                  })}
+                </select>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Disponibles aquí: {supportedAssetLabel(cluster)}. Los límites se guardan en
+                  la unidad mínima del activo.
+                </p>
+                {!assetSupported && (
+                  <p className="mt-2 flex items-start gap-1.5 text-[11px] text-amber-300">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    {selectedAsset} no tiene un mint SPL válido en esta red.
+                  </p>
+                )}
+              </div>
+
               {policy && (
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className="space-y-2 rounded-xl border border-border/50 bg-muted/20 p-3">
                     <label className="text-xs font-medium text-muted-foreground" htmlFor="vault-deposit">
-                      Depositar SOL
+                      Depositar {selectedAsset}
                     </label>
                     <input
                       id="vault-deposit"
@@ -657,7 +795,7 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
                     </p>
                     <button
                       onClick={() => void handleWithdraw()}
-                      disabled={Boolean(busy) || availableLamports <= 0}
+                      disabled={Boolean(busy) || availableBaseUnits <= 0}
                       className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
                     >
                       {busy === "withdraw" ? (
@@ -712,7 +850,7 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
                   </div>
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-muted-foreground" htmlFor="vault-max-run">
-                      Máx. por ejecución (SOL)
+                      Máx. por ejecución ({selectedAsset})
                     </label>
                     <input
                       id="vault-max-run"
@@ -725,7 +863,7 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
                   </div>
                   <div>
                     <label className="mb-1.5 block text-xs font-medium text-muted-foreground" htmlFor="vault-max-total">
-                      Máx. total (SOL)
+                      Máx. total ({selectedAsset})
                     </label>
                     <input
                       id="vault-max-total"
@@ -818,7 +956,7 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
 
                 <button
                   onClick={() => void handleSubmit()}
-                  disabled={Boolean(busy) || !isDevnet}
+                  disabled={Boolean(busy) || !isDevnet || !assetSupported}
                   className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-purple-cyan px-3 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
                 >
                   {busy === "save" ? (

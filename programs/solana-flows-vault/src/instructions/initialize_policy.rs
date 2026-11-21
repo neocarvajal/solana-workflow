@@ -55,10 +55,6 @@ pub fn handle_initialize_policy(
         destination != Pubkey::default(),
         VaultError::InvalidDestination
     );
-    require!(
-        asset_mint == Pubkey::default(),
-        VaultError::UnsupportedAssetMint
-    );
     require!(max_per_run > 0, VaultError::InvalidMaxPerRun);
     require!(max_total >= max_per_run, VaultError::InvalidMaxTotal);
     require!(keeper.is_some(), VaultError::KeeperRequired);

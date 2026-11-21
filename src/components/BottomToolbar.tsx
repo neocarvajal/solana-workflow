@@ -5,7 +5,12 @@ import { Buffer } from 'buffer';
 import bs58 from 'bs58';
 import { Transaction, VersionedTransaction } from '@solana/web3.js';
 import { connection, publishWorkflowMemo,solexplorerUrl } from '@/lib/solana';
-import { isMainnet } from '@/lib/network';
+import { getCluster, isMainnet, type SolanaCluster } from '@/lib/network';
+import {
+  isAssetSupportedOnCluster,
+  normalizeVaultAsset,
+  supportedAssetLabel,
+} from '@/lib/vaultTokens';
 import { notifyTxSuccess } from '@/lib/tx-toast';
 import MainnetPublishWarning from './MainnetPublishWarning';
 import { Switch } from '@/components/ui/switch';
@@ -42,6 +47,7 @@ import { sendAlert } from "@/lib/alerts";
 import { useRouter } from 'next/router';
 
 const MAINNET_ACK_KEY = "solflows_mainnet_publish_warning_ack";
+const UNSUPPORTED_ASSET_ACK_KEY = "solflows_unsupported_asset_publish_ack_v1";
 
 function mainnetWarningAcknowledged(): boolean {
   if (typeof window === "undefined") return false;
@@ -50,6 +56,42 @@ function mainnetWarningAcknowledged(): boolean {
   } catch {
     return false;
   }
+}
+
+function unsupportedAssetAckKey(cluster: SolanaCluster, assets: string[]): string {
+  return `${cluster}:${[...assets].sort().join(",")}`;
+}
+
+function unsupportedAssetsAcknowledged(cluster: SolanaCluster, assets: string[]): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return (
+      window.localStorage.getItem(UNSUPPORTED_ASSET_ACK_KEY) ===
+      unsupportedAssetAckKey(cluster, assets)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Assets in the flow that the vault/dapp cannot transfer on the current network. */
+function findUnsupportedAssets(cluster: SolanaCluster): string[] {
+  const unsupported = new Set<string>();
+  for (const node of getFlowNodes()) {
+    const params = node.params || {};
+    const candidates =
+      node.module?.type === "swap"
+        ? [params.from, params.to]
+        : [params.asset];
+    for (const raw of candidates) {
+      if (typeof raw !== "string" || !raw.trim()) continue;
+      const symbol = normalizeVaultAsset(raw);
+      if (!symbol || !isAssetSupportedOnCluster(symbol, cluster)) {
+        unsupported.add(raw.trim().toUpperCase());
+      }
+    }
+  }
+  return [...unsupported];
 }
 
 const BottomToolbar: React.FC = () => {
@@ -64,6 +106,8 @@ const BottomToolbar: React.FC = () => {
   const [activationRow, setActivationRow] = useState<WorkflowAutomationRow | null>(null);
   const [togglingActivation, setTogglingActivation] = useState(false);
   const [mainnetWarningOpen, setMainnetWarningOpen] = useState(false);
+  const [unsupportedAssetOpen, setUnsupportedAssetOpen] = useState(false);
+  const [unsupportedAssets, setUnsupportedAssets] = useState<string[]>([]);
   const { publicKey, connected, sendTransaction } = useWallet();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -529,12 +573,23 @@ const BottomToolbar: React.FC = () => {
     }
   };
 
+  const continuePublish = () => {
+    const cluster = getCluster();
+    const unsupported = findUnsupportedAssets(cluster);
+    if (unsupported.length > 0 && !unsupportedAssetsAcknowledged(cluster, unsupported)) {
+      setUnsupportedAssets(unsupported);
+      setUnsupportedAssetOpen(true);
+      return;
+    }
+    void performPublish();
+  };
+
   const publishOnchain = () => {
     if (isMainnet() && !mainnetWarningAcknowledged()) {
       setMainnetWarningOpen(true);
       return;
     }
-    void performPublish();
+    continuePublish();
   };
 
   const performPublish = async () => {
@@ -876,6 +931,28 @@ const BottomToolbar: React.FC = () => {
             }
           }
           setMainnetWarningOpen(false);
+          continuePublish();
+        }}
+      />
+      <MainnetPublishWarning
+        kind="unsupported_asset"
+        open={unsupportedAssetOpen}
+        assets={unsupportedAssets}
+        cluster={getCluster()}
+        supportedAssets={supportedAssetLabel(getCluster())}
+        onCancel={() => setUnsupportedAssetOpen(false)}
+        onConfirm={(dontShowAgain) => {
+          if (dontShowAgain && typeof window !== "undefined") {
+            try {
+              window.localStorage.setItem(
+                UNSUPPORTED_ASSET_ACK_KEY,
+                unsupportedAssetAckKey(getCluster(), unsupportedAssets),
+              );
+            } catch {
+              // Ignore storage failures; the warning still applies this time.
+            }
+          }
+          setUnsupportedAssetOpen(false);
           void performPublish();
         }}
       />

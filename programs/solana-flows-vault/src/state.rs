@@ -14,7 +14,8 @@ pub struct VaultPolicy {
     pub workflow_hash: [u8; 32],
     /// The only address an automated transfer may pay.
     pub destination: Pubkey,
-    /// Pubkey::default() for SOL. Non-default mints are reserved for the SPL rollout.
+    /// Pubkey::default() for SOL, otherwise the SPL mint the policy is bound to.
+    /// Amount limits are always expressed in the asset's smallest unit.
     pub asset_mint: Pubkey,
     /// Hard cap for a single automated execution, in lamports.
     pub max_per_run: u64,
@@ -89,6 +90,33 @@ pub struct SolAutomatedTransfer {
     pub owner: Pubkey,
     pub workflow_id: String,
     pub destination: Pubkey,
+    pub amount: u64,
+    pub total_spent: u64,
+    pub executed_at: i64,
+}
+
+#[event]
+pub struct SplDeposited {
+    pub owner: Pubkey,
+    pub workflow_id: String,
+    pub mint: Pubkey,
+    pub amount: u64,
+}
+
+#[event]
+pub struct SplWithdrawn {
+    pub owner: Pubkey,
+    pub workflow_id: String,
+    pub mint: Pubkey,
+    pub amount: u64,
+}
+
+#[event]
+pub struct SplAutomatedTransfer {
+    pub owner: Pubkey,
+    pub workflow_id: String,
+    pub destination: Pubkey,
+    pub mint: Pubkey,
     pub amount: u64,
     pub total_spent: u64,
     pub executed_at: i64,

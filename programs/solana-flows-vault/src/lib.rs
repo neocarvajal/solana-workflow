@@ -51,6 +51,7 @@ pub mod solana_flows_vault {
         min_interval_seconds: i64,
         expires_at: i64,
         keeper: Option<Pubkey>,
+        asset_mint: Pubkey,
     ) -> Result<()> {
         crate::instructions::update_policy::handle_update_policy(
             ctx,
@@ -60,6 +61,7 @@ pub mod solana_flows_vault {
             min_interval_seconds,
             expires_at,
             keeper,
+            asset_mint,
         )
     }
 
@@ -80,5 +82,20 @@ pub mod solana_flows_vault {
         amount: u64,
     ) -> Result<()> {
         crate::instructions::execute_transfer_sol::handle_execute_transfer_sol(ctx, amount)
+    }
+
+    pub fn deposit_spl(ctx: Context<DepositSpl>, amount: u64) -> Result<()> {
+        crate::instructions::deposit_spl::handle_deposit_spl(ctx, amount)
+    }
+
+    pub fn withdraw_spl(ctx: Context<WithdrawSpl>, amount: u64) -> Result<()> {
+        crate::instructions::withdraw_spl::handle_withdraw_spl(ctx, amount)
+    }
+
+    pub fn execute_transfer_spl(
+        ctx: Context<ExecuteTransferSpl>,
+        amount: u64,
+    ) -> Result<()> {
+        crate::instructions::execute_transfer_spl::handle_execute_transfer_spl(ctx, amount)
     }
 }

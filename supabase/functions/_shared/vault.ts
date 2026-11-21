@@ -6,6 +6,11 @@ import {
   TransactionInstruction,
 } from "npm:@solana/web3.js@1.99.0";
 import bs58 from "npm:bs58@6.0.0";
+import {
+  createAssociatedTokenAccountInstruction,
+  getAssociatedTokenAddressSync,
+  TOKEN_PROGRAM_ID,
+} from "npm:@solana/spl-token@0.4.9";
 
 export const VAULT_PROGRAM_ID = new PublicKey(
   Deno.env.get("VAULT_PROGRAM_ID") ||
@@ -184,6 +189,65 @@ export async function buildExecuteTransferSolInstruction(args: {
     data: Buffer.concat([
       Buffer.from(discriminator),
       encodeU64(args.amountLamports),
+    ]),
+  });
+}
+
+export function getVaultTokenAccounts(
+  mint: PublicKey,
+  vault: PublicKey,
+  destination: PublicKey,
+) {
+  return {
+    vaultAta: getAssociatedTokenAddressSync(mint, vault, true),
+    destinationAta: getAssociatedTokenAddressSync(mint, destination, true),
+  };
+}
+
+export function buildCreateAtaInstruction(args: {
+  payer: PublicKey;
+  owner: PublicKey;
+  mint: PublicKey;
+  ata: PublicKey;
+}): TransactionInstruction {
+  return createAssociatedTokenAccountInstruction(
+    args.payer,
+    args.ata,
+    args.owner,
+    args.mint,
+    TOKEN_PROGRAM_ID,
+  );
+}
+
+export async function buildExecuteTransferSplInstruction(args: {
+  policy: PublicKey;
+  vault: PublicKey;
+  assetMint: PublicKey;
+  vaultAta: PublicKey;
+  destination: PublicKey;
+  destinationAta: PublicKey;
+  crank: PublicKey;
+  amountBaseUnits: number | bigint;
+}): Promise<TransactionInstruction> {
+  const discriminator = (await sha256("global:execute_transfer_spl")).subarray(
+    0,
+    8,
+  );
+  return new TransactionInstruction({
+    programId: VAULT_PROGRAM_ID,
+    keys: [
+      { pubkey: args.policy, isSigner: false, isWritable: true },
+      { pubkey: args.vault, isSigner: false, isWritable: false },
+      { pubkey: args.assetMint, isSigner: false, isWritable: false },
+      { pubkey: args.vaultAta, isSigner: false, isWritable: true },
+      { pubkey: args.destination, isSigner: false, isWritable: false },
+      { pubkey: args.destinationAta, isSigner: false, isWritable: true },
+      { pubkey: args.crank, isSigner: true, isWritable: false },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.concat([
+      Buffer.from(discriminator),
+      encodeU64(args.amountBaseUnits),
     ]),
   });
 }

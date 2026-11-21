@@ -1,6 +1,13 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { deliverAlert, resolveAlertMessage } from "../_shared/alerts.ts";
+import {
+  assetToBaseUnits,
+  baseUnitsToAmount,
+  isAssetSupportedOnCluster,
+  normalizeVaultAsset,
+  VAULT_ASSETS,
+} from "../_shared/vaultTokens.ts";
 
 const COIN_IDS: Record<string, string> = {
   SOL: "solana", BONK: "bonk", JUP: "jupiter-exchange-solana", WIF: "dogwifcoin", USDC: "usd-coin",
@@ -125,14 +132,27 @@ Deno.serve(async (req) => {
       for (const step of workflow.steps) {
         try {
           if (step.type === "send_transaction") {
-            const payload = { to: step.params.to, amount: step.params.amount, asset: step.params.asset || "SOL" };
+            const requestedAsset = String(step.params.asset || "SOL").toUpperCase();
+            const payload = { to: step.params.to, amount: step.params.amount, asset: requestedAsset };
             if (financialAutomation) {
-              const asset = String(step.params.asset || "SOL").toUpperCase();
-              const amountSol = Number(step.params.amount);
-              const amountLamports = Math.round(amountSol * 1_000_000_000);
+              const cluster = Deno.env.get("SOLANA_CLUSTER") || "devnet";
+              const asset = normalizeVaultAsset(requestedAsset);
               const requestedDestination = step.params.to
                 ? String(step.params.to)
                 : undefined;
+              let amountBaseUnits: number | null = null;
+              let assetError: string | null = null;
+              if (!asset) {
+                assetError = "Activo no soportado por la bóveda. Usa SOL, USDC, JUP o BONK.";
+              } else if (!isAssetSupportedOnCluster(asset, cluster)) {
+                assetError = `${asset} no tiene un mint SPL válido en ${cluster}.`;
+              } else {
+                try {
+                  amountBaseUnits = assetToBaseUnits(asset, step.params.amount);
+                } catch (e) {
+                  assetError = e instanceof Error ? e.message : "Monto inválido";
+                }
+              }
 
               if (executionMode !== "vault_transfer") {
                 logs.push({
@@ -170,23 +190,29 @@ Deno.serve(async (req) => {
                   payload,
                   note: "Solo se permite una transferencia de bóveda por ejecución.",
                 });
-              } else if (asset !== "SOL") {
+              } else if (assetError) {
                 logs.push({
                   step: "send_transaction",
                   skipped: true,
-                  reason: "unsupported_asset",
+                  reason: asset && !isAssetSupportedOnCluster(asset, cluster)
+                    ? "asset_not_available_on_network"
+                    : "unsupported_asset",
                   executionMode,
                   payload,
-                  note: "Esta versión de la bóveda solo transfiere SOL.",
+                  note: assetError,
                 });
-              } else if (!Number.isSafeInteger(amountLamports) || amountLamports <= 0) {
+              } else if (
+                amountBaseUnits === null ||
+                !Number.isSafeInteger(amountBaseUnits) ||
+                amountBaseUnits <= 0
+              ) {
                 logs.push({
                   step: "send_transaction",
                   skipped: true,
                   reason: "invalid_amount",
                   executionMode,
                   payload,
-                  note: "El monto debe ser un número positivo en SOL.",
+                  note: "El monto debe ser un número positivo en el activo indicado.",
                 });
               } else if (!supabaseUrl || !serviceKey) {
                 logs.push({
@@ -206,7 +232,8 @@ Deno.serve(async (req) => {
                   body: JSON.stringify({
                     owner_wallet: ownerWallet,
                     workflow_id: stableWorkflowId,
-                    amount_lamports: amountLamports,
+                    asset,
+                    amount_base_units: amountBaseUnits,
                     destination: requestedDestination,
                   }),
                 });
@@ -230,6 +257,9 @@ Deno.serve(async (req) => {
                     policy: result.policy,
                     vault: result.vault,
                     destination: result.destination,
+                    asset: result.asset || "SOL",
+                    amount_base_units:
+                      result.amount_base_units ?? result.amount_lamports,
                     amount_lamports: result.amount_lamports,
                     executionMode,
                     payload,
@@ -388,10 +418,15 @@ Deno.serve(async (req) => {
           entry?.step === "send_transaction" &&
           entry?.executed === true,
       );
-      const amountSol =
-        typeof transferLog?.amount_lamports === "number"
-          ? transferLog.amount_lamports / 1_000_000_000
-          : 0;
+      const assetSymbol = normalizeVaultAsset(transferLog?.asset) || "SOL";
+      const baseUnits =
+        typeof transferLog?.amount_base_units === "number"
+          ? transferLog.amount_base_units
+          : typeof transferLog?.amount_lamports === "number"
+            ? transferLog.amount_lamports
+            : 0;
+      const amountDisplay = baseUnitsToAmount(assetSymbol, baseUnits);
+      const assetLabel = VAULT_ASSETS[assetSymbol].symbol;
       const destination = String(transferLog?.destination || "");
       const shortDestination = destination
         ? `${destination.slice(0, 4)}…${destination.slice(-4)}`
@@ -407,7 +442,7 @@ Deno.serve(async (req) => {
           workflow_id: stableWorkflowId || workflowId || null,
           workflow_name: workflow.name,
           title: `Transferencia ejecutada · ${workflow.name}`,
-          message: `${amountSol} SOL enviados a ${shortDestination}\nVer en Explorer: ${explorerUrl}`,
+          message: `${amountDisplay} ${assetLabel} enviados a ${shortDestination}\nVer en Explorer: ${explorerUrl}`,
           channel: "app",
           status: "success",
           metadata: {
@@ -415,6 +450,8 @@ Deno.serve(async (req) => {
             txSignature,
             explorerUrl,
             amountLamports: transferLog?.amount_lamports ?? null,
+            amountBaseUnits: baseUnits,
+            asset: assetLabel,
             destination: destination || null,
           },
         });

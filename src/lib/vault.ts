@@ -7,6 +7,11 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import { connection as appConnection } from "@/lib/solana";
+import {
+  createAssociatedTokenAccountInstruction,
+  getAssociatedTokenAddressSync,
+  TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
 
 export const VAULT_PROGRAM_ID = new PublicKey(
   process.env.NEXT_PUBLIC_VAULT_PROGRAM_ID ||
@@ -47,6 +52,8 @@ export type VaultSnapshot = VaultAddresses & {
   policyData: VaultPolicy | null;
   balanceLamports: number;
   rentExemptionLamports: number;
+  /** Vault ATA balance in the policy's smallest token unit; null for SOL. */
+  tokenBalanceBaseUnits: bigint | null;
 };
 
 export type VaultWallet = {
@@ -244,7 +251,23 @@ export async function fetchVaultSnapshot(
     throw new Error("No se pudo leer la política de la bóveda");
   }
 
-  return { ...addresses, policyData, balanceLamports, rentExemptionLamports };
+  let tokenBalanceBaseUnits: bigint | null = null;
+  if (policyData && policyData.assetMint !== PublicKey.default.toBase58()) {
+    const mint = new PublicKey(policyData.assetMint);
+    const vaultAta = getAssociatedTokenAddressSync(mint, addresses.vault, true);
+    const ataAccount = await connection.getAccountInfo(vaultAta);
+    tokenBalanceBaseUnits = ataAccount
+      ? BigInt((await connection.getTokenAccountBalance(vaultAta)).value.amount)
+      : BigInt(0);
+  }
+
+  return {
+    ...addresses,
+    policyData,
+    balanceLamports,
+    rentExemptionLamports,
+    tokenBalanceBaseUnits,
+  };
 }
 
 /** True when an on-chain policy already exists for this workflow. */
@@ -287,6 +310,7 @@ async function initializeInstruction(args: {
   workflowId: string;
   workflowHash: Uint8Array;
   destination: PublicKey;
+  assetMint: PublicKey;
   maxPerRun: number;
   maxTotal: number;
   minIntervalSeconds: number;
@@ -301,7 +325,7 @@ async function initializeInstruction(args: {
     encodeString(args.workflowId),
     Buffer.from(args.workflowHash),
     args.destination.toBuffer(),
-    PublicKey.default.toBuffer(),
+    args.assetMint.toBuffer(),
     encodeU64(args.maxPerRun),
     encodeU64(args.maxTotal),
     encodeI64(args.minIntervalSeconds),
@@ -331,10 +355,14 @@ export async function initializeVaultPolicy(args: {
   minIntervalSeconds: number;
   expiresAt: number;
   keeper?: string | null;
+  assetMint?: string;
   connection?: Connection;
 }): Promise<string> {
   const connection = args.connection || appConnection;
   const destination = new PublicKey(args.destination);
+  const assetMint = args.assetMint?.trim()
+    ? new PublicKey(args.assetMint.trim())
+    : PublicKey.default;
   const keeper = args.keeper?.trim() ? new PublicKey(args.keeper.trim()) : null;
   if (!keeper) throw new Error("La política requiere un ejecutor autorizado");
   const addresses = await getVaultAddresses(args.owner, args.workflowId);
@@ -351,6 +379,7 @@ export async function initializeVaultPolicy(args: {
     workflowId: args.workflowId,
     workflowHash: addresses.workflowHash,
     destination,
+    assetMint,
     maxPerRun: args.maxPerRunLamports,
     maxTotal: args.maxTotalLamports,
     minIntervalSeconds: args.minIntervalSeconds,
@@ -370,10 +399,14 @@ export async function updateVaultPolicy(args: {
   minIntervalSeconds: number;
   expiresAt: number;
   keeper?: string | null;
+  assetMint?: string;
   connection?: Connection;
 }): Promise<string> {
   const connection = args.connection || appConnection;
   const destination = new PublicKey(args.destination);
+  const assetMint = args.assetMint?.trim()
+    ? new PublicKey(args.assetMint.trim())
+    : PublicKey.default;
   const keeper = args.keeper?.trim() ? new PublicKey(args.keeper.trim()) : null;
   if (!keeper) throw new Error("La política requiere un ejecutor autorizado");
   const { policy, vault } = await getVaultAddresses(args.owner, args.workflowId);
@@ -391,6 +424,7 @@ export async function updateVaultPolicy(args: {
     encodeI64(args.minIntervalSeconds),
     encodeI64(args.expiresAt),
     encodeOptionPubkey(keeper),
+    assetMint.toBuffer(),
   ]);
   const instruction = new TransactionInstruction({
     programId: VAULT_PROGRAM_ID,
@@ -467,4 +501,128 @@ export async function setVaultPaused(args: {
     data: Buffer.concat([await discriminator("set_paused"), Buffer.from([args.paused ? 1 : 0])]),
   });
   return sendVaultTransaction(args.wallet, [instruction], connection);
+}
+
+async function ensureTokenAccounts(args: {
+  owner: PublicKey;
+  vault: PublicKey;
+  mint: PublicKey;
+  connection: Connection;
+}): Promise<TransactionInstruction[]> {
+  const ownerAta = getAssociatedTokenAddressSync(args.mint, args.owner, true);
+  const vaultAta = getAssociatedTokenAddressSync(args.mint, args.vault, true);
+  const [ownerAtaAccount, vaultAtaAccount] = await Promise.all([
+    args.connection.getAccountInfo(ownerAta),
+    args.connection.getAccountInfo(vaultAta),
+  ]);
+  const instructions: TransactionInstruction[] = [];
+  if (!ownerAtaAccount) {
+    instructions.push(
+      createAssociatedTokenAccountInstruction(
+        args.owner,
+        ownerAta,
+        args.owner,
+        args.mint,
+      ),
+    );
+  }
+  if (!vaultAtaAccount) {
+    instructions.push(
+      createAssociatedTokenAccountInstruction(
+        args.owner,
+        vaultAta,
+        args.vault,
+        args.mint,
+      ),
+    );
+  }
+  return instructions;
+}
+
+export async function depositVaultSpl(args: {
+  wallet: VaultWallet;
+  owner: PublicKey;
+  workflowId: string;
+  mint: string;
+  amountBaseUnits: number;
+  connection?: Connection;
+}): Promise<string> {
+  if (args.amountBaseUnits <= 0) {
+    throw new Error("El depósito debe ser mayor que cero");
+  }
+  const connection = args.connection || appConnection;
+  const mint = new PublicKey(args.mint);
+  if (mint.equals(PublicKey.default)) {
+    throw new Error("Usa depositVaultSol para depositar SOL");
+  }
+  const { policy, vault } = await getVaultAddresses(args.owner, args.workflowId);
+  const setup = await ensureTokenAccounts({
+    owner: args.owner,
+    vault,
+    mint,
+    connection,
+  });
+  const vaultAta = getAssociatedTokenAddressSync(mint, vault, true);
+  const ownerAta = getAssociatedTokenAddressSync(mint, args.owner, true);
+  const instruction = new TransactionInstruction({
+    programId: VAULT_PROGRAM_ID,
+    keys: [
+      { pubkey: args.owner, isSigner: true, isWritable: true },
+      { pubkey: policy, isSigner: false, isWritable: false },
+      { pubkey: vault, isSigner: false, isWritable: false },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: ownerAta, isSigner: false, isWritable: true },
+      { pubkey: vaultAta, isSigner: false, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.concat([
+      await discriminator("deposit_spl"),
+      encodeU64(args.amountBaseUnits),
+    ]),
+  });
+  return sendVaultTransaction(args.wallet, [...setup, instruction], connection);
+}
+
+export async function withdrawVaultSpl(args: {
+  wallet: VaultWallet;
+  owner: PublicKey;
+  workflowId: string;
+  mint: string;
+  amountBaseUnits: number;
+  connection?: Connection;
+}): Promise<string> {
+  if (args.amountBaseUnits <= 0) {
+    throw new Error("No hay fondos disponibles para retirar");
+  }
+  const connection = args.connection || appConnection;
+  const mint = new PublicKey(args.mint);
+  if (mint.equals(PublicKey.default)) {
+    throw new Error("Usa withdrawVaultSol para retirar SOL");
+  }
+  const { policy, vault } = await getVaultAddresses(args.owner, args.workflowId);
+  const setup = await ensureTokenAccounts({
+    owner: args.owner,
+    vault,
+    mint,
+    connection,
+  });
+  const vaultAta = getAssociatedTokenAddressSync(mint, vault, true);
+  const ownerAta = getAssociatedTokenAddressSync(mint, args.owner, true);
+  const instruction = new TransactionInstruction({
+    programId: VAULT_PROGRAM_ID,
+    keys: [
+      { pubkey: args.owner, isSigner: true, isWritable: false },
+      { pubkey: policy, isSigner: false, isWritable: false },
+      { pubkey: vault, isSigner: false, isWritable: false },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: vaultAta, isSigner: false, isWritable: true },
+      { pubkey: ownerAta, isSigner: false, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.concat([
+      await discriminator("withdraw_spl"),
+      encodeU64(args.amountBaseUnits),
+    ]),
+  });
+  return sendVaultTransaction(args.wallet, [...setup, instruction], connection);
 }

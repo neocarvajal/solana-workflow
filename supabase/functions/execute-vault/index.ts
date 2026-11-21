@@ -5,14 +5,23 @@ import {
   Transaction,
   sendAndConfirmTransaction,
 } from "npm:@solana/web3.js@1.99.0";
+import { TOKEN_PROGRAM_ID } from "npm:@solana/spl-token@0.4.9";
 import {
+  buildCreateAtaInstruction,
   buildExecuteTransferSolInstruction,
+  buildExecuteTransferSplInstruction,
   decodeVaultPolicy,
   getVaultAddresses,
+  getVaultTokenAccounts,
   json,
   loadCrank,
   VAULT_PROGRAM_ID,
 } from "../_shared/vault.ts";
+import {
+  isAssetSupportedOnCluster,
+  normalizeVaultAsset,
+  VAULT_ASSETS,
+} from "../_shared/vaultTokens.ts";
 
 function unauthorized() {
   return json({ error: "Unauthorized" }, 401);
@@ -68,7 +77,10 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const ownerWallet = String(body.owner_wallet || "");
     const workflowId = String(body.workflow_id || "");
-    const amountLamports = Number(body.amount_lamports);
+    const assetSymbol = normalizeVaultAsset(body.asset || "SOL");
+    const cluster = Deno.env.get("SOLANA_CLUSTER") || "devnet";
+    const rawAmount = body.amount_base_units ?? body.amount_lamports;
+    const amountBaseUnits = Number(rawAmount);
     const requestedDestination = body.destination
       ? String(body.destination)
       : null;
@@ -77,13 +89,35 @@ Deno.serve(async (req) => {
     if (!workflowId || workflowId.length > 64) {
       throw new Error("workflow_id is required and must be at most 64 bytes");
     }
+    if (!assetSymbol) {
+      return json(
+        {
+          error: "unsupported_asset",
+          note: "Supported assets: SOL, USDC, JUP, BONK.",
+        },
+        400,
+      );
+    }
+    if (!isAssetSupportedOnCluster(assetSymbol, cluster)) {
+      return json(
+        {
+          error: "asset_not_available_on_network",
+          asset: assetSymbol,
+          cluster,
+          note: `${assetSymbol} no tiene un mint SPL válido en ${cluster}.`,
+        },
+        400,
+      );
+    }
     if (
-      !Number.isSafeInteger(amountLamports) ||
-      amountLamports <= 0
+      !Number.isSafeInteger(amountBaseUnits) ||
+      amountBaseUnits <= 0
     ) {
-      throw new Error("amount_lamports must be a positive safe integer");
+      throw new Error("amount_base_units must be a positive safe integer");
     }
 
+    const asset = VAULT_ASSETS[assetSymbol];
+    const assetMint = new PublicKey(asset.mint);
     const owner = new PublicKey(ownerWallet);
     const addresses = await getVaultAddresses(owner, workflowId);
     const rpcUrl =
@@ -106,9 +140,14 @@ Deno.serve(async (req) => {
     if (!Buffer.from(policy.workflowHash).equals(Buffer.from(addresses.workflowHash))) {
       return json({ error: "Workflow hash mismatch" }, 400);
     }
-    if (!policy.assetMint.equals(PublicKey.default)) {
+    if (!policy.assetMint.equals(assetMint)) {
       return json(
-        { error: "Only SOL policies are supported in this version" },
+        {
+          error: "asset_mint_mismatch",
+          note: "El activo solicitado no coincide con el mint autorizado por la política.",
+          policyAssetMint: policy.assetMint.toBase58(),
+          requestedAssetMint: assetMint.toBase58(),
+        },
         400,
       );
     }
@@ -140,7 +179,7 @@ Deno.serve(async (req) => {
       return json({ error: "Vault minimum interval has not elapsed" }, 429);
     }
 
-    const amount = BigInt(amountLamports);
+    const amount = BigInt(amountBaseUnits);
     if (amount > policy.maxPerRun) {
       return json({ error: "Amount exceeds max_per_run" }, 400);
     }
@@ -148,26 +187,97 @@ Deno.serve(async (req) => {
       return json({ error: "Amount exceeds max_total" }, 400);
     }
 
-    const [vaultBalance, rentExemption, crankBalance] = await Promise.all([
-      connection.getBalance(addresses.vault),
-      connection.getMinimumBalanceForRentExemption(0),
-      connection.getBalance(crank.publicKey),
-    ]);
-    if (vaultBalance - amountLamports < rentExemption) {
-      return json({ error: "Vault would fall below rent exemption" }, 400);
-    }
+    const crankBalance = await connection.getBalance(crank.publicKey);
     if (crankBalance <= 0) {
       return json({ error: "Crank has no SOL for fees" }, 503);
     }
 
-    const instruction = await buildExecuteTransferSolInstruction({
-      policy: addresses.policy,
-      vault: addresses.vault,
-      destination,
-      crank: crank.publicKey,
-      amountLamports,
-    });
-    const transaction = new Transaction().add(instruction);
+    const instructions = [];
+    let programAmount = amountBaseUnits;
+
+    if (assetSymbol === "SOL") {
+      const [vaultBalance, rentExemption] = await Promise.all([
+        connection.getBalance(addresses.vault),
+        connection.getMinimumBalanceForRentExemption(0),
+      ]);
+      if (vaultBalance - amountBaseUnits < rentExemption) {
+        return json({ error: "Vault would fall below rent exemption" }, 400);
+      }
+      instructions.push(
+        await buildExecuteTransferSolInstruction({
+          policy: addresses.policy,
+          vault: addresses.vault,
+          destination,
+          crank: crank.publicKey,
+          amountLamports: amountBaseUnits,
+        }),
+      );
+    } else {
+      const mintAccount = await connection.getAccountInfo(assetMint);
+      if (
+        !mintAccount ||
+        !mintAccount.owner.equals(TOKEN_PROGRAM_ID) ||
+        mintAccount.data.length !== 82
+      ) {
+        return json(
+          {
+            error: "asset_not_available_on_network",
+            asset: assetSymbol,
+            cluster,
+            note: `${assetSymbol} no es un mint SPL inicializado en ${cluster}.`,
+          },
+          400,
+        );
+      }
+
+      const { vaultAta, destinationAta } = getVaultTokenAccounts(
+        assetMint,
+        addresses.vault,
+        destination,
+      );
+      const [vaultAtaAccount, destinationAtaAccount, vaultTokenBalance] =
+        await Promise.all([
+          connection.getAccountInfo(vaultAta),
+          connection.getAccountInfo(destinationAta),
+          connection.getTokenAccountBalance(vaultAta),
+        ]);
+      if (!vaultAtaAccount) {
+        return json(
+          {
+            error: "vault_token_account_missing",
+            note: "La bóveda no tiene un ATA para este activo. Deposita tokens primero.",
+          },
+          400,
+        );
+      }
+      if (BigInt(vaultTokenBalance.value.amount) < amount) {
+        return json({ error: "Insufficient token balance in vault" }, 400);
+      }
+      if (!destinationAtaAccount) {
+        instructions.push(
+          buildCreateAtaInstruction({
+            payer: crank.publicKey,
+            owner: destination,
+            mint: assetMint,
+            ata: destinationAta,
+          }),
+        );
+      }
+      instructions.push(
+        await buildExecuteTransferSplInstruction({
+          policy: addresses.policy,
+          vault: addresses.vault,
+          assetMint,
+          vaultAta,
+          destination,
+          destinationAta,
+          crank: crank.publicKey,
+          amountBaseUnits,
+        }),
+      );
+    }
+
+    const transaction = new Transaction().add(...instructions);
     const signature = await sendAndConfirmTransaction(
       connection,
       transaction,
@@ -181,7 +291,9 @@ Deno.serve(async (req) => {
       policy: addresses.policy.toBase58(),
       vault: addresses.vault.toBase58(),
       destination: destination.toBase58(),
-      amount_lamports: amountLamports,
+      asset: assetSymbol,
+      amount_base_units: programAmount,
+      amount_lamports: assetSymbol === "SOL" ? programAmount : undefined,
     });
   } catch (error) {
     console.error("execute-vault failed", error);

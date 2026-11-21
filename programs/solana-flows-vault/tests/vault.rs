@@ -4,6 +4,13 @@ use {
         solana_program::{instruction::Instruction, system_instruction, system_program},
         AccountDeserialize, InstructionData, ToAccountMetas,
     },
+    anchor_spl::{
+        associated_token::{
+            get_associated_token_address,
+            spl_associated_token_account::instruction::create_associated_token_account,
+        },
+        token::spl_token,
+    },
     litesvm::{types::TransactionResult, LiteSVM},
     solana_clock::Clock,
     solana_flows_vault::{
@@ -251,6 +258,7 @@ fn update_ix(
     min_interval_seconds: i64,
     expires_at: i64,
     keeper: Option<Pubkey>,
+    asset_mint: Pubkey,
 ) -> Instruction {
     Instruction::new_with_bytes(
         solana_flows_vault::id(),
@@ -261,6 +269,7 @@ fn update_ix(
             min_interval_seconds,
             expires_at,
             keeper,
+            asset_mint,
         }
         .data(),
         accounts::UpdatePolicy {
@@ -373,6 +382,170 @@ fn setup_policy(
 fn assert_still_zero(svm: &LiteSVM, owner: &Keypair) {
     let policy = read_policy(svm, policy_pda(&owner.pubkey(), WORKFLOW_ID));
     assert_eq!(policy.total_spent, 0);
+}
+
+const MINT_ACCOUNT_LEN: u64 = 82;
+
+fn create_spl_mint(svm: &mut LiteSVM, owner: &Keypair, decimals: u8) -> Keypair {
+    let mint = Keypair::new();
+    let rent = svm
+        .get_sysvar::<Rent>()
+        .minimum_balance(MINT_ACCOUNT_LEN as usize);
+    let create = system_instruction::create_account(
+        &owner.pubkey(),
+        &mint.pubkey(),
+        rent,
+        MINT_ACCOUNT_LEN,
+        &spl_token::ID,
+    );
+    let initialize = spl_token::instruction::initialize_mint2(
+        &spl_token::ID,
+        &mint.pubkey(),
+        &owner.pubkey(),
+        None,
+        decimals,
+    )
+    .unwrap();
+    let res = send(svm, &[create, initialize], owner, &[owner, &mint]);
+    assert!(res.is_ok(), "create mint failed: {res:?}");
+    mint
+}
+
+fn create_ata(svm: &mut LiteSVM, payer: &Keypair, authority: Pubkey, mint: Pubkey) -> Pubkey {
+    let ata = get_associated_token_address(&authority, &mint);
+    let ix = create_associated_token_account(
+        &payer.pubkey(),
+        &authority,
+        &mint,
+        &spl_token::ID,
+    );
+    let res = send(svm, &[ix], payer, &[payer]);
+    assert!(res.is_ok(), "create ATA failed: {res:?}");
+    ata
+}
+
+fn mint_to(svm: &mut LiteSVM, owner: &Keypair, mint: Pubkey, amount: u64) {
+    let ata = get_associated_token_address(&owner.pubkey(), &mint);
+    let ix = spl_token::instruction::mint_to(
+        &spl_token::ID,
+        &mint,
+        &ata,
+        &owner.pubkey(),
+        &[],
+        amount,
+    )
+    .unwrap();
+    let res = send(svm, &[ix], owner, &[owner]);
+    assert!(res.is_ok(), "mint_to failed: {res:?}");
+}
+
+fn token_amount(svm: &LiteSVM, ata: Pubkey) -> u64 {
+    let account = svm.get_account(&ata).unwrap();
+    let bytes: [u8; 8] = account.data[64..72].try_into().unwrap();
+    u64::from_le_bytes(bytes)
+}
+
+fn deposit_spl_ix(
+    owner: &Keypair,
+    workflow_id: &str,
+    mint: Pubkey,
+    amount: u64,
+) -> Instruction {
+    let vault = vault_pda(&owner.pubkey(), workflow_id);
+    Instruction::new_with_bytes(
+        solana_flows_vault::id(),
+        &instruction::DepositSpl { amount }.data(),
+        accounts::DepositSpl {
+            owner: owner.pubkey(),
+            policy: policy_pda(&owner.pubkey(), workflow_id),
+            vault,
+            asset_mint: mint,
+            owner_ata: get_associated_token_address(&owner.pubkey(), &mint),
+            vault_ata: get_associated_token_address(&vault, &mint),
+            token_program: spl_token::ID,
+        }
+        .to_account_metas(None),
+    )
+}
+
+fn withdraw_spl_ix(
+    owner: &Keypair,
+    workflow_id: &str,
+    mint: Pubkey,
+    amount: u64,
+) -> Instruction {
+    let vault = vault_pda(&owner.pubkey(), workflow_id);
+    Instruction::new_with_bytes(
+        solana_flows_vault::id(),
+        &instruction::WithdrawSpl { amount }.data(),
+        accounts::WithdrawSpl {
+            owner: owner.pubkey(),
+            policy: policy_pda(&owner.pubkey(), workflow_id),
+            vault,
+            asset_mint: mint,
+            vault_ata: get_associated_token_address(&vault, &mint),
+            owner_ata: get_associated_token_address(&owner.pubkey(), &mint),
+            token_program: spl_token::ID,
+        }
+        .to_account_metas(None),
+    )
+}
+
+fn execute_spl_ix(
+    crank: &Keypair,
+    owner: &Pubkey,
+    workflow_id: &str,
+    mint: Pubkey,
+    destination: Pubkey,
+    amount: u64,
+) -> Instruction {
+    let vault = vault_pda(owner, workflow_id);
+    Instruction::new_with_bytes(
+        solana_flows_vault::id(),
+        &instruction::ExecuteTransferSpl { amount }.data(),
+        accounts::ExecuteTransferSpl {
+            policy: policy_pda(owner, workflow_id),
+            vault,
+            asset_mint: mint,
+            vault_ata: get_associated_token_address(&vault, &mint),
+            destination,
+            destination_ata: get_associated_token_address(&destination, &mint),
+            crank: crank.pubkey(),
+            token_program: spl_token::ID,
+        }
+        .to_account_metas(None),
+    )
+}
+
+fn setup_spl_policy(
+    svm: &mut LiteSVM,
+    owner: &Keypair,
+    mint: Pubkey,
+    destination: Pubkey,
+    max_per_run: u64,
+    max_total: u64,
+) {
+    let ix = initialize_ix(
+        owner,
+        WORKFLOW_ID,
+        destination,
+        mint,
+        max_per_run,
+        max_total,
+        0,
+        0,
+        Some(owner.pubkey()),
+    );
+    let res = send(svm, &[ix], owner, &[owner]);
+    assert!(res.is_ok(), "initialize SPL policy failed: {res:?}");
+
+    let vault = vault_pda(&owner.pubkey(), WORKFLOW_ID);
+    create_ata(svm, owner, vault, mint);
+    create_ata(svm, owner, destination, mint);
+
+    let ix = deposit_spl_ix(owner, WORKFLOW_ID, mint, 5_000_000);
+    let res = send(svm, &[ix], owner, &[owner]);
+    assert!(res.is_ok(), "SPL deposit failed: {res:?}");
 }
 
 #[test]
@@ -686,27 +859,21 @@ fn initialize_rejects_invalid_policies() {
     let (mut svm, owner) = new_svm();
     let destination = Pubkey::new_unique();
 
-    let invalid_cases: [(&str, Pubkey, u64, u64, i64, i64); 5] = [
-        ("wf-asset", destination, 1_000_000, 10_000_000, 0, 0),
+    let invalid_cases: [(&str, Pubkey, u64, u64, i64, i64); 4] = [
         ("wf-total", destination, 2_000_000, 1_000_000, 0, 0),
         ("wf-expiry", destination, 1_000_000, 10_000_000, 0, START_TS - 1),
         ("wf-default", Pubkey::default(), 1_000_000, 10_000_000, 0, 0),
         ("wf-interval", destination, 1_000_000, 10_000_000, -1, 0),
     ];
 
-    for (index, (workflow_id, destination, max_per_run, max_total, interval, expires)) in
-        invalid_cases.iter().enumerate()
+    for (workflow_id, destination, max_per_run, max_total, interval, expires) in
+        invalid_cases.iter()
     {
-        let asset_mint = if index == 0 {
-            Pubkey::new_unique()
-        } else {
-            Pubkey::default()
-        };
         let ix = initialize_ix(
             &owner,
             workflow_id,
             *destination,
-            asset_mint,
+            Pubkey::default(),
             *max_per_run,
             *max_total,
             *interval,
@@ -794,6 +961,7 @@ fn update_policy_is_owner_only_and_keeps_caps_consistent() {
         60,
         0,
         Some(keeper),
+        Pubkey::default(),
     );
     let res = send(&mut svm, &[ix], &owner, &[&owner]);
     assert!(res.is_ok(), "update failed: {res:?}");
@@ -817,6 +985,7 @@ fn update_policy_is_owner_only_and_keeps_caps_consistent() {
         60,
         0,
         Some(owner.pubkey()),
+        Pubkey::default(),
     );
     let res = send(&mut svm, &[ix], &stranger, &[&stranger]);
     assert!(res.is_err(), "non-owner update should fail");
@@ -830,6 +999,7 @@ fn update_policy_is_owner_only_and_keeps_caps_consistent() {
         60,
         0,
         Some(owner.pubkey()),
+        Pubkey::default(),
     );
     let res = send(&mut svm, &[ix], &owner, &[&owner]);
     assert!(res.is_err(), "max_total below total_spent should fail");
@@ -843,6 +1013,7 @@ fn update_policy_is_owner_only_and_keeps_caps_consistent() {
         60,
         0,
         Some(owner.pubkey()),
+        Pubkey::default(),
     );
     let res = send(&mut svm, &[ix], &owner, &[&owner]);
     assert!(res.is_err(), "vault as destination should fail");
@@ -895,8 +1066,311 @@ fn update_rejects_missing_keeper() {
         0,
         0,
         None,
+        Pubkey::default(),
     );
     let res = send(&mut svm, &[ix], &owner, &[&owner]);
     assert!(res.is_err(), "removing the keeper should be rejected");
     assert_eq!(read_policy(&svm, policy_key).keeper, Some(owner.pubkey()));
+}
+
+#[test]
+fn spl_deposit_execute_and_withdraw() {
+    let (mut svm, owner) = new_svm();
+    let mint = create_spl_mint(&mut svm, &owner, 6);
+    let owner_ata = create_ata(&mut svm, &owner, owner.pubkey(), mint.pubkey());
+    mint_to(&mut svm, &owner, mint.pubkey(), 10_000_000);
+    assert_eq!(token_amount(&svm, owner_ata), 10_000_000);
+
+    let destination = Pubkey::new_unique();
+    let vault = vault_pda(&owner.pubkey(), WORKFLOW_ID);
+    let vault_ata = get_associated_token_address(&vault, &mint.pubkey());
+    let destination_ata = get_associated_token_address(&destination, &mint.pubkey());
+    setup_spl_policy(
+        &mut svm,
+        &owner,
+        mint.pubkey(),
+        destination,
+        2_000_000,
+        3_000_000,
+    );
+    assert_eq!(token_amount(&svm, vault_ata), 5_000_000);
+    assert_eq!(token_amount(&svm, owner_ata), 5_000_000);
+
+    let res = send(
+        &mut svm,
+        &[execute_spl_ix(
+            &owner,
+            &owner.pubkey(),
+            WORKFLOW_ID,
+            mint.pubkey(),
+            destination,
+            1_000_000,
+        )],
+        &owner,
+        &[&owner],
+    );
+    assert!(res.is_ok(), "SPL transfer failed: {res:?}");
+    assert_eq!(token_amount(&svm, destination_ata), 1_000_000);
+    assert_eq!(
+        read_policy(&svm, policy_pda(&owner.pubkey(), WORKFLOW_ID)).total_spent,
+        1_000_000
+    );
+
+    let res = send(
+        &mut svm,
+        &[execute_spl_ix(
+            &owner,
+            &owner.pubkey(),
+            WORKFLOW_ID,
+            mint.pubkey(),
+            destination,
+            2_000_000,
+        )],
+        &owner,
+        &[&owner],
+    );
+    assert!(res.is_ok(), "second SPL transfer failed: {res:?}");
+    assert_eq!(token_amount(&svm, destination_ata), 3_000_000);
+
+    let res = send(
+        &mut svm,
+        &[execute_spl_ix(
+            &owner,
+            &owner.pubkey(),
+            WORKFLOW_ID,
+            mint.pubkey(),
+            destination,
+            1,
+        )],
+        &owner,
+        &[&owner],
+    );
+    assert!(res.is_err(), "lifetime cap should reject the SPL transfer");
+    assert_eq!(token_amount(&svm, destination_ata), 3_000_000);
+
+    let res = send(
+        &mut svm,
+        &[withdraw_spl_ix(
+            &owner,
+            WORKFLOW_ID,
+            mint.pubkey(),
+            2_000_000,
+        )],
+        &owner,
+        &[&owner],
+    );
+    assert!(res.is_ok(), "SPL withdrawal failed: {res:?}");
+    assert_eq!(token_amount(&svm, vault_ata), 0);
+    assert_eq!(token_amount(&svm, owner_ata), 7_000_000);
+}
+
+#[test]
+fn spl_execution_enforces_keeper_and_policy() {
+    let (mut svm, owner) = new_svm();
+    let keeper = Keypair::new();
+    svm.airdrop(&keeper.pubkey(), 1_000_000_000).unwrap();
+    let mint = create_spl_mint(&mut svm, &owner, 6);
+    let owner_ata = create_ata(&mut svm, &owner, owner.pubkey(), mint.pubkey());
+    mint_to(&mut svm, &owner, mint.pubkey(), 10_000_000);
+    let destination = Pubkey::new_unique();
+    let other_destination = Pubkey::new_unique();
+    create_ata(&mut svm, &owner, destination, mint.pubkey());
+    create_ata(&mut svm, &owner, other_destination, mint.pubkey());
+
+    let ix = initialize_ix(
+        &owner,
+        WORKFLOW_ID,
+        destination,
+        mint.pubkey(),
+        1_000_000,
+        10_000_000,
+        0,
+        0,
+        Some(keeper.pubkey()),
+    );
+    let res = send(&mut svm, &[ix], &owner, &[&owner]);
+    assert!(res.is_ok(), "initialize failed: {res:?}");
+    let vault = vault_pda(&owner.pubkey(), WORKFLOW_ID);
+    create_ata(&mut svm, &owner, vault, mint.pubkey());
+    let res = send(
+        &mut svm,
+        &[deposit_spl_ix(
+            &owner,
+            WORKFLOW_ID,
+            mint.pubkey(),
+            5_000_000,
+        )],
+        &owner,
+        &[&owner],
+    );
+    assert!(res.is_ok(), "deposit failed: {res:?}");
+    assert_eq!(token_amount(&svm, owner_ata), 5_000_000);
+
+    let res = send(
+        &mut svm,
+        &[execute_spl_ix(
+            &owner,
+            &owner.pubkey(),
+            WORKFLOW_ID,
+            mint.pubkey(),
+            destination,
+            100_000,
+        )],
+        &owner,
+        &[&owner],
+    );
+    assert!(res.is_err(), "wrong keeper should be rejected");
+
+    let res = send(
+        &mut svm,
+        &[execute_spl_ix(
+            &keeper,
+            &owner.pubkey(),
+            WORKFLOW_ID,
+            mint.pubkey(),
+            other_destination,
+            100_000,
+        )],
+        &keeper,
+        &[&keeper],
+    );
+    assert!(res.is_err(), "wrong destination should be rejected");
+
+    let res = send(
+        &mut svm,
+        &[set_paused_ix(&owner, WORKFLOW_ID, true)],
+        &owner,
+        &[&owner],
+    );
+    assert!(res.is_ok(), "pause failed: {res:?}");
+    let res = send(
+        &mut svm,
+        &[execute_spl_ix(
+            &keeper,
+            &owner.pubkey(),
+            WORKFLOW_ID,
+            mint.pubkey(),
+            destination,
+            100_000,
+        )],
+        &keeper,
+        &[&keeper],
+    );
+    assert!(res.is_err(), "paused policy should reject the SPL transfer");
+    assert_still_zero(&svm, &owner);
+
+    let res = send(
+        &mut svm,
+        &[set_paused_ix(&owner, WORKFLOW_ID, false)],
+        &owner,
+        &[&owner],
+    );
+    assert!(res.is_ok(), "unpause failed: {res:?}");
+    let res = send(
+        &mut svm,
+        &[execute_spl_ix(
+            &keeper,
+            &owner.pubkey(),
+            WORKFLOW_ID,
+            mint.pubkey(),
+            destination,
+            100_000,
+        )],
+        &keeper,
+        &[&keeper],
+    );
+    assert!(res.is_ok(), "keeper SPL transfer failed: {res:?}");
+    assert_eq!(
+        read_policy(&svm, policy_pda(&owner.pubkey(), WORKFLOW_ID)).total_spent,
+        100_000
+    );
+}
+
+#[test]
+fn updating_asset_resets_spend_counters() {
+    let (mut svm, owner) = new_svm();
+    let mint = create_spl_mint(&mut svm, &owner, 6);
+    let destination = Pubkey::new_unique();
+    setup_policy(
+        &mut svm,
+        &owner,
+        destination,
+        1_000_000,
+        10_000_000,
+        0,
+        0,
+        Some(owner.pubkey()),
+    );
+    let res = send(
+        &mut svm,
+        &[execute_ix(
+            &owner,
+            &owner.pubkey(),
+            WORKFLOW_ID,
+            destination,
+            500_000,
+        )],
+        &owner,
+        &[&owner],
+    );
+    assert!(res.is_ok(), "SOL transfer failed: {res:?}");
+    assert_eq!(
+        read_policy(&svm, policy_pda(&owner.pubkey(), WORKFLOW_ID)).total_spent,
+        500_000
+    );
+
+    let ix = update_ix(
+        &owner,
+        WORKFLOW_ID,
+        destination,
+        2_000_000,
+        4_000_000,
+        0,
+        0,
+        Some(owner.pubkey()),
+        mint.pubkey(),
+    );
+    let res = send(&mut svm, &[ix], &owner, &[&owner]);
+    assert!(res.is_ok(), "asset switch failed: {res:?}");
+    let policy = read_policy(&svm, policy_pda(&owner.pubkey(), WORKFLOW_ID));
+    assert_eq!(policy.asset_mint, mint.pubkey());
+    assert_eq!(policy.total_spent, 0);
+    assert_eq!(policy.last_execution_at, 0);
+    assert_eq!(policy.max_per_run, 2_000_000);
+    assert_eq!(policy.max_total, 4_000_000);
+}
+
+#[test]
+fn sol_instruction_rejects_spl_policy() {
+    let (mut svm, owner) = new_svm();
+    let mint = create_spl_mint(&mut svm, &owner, 6);
+    let destination = Pubkey::new_unique();
+    let ix = initialize_ix(
+        &owner,
+        WORKFLOW_ID,
+        destination,
+        mint.pubkey(),
+        1_000_000,
+        10_000_000,
+        0,
+        0,
+        Some(owner.pubkey()),
+    );
+    let res = send(&mut svm, &[ix], &owner, &[&owner]);
+    assert!(res.is_ok(), "initialize failed: {res:?}");
+
+    let res = send(
+        &mut svm,
+        &[execute_ix(
+            &owner,
+            &owner.pubkey(),
+            WORKFLOW_ID,
+            destination,
+            100_000,
+        )],
+        &owner,
+        &[&owner],
+    );
+    assert!(res.is_err(), "SOL instruction must reject an SPL policy");
+    assert_still_zero(&svm, &owner);
 }

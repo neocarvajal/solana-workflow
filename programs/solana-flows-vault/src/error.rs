@@ -38,7 +38,7 @@ pub enum VaultError {
     InsufficientVaultBalance,
     #[msg("The transfer would leave the vault below rent exemption")]
     RentExemptionViolation,
-    #[msg("This deployment only supports SOL policies (asset_mint must be default)")]
+    #[msg("This instruction is not available for the policy's asset_mint")]
     UnsupportedAssetMint,
     #[msg("The vault PDA is already initialized")]
     VaultAlreadyInitialized,
