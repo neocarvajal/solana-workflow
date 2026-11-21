@@ -1,3 +1,7 @@
+# Project
+
+- solana-workflow — https://github.com/neocarvajal/solana-workflow
+
 ## Commit messages
 
 - All Git commit messages for this project must be written in English only.
