@@ -196,6 +196,13 @@ export function subscribeExecutionMode(listener: ExecutionModeListener) {
 /* ── Stable workflow identifier ───────────────────────────── */
 const WORKFLOW_ID_KEY = "solflows_workflow_id";
 let currentWorkflowId: string | null = null;
+type WorkflowIdListener = (id: string) => void;
+const workflowIdListeners = new Set<WorkflowIdListener>();
+
+export function subscribeWorkflowId(listener: WorkflowIdListener): () => void {
+  workflowIdListeners.add(listener);
+  return () => workflowIdListeners.delete(listener);
+}
 
 export function getWorkflowId(): string {
   if (currentWorkflowId) return currentWorkflowId;
@@ -224,6 +231,7 @@ export function setWorkflowId(value: string | null | undefined) {
       localStorage.setItem(WORKFLOW_ID_KEY, currentWorkflowId);
     }
   } catch { }
+  workflowIdListeners.forEach((listener) => listener(currentWorkflowId!));
 }
 
 function withAutomationMeta(wf: Workflow): Workflow {

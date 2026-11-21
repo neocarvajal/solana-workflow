@@ -247,6 +247,16 @@ export async function fetchVaultSnapshot(
   return { ...addresses, policyData, balanceLamports, rentExemptionLamports };
 }
 
+/** True when an on-chain policy already exists for this workflow. */
+export async function isVaultConfigured(
+  owner: PublicKey,
+  workflowId: string,
+  connection: Connection = appConnection,
+): Promise<boolean> {
+  const snapshot = await fetchVaultSnapshot(owner, workflowId, connection);
+  return Boolean(snapshot.policyData);
+}
+
 async function sendVaultTransaction(
   wallet: VaultWallet,
   instructions: TransactionInstruction[],

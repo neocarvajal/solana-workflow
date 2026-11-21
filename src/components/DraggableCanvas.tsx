@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
 import NodeSettingsModal from "./NodeSettingsModal";
 import { Plus, Sparkles, Search, Zap, Wrench, X } from "lucide-react";
 import DraggableNode from "./DraggableNode";
@@ -10,12 +11,15 @@ import {
   subscribeRunningNode, subscribeAnimatingLine,
   subscribeErrorNode, getErrorNodeId, setErrorNodeId,
   getExecutionMode, subscribeExecutionMode,
+  getWorkflowId, subscribeWorkflowId,
 } from "@/lib/workflowStore";
 import { isFinancialExecutionMode } from "@/lib/schedule";
+import { isVaultConfigured } from "@/lib/vault";
 
 const NODE_RADIUS = 48;
 
 const DraggableCanvas: React.FC = () => {
+  const { publicKey } = useWallet();
   const [nodes, setNodes] = useState<FlowNode[]>(getFlowNodes());
   const [settingsNode, setSettingsNode] = useState<FlowNode | null>(null);
 
@@ -33,6 +37,7 @@ const DraggableCanvas: React.FC = () => {
   const [errorNodeId, setErrorNodeIdState] = useState<string | null>(getErrorNodeId());
   const [animatingLineIndex, setAnimatingLineIndex] = useState<number>(-1);
   const [executionMode, setExecutionMode] = useState(getExecutionMode);
+  const [vaultConfigured, setVaultConfigured] = useState<boolean | null>(null);
 
   /* Canvas pan, wheel zoom & pinch zoom */
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -66,6 +71,31 @@ const DraggableCanvas: React.FC = () => {
       unsubExecutionMode();
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const checkVault = async () => {
+      if (!publicKey) {
+        setVaultConfigured(null);
+        return;
+      }
+      try {
+        const configured = await isVaultConfigured(publicKey, getWorkflowId());
+        if (!cancelled) setVaultConfigured(configured);
+      } catch {
+        if (!cancelled) setVaultConfigured(null);
+      }
+    };
+    void checkVault();
+    const unsubWorkflowId = subscribeWorkflowId(() => void checkVault());
+    const onVaultUpdated = () => void checkVault();
+    window.addEventListener("vault-updated", onVaultUpdated);
+    return () => {
+      cancelled = true;
+      unsubWorkflowId();
+      window.removeEventListener("vault-updated", onVaultUpdated);
+    };
+  }, [publicKey]);
 
   useEffect(() => { offsetRef.current = offset; }, [offset]);
   useEffect(() => { scaleRef.current = scale; }, [scale]);
@@ -378,7 +408,8 @@ const DraggableCanvas: React.FC = () => {
 
   const vaultRequiredFor = (node: FlowNode) =>
     isFinancialExecutionMode(executionMode) &&
-    (node.module.type === "send_transaction" || node.module.type === "swap");
+    (node.module.type === "send_transaction" || node.module.type === "swap") &&
+    vaultConfigured === false;
 
   return (
     <div className="relative h-full min-h-0 min-w-0 flex-1 overflow-hidden">

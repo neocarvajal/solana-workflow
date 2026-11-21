@@ -146,7 +146,7 @@ const DraggableNode: React.FC<Props> = ({
 
           {vaultRequired && (
             <div
-              className="absolute -left-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border border-amber-300/60 bg-amber-400/20 text-amber-300 shadow"
+              className="absolute -left-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-amber-500 text-amber-950 shadow-lg"
               title="Configura la bóveda y sus límites antes de activar la ejecución on-chain"
               aria-label="Requiere configurar la bóveda"
             >

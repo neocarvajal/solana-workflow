@@ -134,6 +134,7 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
         const settings = getSettings();
         setDestination((prev) => prev || settings.recipientWallet || publicKey.toBase58());
       }
+      window.dispatchEvent(new Event("vault-updated"));
     } catch (e) {
       setSnapshot(null);
       setError(e instanceof Error ? e.message : "No se pudo leer la bóveda");
