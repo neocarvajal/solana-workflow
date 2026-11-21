@@ -280,6 +280,55 @@ export async function isVaultConfigured(
   return Boolean(snapshot.policyData);
 }
 
+/**
+ * Waits for a signature using HTTP signature statuses only.
+ *
+ * Wallet adapters such as Phantom broadcast through their own RPC and may use a
+ * fresher blockhash than the one attached here. `connection.confirmTransaction`
+ * with a blockhash strategy then throws `TransactionExpiredBlockheightExceededError`
+ * (or its devnet WebSocket subscription drops) even though the transaction
+ * already landed. Polling `getSignatureStatuses` avoids both false failures.
+ */
+async function confirmVaultSignature(
+  connection: Connection,
+  signature: string,
+): Promise<void> {
+  const POLL_INTERVAL_MS = 1_000;
+  const TIMEOUT_MS = 60_000;
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < TIMEOUT_MS) {
+    const { value } = await connection.getSignatureStatuses([signature], {
+      searchTransactionHistory: true,
+    });
+    const status = value[0];
+    if (status) {
+      if (status.err) {
+        throw new Error(
+          `La transacción falló en la red: ${JSON.stringify(status.err)}`,
+        );
+      }
+      if (
+        status.confirmationStatus === "confirmed" ||
+        status.confirmationStatus === "finalized"
+      ) {
+        return;
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  }
+
+  // The signature may be known without an explicit commitment level. If there
+  // is no error the transaction landed, so do not report a false failure.
+  const { value } = await connection.getSignatureStatuses([signature], {
+    searchTransactionHistory: true,
+  });
+  if (value[0] && !value[0].err) return;
+  throw new Error(
+    "La transacción fue enviada pero no se pudo confirmar a tiempo. Revisa el explorer antes de reintentar.",
+  );
+}
+
 async function sendVaultTransaction(
   wallet: VaultWallet,
   instructions: TransactionInstruction[],
@@ -288,18 +337,14 @@ async function sendVaultTransaction(
   if (!wallet.publicKey) throw new Error("Conecta tu wallet para firmar");
   const transaction = new Transaction().add(...instructions);
   transaction.feePayer = wallet.publicKey;
-  const { blockhash, lastValidBlockHeight } =
-    await connection.getLatestBlockhash("confirmed");
+  const { blockhash } = await connection.getLatestBlockhash("confirmed");
   transaction.recentBlockhash = blockhash;
 
   const signature = await wallet.sendTransaction(transaction, connection, {
     skipPreflight: false,
     preflightCommitment: "confirmed",
   });
-  await connection.confirmTransaction(
-    { signature, blockhash, lastValidBlockHeight },
-    "confirmed",
-  );
+  await confirmVaultSignature(connection, signature);
   return signature;
 }
 
