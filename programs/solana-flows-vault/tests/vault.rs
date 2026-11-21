@@ -1074,6 +1074,63 @@ fn update_rejects_missing_keeper() {
 }
 
 #[test]
+fn update_resets_spending_when_switching_asset() {
+    let (mut svm, owner) = new_svm();
+    let destination = Pubkey::new_unique();
+    let policy_key = policy_pda(&owner.pubkey(), WORKFLOW_ID);
+    setup_policy(
+        &mut svm,
+        &owner,
+        destination,
+        1_000_000,
+        3_000_000,
+        0,
+        0,
+        Some(owner.pubkey()),
+    );
+
+    let res = send(
+        &mut svm,
+        &[execute_ix(
+            &owner,
+            &owner.pubkey(),
+            WORKFLOW_ID,
+            destination,
+            500_000,
+        )],
+        &owner,
+        &[&owner],
+    );
+    assert!(res.is_ok(), "transfer before asset switch failed: {res:?}");
+    assert_eq!(read_policy(&svm, policy_key).total_spent, 500_000);
+
+    let mint = create_spl_mint(&mut svm, &owner, 6);
+    let ix = update_ix(
+        &owner,
+        WORKFLOW_ID,
+        destination,
+        100_000,
+        1_000_000,
+        0,
+        0,
+        Some(owner.pubkey()),
+        mint.pubkey(),
+    );
+    let res = send(&mut svm, &[ix], &owner, &[&owner]);
+    assert!(
+        res.is_ok(),
+        "switching to a new asset should reset the old counters: {res:?}"
+    );
+
+    let policy = read_policy(&svm, policy_key);
+    assert_eq!(policy.asset_mint, mint.pubkey());
+    assert_eq!(policy.max_per_run, 100_000);
+    assert_eq!(policy.max_total, 1_000_000);
+    assert_eq!(policy.total_spent, 0);
+    assert_eq!(policy.last_execution_at, 0);
+}
+
+#[test]
 fn spl_deposit_execute_and_withdraw() {
     let (mut svm, owner) = new_svm();
     let mint = create_spl_mint(&mut svm, &owner, 6);

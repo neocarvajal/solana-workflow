@@ -34,8 +34,13 @@ pub fn handle_update_policy(
     );
     require!(max_per_run > 0, VaultError::InvalidMaxPerRun);
     require!(keeper.is_some(), VaultError::KeeperRequired);
+
+    // Spending counters are denominated in the old asset's smallest unit. When
+    // switching assets they are reset below, so they must not constrain the new
+    // limits; otherwise SOL lamports would be compared against USDC base units.
+    let switching_asset = ctx.accounts.policy.asset_mint != asset_mint;
     require!(
-        max_total >= ctx.accounts.policy.total_spent,
+        switching_asset || max_total >= ctx.accounts.policy.total_spent,
         VaultError::InvalidMaxTotal
     );
     require!(max_total >= max_per_run, VaultError::InvalidMaxTotal);
@@ -68,7 +73,7 @@ pub fn handle_update_policy(
     // Switching assets changes the unit of every limit, so the spending
     // counters start over. Keeping them would silently mix lamports and token
     // base units under the same caps.
-    if policy.asset_mint != asset_mint {
+    if switching_asset {
         policy.asset_mint = asset_mint;
         policy.total_spent = 0;
         policy.last_execution_at = 0;
