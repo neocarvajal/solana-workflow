@@ -307,6 +307,7 @@ export async function initializeVaultPolicy(args: {
   const connection = args.connection || appConnection;
   const destination = new PublicKey(args.destination);
   const keeper = args.keeper?.trim() ? new PublicKey(args.keeper.trim()) : null;
+  if (!keeper) throw new Error("La política requiere un ejecutor autorizado");
   const addresses = await getVaultAddresses(args.owner, args.workflowId);
   if (destination.equals(addresses.vault)) {
     throw new Error("El destino no puede ser la propia bóveda");
@@ -345,6 +346,7 @@ export async function updateVaultPolicy(args: {
   const connection = args.connection || appConnection;
   const destination = new PublicKey(args.destination);
   const keeper = args.keeper?.trim() ? new PublicKey(args.keeper.trim()) : null;
+  if (!keeper) throw new Error("La política requiere un ejecutor autorizado");
   const { policy, vault } = await getVaultAddresses(args.owner, args.workflowId);
   if (destination.equals(vault)) {
     throw new Error("El destino no puede ser la propia bóveda");

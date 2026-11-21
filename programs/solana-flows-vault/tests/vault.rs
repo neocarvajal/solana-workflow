@@ -75,7 +75,7 @@ fn initialize_accepts_prefunded_vault_pda() {
         10_000_000,
         0,
         0,
-        None,
+        Some(owner.pubkey()),
     );
     let res = send(&mut svm, &[ix], &owner, &[&owner]);
     assert!(res.is_ok(), "initialize failed: {res:?}");
@@ -101,7 +101,7 @@ fn initialize_rejects_hash_mismatch() {
         10_000_000,
         0,
         0,
-        None,
+        Some(owner.pubkey()),
     );
     let res = send(&mut svm, &[ix], &owner, &[&owner]);
     assert!(res.is_err(), "mismatched hash should be rejected");
@@ -122,7 +122,7 @@ fn enforces_expiry() {
         10_000_000,
         0,
         START_TS + 60,
-        None,
+        Some(owner.pubkey()),
     );
 
     let execute = |svm: &mut LiteSVM| {
@@ -392,7 +392,7 @@ fn initializes_and_deposits() {
         10_000_000,
         0,
         0,
-        None,
+        Some(owner.pubkey()),
     );
     let res = send(&mut svm, &[ix], &owner, &[&owner]);
     assert!(res.is_ok(), "initialize failed: {res:?}");
@@ -409,7 +409,7 @@ fn initializes_and_deposits() {
     assert_eq!(policy.total_spent, 0);
     assert_eq!(policy.last_execution_at, 0);
     assert!(!policy.paused);
-    assert_eq!(policy.keeper, None);
+    assert_eq!(policy.keeper, Some(owner.pubkey()));
     assert_eq!(lamports(&svm, &vault_key), rent);
 
     let owner_before = lamports(&svm, &owner.pubkey());
@@ -435,7 +435,7 @@ fn enforces_per_run_and_lifetime_caps() {
         1_500_000,
         0,
         0,
-        None,
+        Some(owner.pubkey()),
     );
 
     let res = send(
@@ -524,7 +524,16 @@ fn enforces_interval_and_pause() {
     let (mut svm, owner) = new_svm();
     let destination = Pubkey::new_unique();
     let policy_key = policy_pda(&owner.pubkey(), WORKFLOW_ID);
-    setup_policy(&mut svm, &owner, destination, 1_000_000, 10_000_000, 3_600, 0, None);
+    setup_policy(
+        &mut svm,
+        &owner,
+        destination,
+        1_000_000,
+        10_000_000,
+        3_600,
+        0,
+        Some(owner.pubkey()),
+    );
 
     let execute = |svm: &mut LiteSVM, amount: u64| {
         send(
@@ -641,7 +650,16 @@ fn withdraw_preserves_rent_and_requires_owner() {
     let (mut svm, owner) = new_svm();
     let destination = Pubkey::new_unique();
     let vault_key = vault_pda(&owner.pubkey(), WORKFLOW_ID);
-    setup_policy(&mut svm, &owner, destination, 1_000_000, 10_000_000, 0, 0, None);
+    setup_policy(
+        &mut svm,
+        &owner,
+        destination,
+        1_000_000,
+        10_000_000,
+        0,
+        0,
+        Some(owner.pubkey()),
+    );
     let rent = svm.get_sysvar::<Rent>().minimum_balance(0);
     let vault_before = lamports(&svm, &vault_key);
     assert_eq!(vault_before, rent + DEPOSIT);
@@ -693,7 +711,7 @@ fn initialize_rejects_invalid_policies() {
             *max_total,
             *interval,
             *expires,
-            None,
+            Some(owner.pubkey()),
         );
         let res = send(&mut svm, &[ix], &owner, &[&owner]);
         assert!(res.is_err(), "{workflow_id} should be rejected");
@@ -712,7 +730,7 @@ fn initialize_rejects_invalid_policies() {
         10_000_000,
         0,
         0,
-        None,
+        Some(owner.pubkey()),
     );
     let res = send(&mut svm, &[ix], &owner, &[&owner]);
     assert!(res.is_err(), "vault as destination should be rejected");
@@ -728,7 +746,7 @@ fn initialize_rejects_invalid_policies() {
             10_000_000,
             0,
             0,
-            None,
+            Some(owner.pubkey()),
         );
         let res = send(&mut svm, &[ix], &owner, &[&owner]);
         assert!(res.is_err(), "invalid workflow id should be rejected");
@@ -740,7 +758,16 @@ fn update_policy_is_owner_only_and_keeps_caps_consistent() {
     let (mut svm, owner) = new_svm();
     let destination = Pubkey::new_unique();
     let policy_key = policy_pda(&owner.pubkey(), WORKFLOW_ID);
-    setup_policy(&mut svm, &owner, destination, 1_000_000, 3_000_000, 0, 0, None);
+    setup_policy(
+        &mut svm,
+        &owner,
+        destination,
+        1_000_000,
+        3_000_000,
+        0,
+        0,
+        Some(owner.pubkey()),
+    );
 
     let res = send(
         &mut svm,
@@ -789,7 +816,7 @@ fn update_policy_is_owner_only_and_keeps_caps_consistent() {
         5_000_000,
         60,
         0,
-        None,
+        Some(owner.pubkey()),
     );
     let res = send(&mut svm, &[ix], &stranger, &[&stranger]);
     assert!(res.is_err(), "non-owner update should fail");
@@ -802,7 +829,7 @@ fn update_policy_is_owner_only_and_keeps_caps_consistent() {
         400_000,
         60,
         0,
-        None,
+        Some(owner.pubkey()),
     );
     let res = send(&mut svm, &[ix], &owner, &[&owner]);
     assert!(res.is_err(), "max_total below total_spent should fail");
@@ -815,8 +842,61 @@ fn update_policy_is_owner_only_and_keeps_caps_consistent() {
         5_000_000,
         60,
         0,
-        None,
+        Some(owner.pubkey()),
     );
     let res = send(&mut svm, &[ix], &owner, &[&owner]);
     assert!(res.is_err(), "vault as destination should fail");
+}
+
+#[test]
+fn initialize_rejects_missing_keeper() {
+    let (mut svm, owner) = new_svm();
+    let workflow_id = "wf-no-keeper";
+    let ix = initialize_ix(
+        &owner,
+        workflow_id,
+        Pubkey::new_unique(),
+        Pubkey::default(),
+        1_000_000,
+        10_000_000,
+        0,
+        0,
+        None,
+    );
+    let res = send(&mut svm, &[ix], &owner, &[&owner]);
+    assert!(res.is_err(), "missing keeper should be rejected");
+    assert!(svm
+        .get_account(&policy_pda(&owner.pubkey(), workflow_id))
+        .is_none());
+}
+
+#[test]
+fn update_rejects_missing_keeper() {
+    let (mut svm, owner) = new_svm();
+    let destination = Pubkey::new_unique();
+    let policy_key = policy_pda(&owner.pubkey(), WORKFLOW_ID);
+    setup_policy(
+        &mut svm,
+        &owner,
+        destination,
+        1_000_000,
+        10_000_000,
+        0,
+        0,
+        Some(owner.pubkey()),
+    );
+
+    let ix = update_ix(
+        &owner,
+        WORKFLOW_ID,
+        destination,
+        1_000_000,
+        10_000_000,
+        0,
+        0,
+        None,
+    );
+    let res = send(&mut svm, &[ix], &owner, &[&owner]);
+    assert!(res.is_err(), "removing the keeper should be rejected");
+    assert_eq!(read_policy(&svm, policy_key).keeper, Some(owner.pubkey()));
 }

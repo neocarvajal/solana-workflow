@@ -61,6 +61,7 @@ pub fn handle_initialize_policy(
     );
     require!(max_per_run > 0, VaultError::InvalidMaxPerRun);
     require!(max_total >= max_per_run, VaultError::InvalidMaxTotal);
+    require!(keeper.is_some(), VaultError::KeeperRequired);
     require!(
         min_interval_seconds >= 0,
         VaultError::InvalidInterval

@@ -44,6 +44,7 @@ import {
 import { executionModeLabel } from "@/lib/schedule";
 import { explorerAddrUrl, shortAddr, solscanUrl, SOLANA_CLUSTER } from "@/lib/solana";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 function formatTimestamp(seconds: bigint): string {
   if (!seconds || Number(seconds) <= 0) return "Nunca";
@@ -89,6 +90,8 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
   const [intervalMinutes, setIntervalMinutes] = useState("15");
   const [expiry, setExpiry] = useState("");
   const [keeper, setKeeper] = useState("");
+  const [keeperPubkey, setKeeperPubkey] = useState<string | null>(null);
+  const [keeperError, setKeeperError] = useState<string | null>(null);
   const [authorized, setAuthorized] = useState(false);
   const [depositAmount, setDepositAmount] = useState("0.005");
   const [executionMode, setExecutionMode] = useState(getExecutionMode);
@@ -117,7 +120,6 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
         setExpiry(
           Number(current.expiresAt) > 0 ? toDatetimeLocal(current.expiresAt) : "",
         );
-        setKeeper(current.keeper || "");
       } else {
         const settings = getSettings();
         setDestination((prev) => prev || settings.recipientWallet || publicKey.toBase58());
@@ -141,6 +143,30 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
     if (!open) return;
     void refresh();
   }, [open, refresh]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadKeeper = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("vault-config");
+        if (error) throw error;
+        if (!data?.keeper) throw new Error("La aplicación no devolvió un ejecutor");
+        if (cancelled) return;
+        setKeeperPubkey(String(data.keeper));
+        setKeeperError(null);
+      } catch (e) {
+        if (cancelled) return;
+        setKeeperPubkey(null);
+        setKeeperError(
+          e instanceof Error ? e.message : "No se pudo cargar el ejecutor",
+        );
+      }
+    };
+    void loadKeeper();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const openVault = () => setOpen(true);
@@ -173,13 +199,17 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
       }
     }
 
-    let keeperKey: PublicKey | null = null;
-    if (keeper.trim()) {
-      try {
-        keeperKey = new PublicKey(keeper.trim());
-      } catch {
-        throw new Error("El keeper no es una dirección Solana válida");
-      }
+    let keeperKey: PublicKey;
+    const keeperValue = keeper.trim() || keeperPubkey;
+    if (!keeperValue) {
+      throw new Error(
+        keeperError || "No se pudo cargar el ejecutor automático. Intenta de nuevo.",
+      );
+    }
+    try {
+      keeperKey = new PublicKey(keeperValue);
+    } catch {
+      throw new Error("El ejecutor no es una dirección Solana válida");
     }
 
     const maxPerRunLamports = solToLamports(maxPerRun);
@@ -206,7 +236,7 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
       maxTotalLamports,
       minIntervalSeconds: Math.round(Number(intervalMinutes) * 60),
       expiresAt,
-      keeper: keeperKey?.toBase58() || null,
+      keeper: keeperKey.toBase58(),
     };
   };
 
@@ -384,9 +414,10 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
               <span>
                 La bóveda solo puede enviar al destino fijo y dentro de los límites que
-                autorices. El crank no recibe tu llave. En esta fase la ejecución
-                automática de fondos sigue desactivada hasta completar la auditoría;
-                esta configuración es de devnet.
+                autorices. Solo el ejecutor autorizado por la aplicación puede dispararla
+                y nunca recibe tu llave. En esta fase la ejecución automática de fondos
+                sigue desactivada hasta completar la auditoría; esta configuración es de
+                devnet.
               </span>
             </p>
           </div>
@@ -460,9 +491,9 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-muted-foreground">Keeper</dt>
-                      <dd className="truncate font-mono" title={policy.keeper || "Permissionless"}>
-                        {policy.keeper ? shortAddr(policy.keeper, 6) : "Permissionless"}
+                      <dt className="text-muted-foreground">Ejecutor</dt>
+                      <dd className="truncate font-mono" title={policy.keeper || ""}>
+                        {policy.keeper ? `App · ${shortAddr(policy.keeper, 6)}` : "No configurado"}
                       </dd>
                     </div>
                     <div>
@@ -654,20 +685,45 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
                       className={fieldClass()}
                     />
                   </div>
-                  <div className="sm:col-span-2">
-                    <label className="mb-1.5 block text-xs font-medium text-muted-foreground" htmlFor="vault-keeper">
-                      Keeper (opcional)
-                    </label>
-                    <input
-                      id="vault-keeper"
-                      type="text"
-                      value={keeper}
-                      onChange={(event) => setKeeper(event.target.value)}
-                      className={fieldClass("font-mono text-xs sm:text-xs")}
-                      placeholder="Vacío = cualquier crank"
-                      spellCheck={false}
-                      autoComplete="off"
-                    />
+                  <div className="sm:col-span-2 rounded-xl border border-border/50 bg-muted/20 p-3">
+                    <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                      Ejecutor gestionado por la aplicación
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Solo el ejecutor autorizado por la aplicación puede mover fondos. No
+                      necesitas crear claves ni configurar direcciones técnicas.
+                    </p>
+                    <p className="mt-1 break-all font-mono text-[11px] text-foreground/80">
+                      {keeperPubkey || (keeperError ? "No disponible" : "Cargando…")}
+                    </p>
+                    {keeperError && (
+                      <p className="mt-1 text-[11px] text-amber-300">
+                        {keeperError}. Se requiere para crear o actualizar la bóveda.
+                      </p>
+                    )}
+                    {policy && keeperPubkey && policy.keeper !== keeperPubkey && (
+                      <p className="mt-1 text-[11px] text-amber-300">
+                        Esta política usa otro ejecutor. Marca la autorización y guarda
+                        para alinearla con la aplicación.
+                      </p>
+                    )}
+                    <details className="mt-2 text-[11px] text-muted-foreground">
+                      <summary className="cursor-pointer select-none">Opciones avanzadas</summary>
+                      <label className="mt-2 block" htmlFor="vault-keeper">
+                        Sobrescribir ejecutor (no recomendado)
+                      </label>
+                      <input
+                        id="vault-keeper"
+                        type="text"
+                        value={keeper}
+                        onChange={(event) => setKeeper(event.target.value)}
+                        className={fieldClass("mt-1 font-mono text-xs")}
+                        placeholder={keeperPubkey || "Dirección del ejecutor"}
+                        spellCheck={false}
+                        autoComplete="off"
+                      />
+                    </details>
                   </div>
                 </div>
 
@@ -679,9 +735,9 @@ const VaultPanel: React.FC<{ hideTrigger?: boolean }> = ({ hideTrigger = false }
                     className="mt-0.5 h-4 w-4 shrink-0 rounded border-border"
                   />
                   <span>
-                    Autorizo explícitamente que el crank del workflow pueda mover fondos
-                    desde esta bóveda, únicamente al destino y dentro de estos límites
-                    on-chain.
+                    Autorizo explícitamente que el ejecutor autorizado por la aplicación
+                    pueda mover fondos desde esta bóveda, únicamente al destino y dentro
+                    de estos límites on-chain.
                   </span>
                 </label>
 

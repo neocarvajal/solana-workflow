@@ -30,7 +30,8 @@ pub struct VaultPolicy {
     pub expires_at: i64,
     /// User kill switch. Pausing blocks automated execution immediately.
     pub paused: bool,
-    /// Optional allowlisted crank. None means any signer may crank.
+    /// Required crank allowed to execute automated transfers.
+    /// Kept as Option to preserve the account layout of deployed policies.
     pub keeper: Option<Pubkey>,
     /// Bump for the SOL vault PDA.
     pub vault_bump: u8,

@@ -14,9 +14,11 @@ unsupported path.
 ## Custody model
 
 One vault per workflow. The user's wallet is the only authority that can change
-the policy, pause the vault, or withdraw. A permissionless crank may execute a
-transfer only if every on-chain policy check passes. The crank never receives a
-user private key and cannot redirect funds.
+the policy, pause the vault, or withdraw. The crank is allowlisted in the policy
+and may execute a transfer only if every on-chain policy check passes. A policy
+without a keeper is rejected, so automated execution can never be opened to
+arbitrary signers. The crank never receives a user private key and cannot
+redirect funds.
 
 ## PDAs
 
@@ -48,12 +50,12 @@ workflow cannot drain another.
 | `last_execution_at` | `i64` | Unix seconds. |
 | `expires_at` | `i64` | `0` means no expiry. |
 | `paused` | `bool` | User kill switch. |
-| `keeper` | `Option<Pubkey>` | Optional allowlisted crank. `None` means permissionless. |
+| `keeper` | `Option<Pubkey>` | Required allowlisted crank. Stored as `Option` only to keep the account layout stable; `None` is rejected. |
 
 ## Instructions
 
 - `initialize_policy(workflow_id, workflow_hash, destination, asset_mint, max_per_run, max_total, min_interval_seconds, expires_at, keeper)` — owner signs; creates the policy PDA and the rent-exempt vault PDA. A pre-funded vault PDA is accepted when it is system-owned and empty.
-- `update_policy(...)` — owner only. Tightening is immediate; any increase requires a new user signature. `total_spent` cannot be reset and `max_total` cannot be lowered below it.
+- `update_policy(...)` — owner only. Tightening is immediate; any increase requires a new user signature. `total_spent` cannot be reset, `max_total` cannot be lowered below it, and the keeper cannot be cleared.
 - `set_paused(bool)` — owner only. Pausing blocks all automated execution.
 - `deposit_sol(amount)` — owner signs a system transfer into the vault PDA.
 - `withdraw_sol(amount)` — owner only; transfers from the vault PDA back to the owner. Must preserve rent exemption.
@@ -90,10 +92,10 @@ anchor build
 cargo test -p solana-flows-vault --test vault
 ```
 
-Ten LiteSVM tests cover creation, deposits, per-run and lifetime caps, interval,
-expiry, pause, keeper allowlisting, destination pinning, owner-only withdrawal,
-rent preservation, pre-funded vaults, invalid policy parameters, hash mismatch,
-and owner-only policy updates.
+Twelve LiteSVM tests cover creation, deposits, per-run and lifetime caps,
+interval, expiry, pause, keeper allowlisting, destination pinning, owner-only
+withdrawal, rent preservation, pre-funded vaults, invalid policy parameters,
+hash mismatch, owner-only policy updates, and rejection of missing keepers.
 
 ## Invariants tested
 
@@ -105,7 +107,8 @@ and owner-only policy updates.
 4. A failed CPI does not increment `total_spent` or `last_execution_at`.
 5. SOL withdrawals cannot leave the vault below rent exemption.
 6. Automated transfers also preserve rent exemption.
-7. Revoking the keeper or pausing takes effect immediately.
+7. Changing the keeper or pausing takes effect immediately; clearing the keeper
+   is rejected by both `initialize_policy` and `update_policy`.
 8. The crank cannot use remaining accounts to substitute the destination, vault,
    or program.
 9. A mismatched `workflow_hash` cannot create a policy.

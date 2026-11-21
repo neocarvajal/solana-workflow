@@ -72,6 +72,7 @@ async function send(label, ixs, signers) {
 }
 
 const owner = Keypair.generate();
+const keeper = Keypair.generate();
 const destination = Keypair.generate().publicKey;
 const funder = loadWallet();
 const workflowId = `devnet-smoke-${Date.now()}`;
@@ -84,6 +85,7 @@ console.log({
   rpc: RPC,
   workflowId,
   owner: owner.publicKey.toBase58(),
+  keeper: keeper.publicKey.toBase58(),
   destination: destination.toBase58(),
   policy: policy.toBase58(),
   vault: vault.toBase58(),
@@ -97,6 +99,11 @@ await send(
       fromPubkey: funder.publicKey,
       toPubkey: owner.publicKey,
       lamports: 50_000_000,
+    }),
+    SystemProgram.transfer({
+      fromPubkey: funder.publicKey,
+      toPubkey: keeper.publicKey,
+      lamports: 20_000_000,
     }),
   ],
   [funder],
@@ -113,7 +120,7 @@ const initData = Buffer.concat([
   u64(2_000_000),
   i64(0),
   i64(0),
-  optionPubkey(null),
+  optionPubkey(keeper.publicKey),
 ]);
 await send(
   "initialize_policy",
@@ -165,13 +172,13 @@ await send(
         { pubkey: policy, isSigner: false, isWritable: true },
         { pubkey: vault, isSigner: false, isWritable: true },
         { pubkey: destination, isSigner: false, isWritable: true },
-        { pubkey: owner.publicKey, isSigner: true, isWritable: false },
+        { pubkey: keeper.publicKey, isSigner: true, isWritable: false },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
       data: Buffer.concat([disc("execute_transfer_sol"), u64(1_000_000)]),
     }),
   ],
-  [owner],
+  [keeper],
 );
 
 const destinationBalance = await connection.getBalance(destination);
@@ -202,15 +209,15 @@ const blockedTx = new Transaction().add(
       { pubkey: policy, isSigner: false, isWritable: true },
       { pubkey: vault, isSigner: false, isWritable: true },
       { pubkey: destination, isSigner: false, isWritable: true },
-      { pubkey: owner.publicKey, isSigner: true, isWritable: false },
+      { pubkey: keeper.publicKey, isSigner: true, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data: Buffer.concat([disc("execute_transfer_sol"), u64(100_000)]),
   }),
 );
-blockedTx.feePayer = owner.publicKey;
+blockedTx.feePayer = keeper.publicKey;
 blockedTx.recentBlockhash = (await connection.getLatestBlockhash("confirmed")).blockhash;
-blockedTx.sign(owner);
+blockedTx.sign(keeper);
 const blocked = await connection.simulateTransaction(blockedTx);
 if (!blocked.value.err) throw new Error("paused policy did not block execution");
 console.log("✅ paused policy blocked execution", blocked.value.err);

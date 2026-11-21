@@ -18,6 +18,11 @@ policy, and signs `execute_transfer_sol` with the configured crank. The program
 rechecks every limit, so a compromised dispatcher still cannot exceed the
 user's policy.
 
+The public `vault-config` function exposes only the crank's public address and
+the execution flag. The vault panel uses it to pin the `keeper` automatically,
+so users never handle a keypair and no policy can be created without an
+allowlisted executor.
+
 ## Required secrets
 
 Set these as Supabase Edge Function secrets:
@@ -31,7 +36,9 @@ Set these as Supabase Edge Function secrets:
 - `VAULT_EXECUTION_ENABLED` — must be exactly `true` to allow
   `execute-vault` to sign. Keep it `false` until the vault is audited.
 - `VAULT_CRANK_SECRET_KEY` — funded devnet keypair (base58 or JSON byte array)
-  used only as the permissionless crank. It never controls a user vault.
+  used only as the allowlisted crank. Its public address is returned by the
+  public `vault-config` function so the dapp can pin it into every policy. The
+  private key never leaves the function environment.
 - `SOLANA_RPC_URL` — devnet RPC used by `execute-vault`.
 - `VAULT_PROGRAM_ID` — defaults to
   `dB4W6X19PphXLpSPZfe6ZjQkpBHpfHFDDeUddEGdqQA`.

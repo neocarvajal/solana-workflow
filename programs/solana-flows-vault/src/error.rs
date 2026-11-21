@@ -12,6 +12,8 @@ pub enum VaultError {
     InvalidMaxPerRun,
     #[msg("max_total must cover max_per_run and the amount already spent")]
     InvalidMaxTotal,
+    #[msg("A keeper is required for automated execution")]
+    KeeperRequired,
     #[msg("min_interval_seconds cannot be negative")]
     InvalidInterval,
     #[msg("expires_at must be zero or in the future")]

@@ -32,6 +32,7 @@ pub fn handle_update_policy(
         VaultError::InvalidDestination
     );
     require!(max_per_run > 0, VaultError::InvalidMaxPerRun);
+    require!(keeper.is_some(), VaultError::KeeperRequired);
     require!(
         max_total >= ctx.accounts.policy.total_spent,
         VaultError::InvalidMaxTotal
