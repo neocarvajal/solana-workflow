@@ -56,6 +56,17 @@ type EmailProviderStatus = {
   updated_at?: string;
 };
 
+type TelegramConfig = {
+  bot_token: string;
+  chat_id: string;
+};
+
+type TelegramStatus = {
+  chat_id: string;
+  configured: boolean;
+  updated_at?: string;
+};
+
 function emailProviderId(value: unknown): string {
   const id = text(value).toLowerCase();
   return EMAIL_PROVIDER_IDS.has(id) ? id : "resend";
@@ -129,6 +140,52 @@ async function readEmailStatus(
     return (data as EmailProviderStatus[] | null)?.[0] ?? null;
   } catch (error) {
     console.error("alert provider status:", error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
+async function readTelegramConfig(
+  ownerWallet: string,
+  nodeId: string,
+): Promise<TelegramConfig | null> {
+  if (!ownerWallet || !nodeId) return null;
+  const sb = supabaseAdmin();
+  if (!sb) return null;
+  try {
+    const { data, error } = await sb.rpc("get_alert_telegram_config", {
+      p_owner_wallet: ownerWallet,
+      p_node_id: nodeId,
+    });
+    if (error) {
+      console.error("telegram config:", error.message);
+      return null;
+    }
+    return (data as TelegramConfig[] | null)?.[0] ?? null;
+  } catch (error) {
+    console.error("telegram config:", error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
+async function readTelegramStatus(
+  ownerWallet: string,
+  nodeId: string,
+): Promise<TelegramStatus | null> {
+  if (!ownerWallet || !nodeId) return null;
+  const sb = supabaseAdmin();
+  if (!sb) return null;
+  try {
+    const { data, error } = await sb.rpc("get_alert_telegram_status", {
+      p_owner_wallet: ownerWallet,
+      p_node_id: nodeId,
+    });
+    if (error) {
+      console.error("telegram status:", error.message);
+      return null;
+    }
+    return (data as TelegramStatus[] | null)?.[0] ?? null;
+  } catch (error) {
+    console.error("telegram status:", error instanceof Error ? error.message : error);
     return null;
   }
 }
@@ -307,13 +364,14 @@ async function sendTelegram(
   body: string,
   fetchImpl: typeof fetch,
 ): Promise<AlertResult> {
-  const token = env("TELEGRAM_BOT_TOKEN");
-  const chatId = text(payload.chatId) || env("TELEGRAM_CHAT_ID");
+  const saved = await readTelegramConfig(text(payload.ownerWallet), text(payload.nodeId));
+  const token = text(saved?.bot_token);
+  const chatId = text(saved?.chat_id) || text(payload.chatId);
 
   if (!token) {
     return fail(
       "telegram",
-      "Falta configurar Telegram en el servidor.",
+      "Configura el bot de Telegram en este nodo antes de enviar alertas.",
       503,
       "telegram",
     );
@@ -321,7 +379,7 @@ async function sendTelegram(
   if (!chatId) {
     return fail(
       "telegram",
-      "Falta el Chat ID de Telegram. Configúralo en el nodo.",
+      "Falta el Chat ID de Telegram. Configúralo en este nodo.",
       400,
       "telegram",
     );
@@ -706,9 +764,17 @@ export async function alertChannelHealth(ownerWallet?: string, nodeId?: string) 
     status?.configured && EMAIL_RE.test(savedFrom.email),
   );
 
+  const telegramStatus = ownerWallet && nodeId
+    ? await readTelegramStatus(ownerWallet, nodeId)
+    : null;
+  const telegramReady = Boolean(
+    telegramStatus?.configured && text(telegramStatus?.chat_id),
+  );
+
   return {
     app: true,
-    telegram: Boolean(env("TELEGRAM_BOT_TOKEN")),
+    telegram: telegramReady,
+    telegramConfiguredInApp: Boolean(telegramStatus?.configured),
     discord: Boolean(env("DISCORD_WEBHOOK_URL")),
     email: savedReady,
     emailProvider: status ? emailProviderId(status.provider) : null,

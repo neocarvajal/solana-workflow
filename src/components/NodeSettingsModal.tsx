@@ -41,6 +41,12 @@ type ProviderStatus = {
   updatedAt: string | null;
 };
 
+type TelegramStatus = {
+  chatId: string;
+  configured: boolean;
+  updatedAt: string | null;
+};
+
 const MODULE_FIELDS: Record<string, FieldDef[]> = {
   /* ── Triggers ──────────────────────────── */
   price_monitor: [
@@ -186,12 +192,6 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
       description: "Debe ser válido. Configura el destinatario en este nodo.",
     },
     {
-      key: "chatId", label: "Telegram Chat ID", type: "text",
-      showWhen: { key: "channel", equals: "telegram" },
-      placeholder: "123456789",
-      description: "Configura el Chat ID en este nodo.",
-    },
-    {
       key: "webhookUrl", label: "Discord Webhook URL", type: "text",
       showWhen: { key: "channel", equals: "discord" },
       placeholder: "https://discord.com/api/webhooks/…",
@@ -299,6 +299,9 @@ const NodeSettingsModal: React.FC<{
   const [emailFrom, setEmailFrom] = useState("");
   const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
   const [savingProvider, setSavingProvider] = useState(false);
+  const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null);
+  const [telegramToken, setTelegramToken] = useState("");
+  const [savingTelegram, setSavingTelegram] = useState(false);
 
   const nodeId = String(params.nodeKey || "").trim();
   const providerDef = getAlertProvider(emailProvider);
@@ -336,6 +339,25 @@ const NodeSettingsModal: React.FC<{
         if (data.configured) {
           setEmailProvider(isAlertProvider(data.provider) ? data.provider : "resend");
           setEmailFrom(data.fromEmail || "");
+        }
+      })
+      .catch(() => { });
+    return () => {
+      active = false;
+    };
+  }, [isAlertNode, ownerWallet, nodeId]);
+
+  useEffect(() => {
+    if (!isAlertNode || !ownerWallet || !nodeId) return;
+    let active = true;
+    setTelegramStatus(null);
+    fetch(`/api/alert-telegram?ownerWallet=${encodeURIComponent(ownerWallet)}&nodeId=${encodeURIComponent(nodeId)}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: TelegramStatus | null) => {
+        if (!active || !data) return;
+        setTelegramStatus(data);
+        if (data.chatId) {
+          setParams((prev) => ({ ...prev, chatId: data.chatId }));
         }
       })
       .catch(() => { });
@@ -428,6 +450,47 @@ const NodeSettingsModal: React.FC<{
     }
   };
 
+  const handleSaveTelegram = async () => {
+    if (!ownerWallet) {
+      toast.error("Conecta tu wallet para guardar Telegram en el nodo.");
+      return;
+    }
+    if (!nodeId) {
+      toast.error("Guarda el nodo antes de configurar Telegram.");
+      return;
+    }
+    const chatId = String(params.chatId || "").trim();
+    if (!chatId || !/^@?[A-Za-z0-9_-]+$/.test(chatId)) {
+      toast.error("Introduce un Chat ID válido.");
+      return;
+    }
+    const token = telegramToken.trim();
+    if (token.length < 10 && !telegramStatus?.configured) {
+      toast.error("Introduce el token del bot de Telegram.");
+      return;
+    }
+
+    setSavingTelegram(true);
+    try {
+      const response = await fetch("/api/alert-telegram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ownerWallet, nodeId, botToken: token, chatId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo guardar");
+      setTelegramStatus(data);
+      setTelegramToken("");
+      setParams((prev) => ({ ...prev, nodeKey: nodeId, chatId: data.chatId }));
+      setChannelHealth(await fetchAlertChannelHealth(ownerWallet, nodeId));
+      toast.success("Telegram guardado en este nodo. La alerta ya puede usar Telegram.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo guardar Telegram.");
+    } finally {
+      setSavingTelegram(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const finalParams = mergeParams(params);
@@ -442,6 +505,10 @@ const NodeSettingsModal: React.FC<{
   const handleTestAlert = async () => {
     if (params.channel === "email" && !isValidAlertEmail(params.email)) {
       toast.error("Introduce un email válido en el nodo.");
+      return;
+    }
+    if (params.channel === "telegram" && !String(params.chatId || "").trim()) {
+      toast.error("Introduce el Chat ID de Telegram en el nodo.");
       return;
     }
     setTestingAlert(true);
@@ -738,6 +805,85 @@ const NodeSettingsModal: React.FC<{
               >
                 {savingProvider && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 {savingProvider ? "Guardando…" : "Guardar proveedor de email en este nodo"}
+              </button>
+            </section>
+          )}
+
+          {node.module.type === "send_alert" && params.channel === "telegram" && (
+            <section className="mt-5 space-y-3 rounded-xl border border-border/40 bg-muted/20 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Bot de Telegram de este nodo
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Necesitas un bot propio. Su token se guarda cifrado y solo pertenece a esta alerta.
+                  </p>
+                </div>
+                {telegramStatus?.configured && (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-1 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
+                    <ShieldCheck className="h-3 w-3" />
+                    Guardado
+                  </span>
+                )}
+              </div>
+
+              <a
+                href="https://t.me/BotFather"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+              >
+                Crear bot con BotFather
+                <ExternalLink className="h-3 w-3" />
+              </a>
+
+              <div>
+                <label htmlFor="alert-telegram-token" className="mb-1.5 block text-xs font-medium text-foreground">
+                  Token del bot
+                </label>
+                <input
+                  id="alert-telegram-token"
+                  type="password"
+                  value={telegramToken}
+                  onChange={(event) => setTelegramToken(event.target.value)}
+                  placeholder="123456789:AA..."
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="w-full rounded-lg border border-border/40 bg-background/70 px-3 py-3 font-mono text-base focus:outline-none focus:ring-2 focus:ring-primary/50 sm:py-2.5 sm:text-sm"
+                />
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  {telegramStatus?.configured
+                    ? "Ya hay un token guardado. Déjalo vacío para conservarlo o pega otro para reemplazarlo."
+                    : "Nunca se muestra ni se guarda en el navegador."}
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="alert-telegram-chat" className="mb-1.5 block text-xs font-medium text-foreground">
+                  Chat ID
+                </label>
+                <input
+                  id="alert-telegram-chat"
+                  type="text"
+                  value={params.chatId || ""}
+                  onChange={(event) => handleChange("chatId", event.target.value)}
+                  placeholder="123456789 o @tu_canal"
+                  className="w-full rounded-lg border border-border/40 bg-background/70 px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary/50 sm:py-2.5 sm:text-sm"
+                />
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  Escribe al bot y usa su Chat ID, o el usuario de tu canal.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSaveTelegram}
+                disabled={savingTelegram}
+                className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
+              >
+                {savingTelegram && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {savingTelegram ? "Guardando…" : "Guardar Telegram en este nodo"}
               </button>
             </section>
           )}
