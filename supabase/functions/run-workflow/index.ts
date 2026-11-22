@@ -83,6 +83,13 @@ Deno.serve(async (req) => {
     const cluster = Deno.env.get("SOLANA_CLUSTER") || "devnet";
     /** Last successful wallet transfer, so the next Alert can link the tx. */
     let lastExecutedTx: { index: number; signature: string } | null = null;
+    /** A failed step blocks every downstream step (no false success alerts). */
+    let stopProcessing = false;
+    let failedStepIndex: number | null = null;
+    const blockStep = (index: number) => {
+      failedStepIndex = index;
+      stopProcessing = true;
+    };
 
     const t = workflow.trigger;
     if (t.type === "price_monitor") {
@@ -140,6 +147,7 @@ Deno.serve(async (req) => {
       logs.push({ result: "condition_not_met" });
     } else {
       for (const [stepIndex, step] of workflow.steps.entries()) {
+        if (stopProcessing) break;
         try {
           if (step.type === "send_transaction") {
             const requestedAsset = String(step.params.asset || "SOL").toUpperCase();
@@ -172,6 +180,7 @@ Deno.serve(async (req) => {
                   payload,
                   note: "Este modo de fondos todavía no tiene una ruta de ejecución.",
                 });
+                blockStep(stepIndex);
               } else if (!vaultExecutionEnabled) {
                 logs.push({
                   step: "send_transaction",
@@ -181,6 +190,7 @@ Deno.serve(async (req) => {
                   payload,
                   note: "El ejecutor de la bóveda está pausado en el servidor (kill switch).",
                 });
+                blockStep(stepIndex);
               } else if (!ownerWallet || !stableWorkflowId) {
                 logs.push({
                   step: "send_transaction",
@@ -190,6 +200,7 @@ Deno.serve(async (req) => {
                   payload,
                   note: "No se puede derivar la bóveda sin owner y workflow_id.",
                 });
+                blockStep(stepIndex);
               } else if (vaultTransferExecuted) {
                 logs.push({
                   step: "send_transaction",
@@ -199,6 +210,7 @@ Deno.serve(async (req) => {
                   payload,
                   note: "Solo se permite una transferencia de bóveda por ejecución.",
                 });
+                blockStep(stepIndex);
               } else if (assetError) {
                 logs.push({
                   step: "send_transaction",
@@ -210,6 +222,7 @@ Deno.serve(async (req) => {
                   payload,
                   note: assetError,
                 });
+                blockStep(stepIndex);
               } else if (
                 amountBaseUnits === null ||
                 !Number.isSafeInteger(amountBaseUnits) ||
@@ -223,6 +236,7 @@ Deno.serve(async (req) => {
                   payload,
                   note: "El monto debe ser un número positivo en el activo indicado.",
                 });
+                blockStep(stepIndex);
               } else if (!supabaseUrl || !serviceKey) {
                 logs.push({
                   step: "send_transaction",
@@ -231,6 +245,7 @@ Deno.serve(async (req) => {
                   executionMode,
                   payload,
                 });
+                blockStep(stepIndex);
               } else {
                 const response = await fetch(`${supabaseUrl}/functions/v1/execute-vault`, {
                   method: "POST",
@@ -265,6 +280,7 @@ Deno.serve(async (req) => {
                     executionMode,
                     payload,
                   });
+                  blockStep(stepIndex);
                 } else if (!response.ok || !result.ok) {
                   logs.push({
                     step: "send_transaction",
@@ -278,6 +294,7 @@ Deno.serve(async (req) => {
                     executionMode,
                     payload,
                   });
+                  blockStep(stepIndex);
                 } else {
                   vaultTransferExecuted = true;
                   if (typeof result.signature === "string" && result.signature.trim()) {
@@ -443,7 +460,8 @@ Deno.serve(async (req) => {
             logs.push({ step: step.type, skipped: true });
           }
         } catch (e) {
-          logs.push({ step: step.type, error: String(e) });
+          logs.push({ step: step.type, stepIndex, error: String(e) });
+          blockStep(stepIndex);
         }
       }
     }
@@ -515,6 +533,8 @@ Deno.serve(async (req) => {
           scheduledFor,
           vaultTransferExecuted,
           txSignature,
+          failedStepIndex,
+          stepFailed: failedStepIndex !== null,
         },
         execution_mode: executionMode,
         scheduled_for: scheduledFor || null,
@@ -522,7 +542,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ triggered, triggerData, logs, txSignature }), {
+    return new Response(JSON.stringify({ triggered, triggerData, logs, txSignature, failedStepIndex }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

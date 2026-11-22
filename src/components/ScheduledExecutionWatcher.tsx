@@ -16,6 +16,7 @@ import {
   getScheduledRunState,
   getWorkflowId,
   setAnimatingLineIndex,
+  setErrorNodeId,
   setRunningNodeId,
   setScheduledRunState,
 } from "@/lib/workflowStore";
@@ -55,9 +56,9 @@ type AutomationRow = {
 };
 
 type Outcome =
-  | { status: "success"; label: string; txSignature: string | null }
-  | { status: "skipped"; label: string; txSignature?: null }
-  | { status: "error"; label: string; txSignature?: null };
+  | { status: "success"; label: string; txSignature: string | null; failedStepIndex: number | null }
+  | { status: "skipped"; label: string; txSignature?: null; failedStepIndex: number | null }
+  | { status: "error"; label: string; txSignature?: null; failedStepIndex: number | null };
 
 type RunLog = {
   step?: string;
@@ -135,6 +136,22 @@ function isWatchable(row: AutomationRow) {
   );
 }
 
+/**
+ * `failedStepIndex` is an index into `workflow.steps`, while the canvas also
+ * contains the trigger as its first node. Stop the animation on the exact node
+ * that blocked the chain instead of walking into the following Alert.
+ */
+function nodeIndexForFailedStep(
+  nodes: ReturnType<typeof getFlowNodes>,
+  failedStepIndex: number | null,
+) {
+  if (typeof failedStepIndex !== "number" || failedStepIndex < 0) return null;
+  const firstStep = nodes.findIndex((node) => node.module.kind === "step");
+  if (firstStep < 0) return null;
+  const index = firstStep + failedStepIndex;
+  return index >= 0 && index < nodes.length ? index : null;
+}
+
 function describeTrigger(triggerData: unknown) {
   if (!triggerData || typeof triggerData !== "object") return "";
   const data = triggerData as Record<string, unknown>;
@@ -175,6 +192,17 @@ function describeFinancialOutcome(logs: RunLog[], txSignature: string | null) {
       label:
         "Transferencia omitida: la bóveda aún está dentro de su intervalo mínimo. " +
         "No se movieron fondos y se reintentará en el próximo ciclo.",
+      txSignature: null,
+    };
+  }
+
+  if (transfer?.executed === false || transfer?.reason === "vault_execution_failed") {
+    const detail = String(
+      transfer.note || transfer.error || "La transferencia de la bóveda falló",
+    );
+    return {
+      status: "error" as const,
+      label: `No se movieron fondos: ${detail}`,
       txSignature: null,
     };
   }
@@ -242,31 +270,41 @@ async function fetchOutcome(
       .maybeSingle();
 
     if (run) {
-      if (run.error || run.status === "failed") {
-        return { status: "error", label: run.error || "La ejecución falló" };
-      }
-
-      const detail = describeTrigger(run.trigger_data);
       const output = run.output && typeof run.output === "object"
-        ? (run.output as { logs?: RunLog[] })
+        ? (run.output as { logs?: RunLog[]; failedStepIndex?: number | null })
         : {};
+      const failedStepIndex =
+        typeof output.failedStepIndex === "number" ? output.failedStepIndex : null;
+      const detail = describeTrigger(run.trigger_data);
       const logs = Array.isArray(output.logs) ? output.logs : [];
       const txSignature = run.tx_signature ?? null;
 
+      if (run.error || run.status === "failed") {
+        return {
+          status: "error",
+          label: run.error || "La ejecución falló",
+          failedStepIndex,
+        };
+      }
+
       if (isFinancialExecutionMode(executionMode)) {
         const financial = describeFinancialOutcome(logs, txSignature);
-        if (financial.status === "success") return financial;
-        return { status: financial.status, label: financial.label };
+        return { ...financial, failedStepIndex };
       }
 
       if (run.status === "skipped") {
-        return { status: "skipped", label: detail || "La condición del trigger no se cumplió" };
+        return {
+          status: "skipped",
+          label: detail || "La condición del trigger no se cumplió",
+          failedStepIndex,
+        };
       }
 
       return {
         status: "success",
         label: detail || "Ejecución completada",
         txSignature,
+        failedStepIndex,
       };
     }
 
@@ -279,13 +317,21 @@ async function fetchOutcome(
       .maybeSingle();
 
     if (fresh?.last_run_at && new Date(fresh.last_run_at).getTime() >= targetMs - 1000) {
-      if (fresh.last_error) return { status: "error", label: fresh.last_error };
+      if (fresh.last_error) {
+        return { status: "error", label: fresh.last_error, failedStepIndex: null };
+      }
       return isFinancialExecutionMode(executionMode)
         ? {
             status: "skipped",
             label: "El workflow se evaluó; no se registró ninguna transferencia",
+            failedStepIndex: null,
           }
-        : { status: "success", label: "Ejecución completada", txSignature: null };
+        : {
+            status: "success",
+            label: "Ejecución completada",
+            txSignature: null,
+            failedStepIndex: null,
+          };
     }
 
     await sleep(1500);
@@ -294,22 +340,31 @@ async function fetchOutcome(
   return null;
 }
 
-async function animateNodes(isCancelled: () => boolean) {
+async function animateNodes(
+  isCancelled: () => boolean,
+  stopIndex: number | null = null,
+  quick = false,
+) {
   const nodes = getFlowNodes();
   // A manual "Ejecutar" is already driving the canvas; do not fight it.
   if (nodes.length === 0 || getRunningNodeId()) return;
 
-  for (let i = 0; i < nodes.length; i++) {
+  const validStop = stopIndex !== null && stopIndex >= 0 && stopIndex < nodes.length;
+  const last = validStop ? (stopIndex as number) : nodes.length - 1;
+  const nodeMs = quick ? 350 : 650;
+  const lineMs = quick ? 250 : 450;
+
+  for (let i = 0; i <= last; i++) {
     if (isCancelled()) break;
     setRunningNodeId(nodes[i].id);
     setAnimatingLineIndex(-1);
-    await sleep(650);
+    await sleep(nodeMs);
 
-    if (i < nodes.length - 1) {
+    if (i < last) {
       if (isCancelled()) break;
       setRunningNodeId(null);
       setAnimatingLineIndex(i);
-      await sleep(450);
+      await sleep(lineMs);
     }
   }
 
@@ -426,6 +481,7 @@ const ScheduledExecutionWatcher: React.FC = () => {
 
     const runVisualExecution = async (row: AutomationRow, scheduledFor: string, quick: boolean) => {
       if (cancelled) return;
+      setErrorNodeId(null);
 
       const toastId =
         queued && queued.target === scheduledFor
@@ -443,36 +499,27 @@ const ScheduledExecutionWatcher: React.FC = () => {
         message: null,
       });
 
-      const animation = quick
-        ? (async () => {
-            if (getRunningNodeId()) return;
-            const nodes = getFlowNodes();
-            for (let i = 0; i < nodes.length; i++) {
-              if (isCancelled()) return;
-              setRunningNodeId(nodes[i].id);
-              await sleep(350);
-              if (i < nodes.length - 1) {
-                setRunningNodeId(null);
-                setAnimatingLineIndex(i);
-                await sleep(250);
-              }
-            }
-            if (!isCancelled()) {
-              setRunningNodeId(null);
-              setAnimatingLineIndex(-1);
-            }
-          })()
-        : animateNodes(isCancelled);
-
+      // The server result is needed before animating so a failed or skipped
+      // transfer can stop the canvas on that node instead of walking into the
+      // Alert step (the cron already decided not to run it).
       const outcome = await fetchOutcome(
         row.id,
         scheduledFor,
         row.execution_mode,
         isCancelled,
       );
-      await animation;
-
       if (cancelled) return;
+
+      const stopIndex = outcome
+        ? nodeIndexForFailedStep(getFlowNodes(), outcome.failedStepIndex)
+        : null;
+      await animateNodes(isCancelled, stopIndex, quick);
+      if (cancelled) return;
+
+      if (stopIndex !== null && outcome?.status === "error") {
+        const nodes = getFlowNodes();
+        if (nodes[stopIndex]) setErrorNodeId(nodes[stopIndex].id);
+      }
 
       const toastShownAt = Date.now();
       let handoffMatch: BellMatch | null = null;
