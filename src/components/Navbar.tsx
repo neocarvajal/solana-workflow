@@ -18,7 +18,7 @@ const Navbar: React.FC = () => {
 
   return (
     <header className="relative z-10 border-b border-border/10 shrink-0 bg-background/80 backdrop-blur-sm">
-      <div className="flex flex-wrap md:flex-nowrap items-center justify-between gap-y-3 px-3 sm:px-4 md:px-8 py-2.5 md:py-4 pt-[calc(0.625rem+env(safe-area-inset-top))]">
+      <div className="flex flex-wrap md:flex-nowrap items-center justify-between gap-y-3 md:gap-x-3 px-3 sm:px-4 md:px-8 py-2.5 md:py-4 pt-[calc(0.625rem+env(safe-area-inset-top))]">
         <div className="flex min-w-0 items-center gap-1.5">
           {showMenu && (
             <button
@@ -55,7 +55,7 @@ const Navbar: React.FC = () => {
           </div>
         )}
 
-        <nav className="flex items-center gap-2 sm:gap-3 md:gap-6 shrink-0">
+        <nav className="flex items-center gap-2 md:gap-3 shrink-0">
           {!showMenu && (
             <Link
               href="/dashboard"

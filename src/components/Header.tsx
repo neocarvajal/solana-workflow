@@ -31,14 +31,14 @@ const Header: React.FC = () => {
   };
 
   return (
-    <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-2 px-1 z-20 sm:flex-nowrap sm:gap-3 md:gap-6">
-      <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto md:gap-4">
+    <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-2 px-1 z-20 sm:flex-nowrap md:gap-3">
+      <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto md:gap-3">
         <input
           type="text"
           value={name}
           onChange={handleNameChange}
           placeholder="Scenario name..."
-          className="text-base sm:text-lg font-semibold bg-transparent border-0 border-b border-transparent hover:border-border focus:border-primary focus:outline-none px-1 py-1 rounded transition-colors w-full min-w-0 sm:w-48 md:w-64"
+          className="text-base sm:text-lg font-semibold bg-transparent border-0 border-b border-transparent hover:border-border focus:border-primary focus:outline-none px-1 py-1 rounded transition-colors w-full min-w-0 sm:w-40 md:w-48"
         />
 
         <button
@@ -53,7 +53,7 @@ const Header: React.FC = () => {
         </button>
       </div>
 
-      <div className="flex w-full min-w-0 items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5 sm:w-auto sm:gap-2 md:gap-3">
+      <div className="flex w-full min-w-0 items-center gap-2 overflow-x-auto no-scrollbar pb-0.5 sm:w-auto md:gap-3">
         <button
           onClick={handleNew}
           className="flex min-h-10 shrink-0 items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs bg-muted hover:bg-muted/80 text-foreground rounded-lg font-medium transition-colors border border-border/40 whitespace-nowrap"
