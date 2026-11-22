@@ -142,20 +142,10 @@ function syncWorkflow() {
 const SETTINGS_KEY = "solflows_settings";
 export interface AppSettings {
   recipientWallet: string;
-  alertChannel: string;
-  alertEmail: string;
-  telegramChatId: string;
-  discordWebhookUrl: string;
-  whatsappPhone: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
   recipientWallet: "",
-  alertChannel: "app",
-  alertEmail: "",
-  telegramChatId: "",
-  discordWebhookUrl: "",
-  whatsappPhone: "",
 };
 
 export function getSettings(): AppSettings {
@@ -166,8 +156,13 @@ export function getSettings(): AppSettings {
   return { ...DEFAULT_SETTINGS };
 }
 
-export function saveSettings(s: AppSettings) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ...s }));
+export function saveSettings(s: Partial<AppSettings>) {
+  // Keep legacy keys in storage for older saved flows, but the UI only writes
+  // the settings it actually exposes (currently the recipient wallet).
+  localStorage.setItem(
+    SETTINGS_KEY,
+    JSON.stringify({ ...DEFAULT_SETTINGS, ...getSettings(), ...s }),
+  );
 }
 
 /* ── Global execution frequency ───────────────────────────── */

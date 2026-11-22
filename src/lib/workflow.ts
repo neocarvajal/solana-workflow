@@ -73,6 +73,11 @@ export const STEP_MODULES: ModuleDef[] = [
       chatId: "",
       webhookUrl: "",
       phone: "",
+      provider: "resend",
+      fromEmail: "",
+      // Stable per-node key used to resolve the provider configuration stored
+      // in Vault. It is not a secret and travels with the workflow JSON.
+      nodeKey: "",
     }
   },
   {
@@ -126,7 +131,7 @@ export function workflowToNodes(wf: Workflow): FlowNode[] {
   const settings = getSettings();
   const globalWallet = settings?.recipientWallet || "";
 
-  const normalize = (module: ModuleDef, params: any) => {
+  const normalize = (module: ModuleDef, params: any, stepIndex = -1) => {
     const defaults = module.defaultParams || {};
     const allowedKeys = Object.keys(defaults);
 
@@ -152,6 +157,13 @@ export function workflowToNodes(wf: Workflow): FlowNode[] {
       }
     }
 
+    if (module.type === "send_alert" && stepIndex >= 0) {
+      // Older workflows have no node key. Derive a stable one from the step
+      // position so their config can be migrated without losing the node.
+      const savedKey = typeof cleanParams.nodeKey === "string" ? cleanParams.nodeKey.trim() : "";
+      cleanParams.nodeKey = savedKey || `alert-${stepIndex + 1}`;
+    }
+
     return cleanParams;
   };
 
@@ -175,7 +187,7 @@ export function workflowToNodes(wf: Workflow): FlowNode[] {
       nodes.push({
         id: `n-${Date.now()}-${i}`,
         module: m,
-        params: normalize(m, s.params),
+        params: normalize(m, s.params, i),
         x: pos?.x ?? START_X + idx * NODE_SPACING_X,
         y: pos?.y ?? START_Y,
       });

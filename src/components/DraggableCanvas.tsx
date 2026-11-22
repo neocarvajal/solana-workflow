@@ -283,6 +283,12 @@ const DraggableCanvas: React.FC = () => {
     }
 
     const newNodeParams = { ...mod.defaultParams };
+    if (mod.type === "send_alert") {
+      newNodeParams.nodeKey =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `alert-${Date.now()}`;
+    }
     if (mod.type === "send_transaction") {
       const { getSettings } = require("@/lib/workflowStore");
       const settings = getSettings();

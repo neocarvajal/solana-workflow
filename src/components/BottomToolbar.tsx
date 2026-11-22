@@ -472,6 +472,7 @@ const BottomToolbar: React.FC = () => {
                 webhookUrl: node.params.webhookUrl,
                 phone: node.params.phone,
                 ownerWallet: publicKey?.toBase58(),
+                nodeId: node.params.nodeKey,
                 variables: {
                   ...triggerVariables,
                   trigger: triggerVariables,

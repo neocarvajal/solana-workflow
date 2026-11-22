@@ -44,16 +44,11 @@ const Landing: React.FC = () => {
       const settings = getSettings();
 
       const recipientWallet = settings.recipientWallet?.trim() || "";
-      const alertChannel = settings.alertChannel?.trim() || "";
 
       const contextParts: string[] = [];
 
       if (recipientWallet) {
         contextParts.push(`default recipient wallet is ${recipientWallet}`);
-      }
-
-      if (alertChannel) {
-        contextParts.push(`default alert channel is ${alertChannel}`);
       }
 
       const contextPrompt =

@@ -1,9 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { X, Trash2, Loader2, Send, AlertTriangle, Landmark } from "lucide-react";
+import {
+  X, Trash2, Loader2, Send, AlertTriangle, Landmark,
+  ChevronDown, ExternalLink, ShieldCheck,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useWallet } from "@solana/wallet-adapter-react";
 import type { FlowNode } from "@/lib/workflow";
-import { getSettings } from "@/lib/workflowStore";
+import {
+  ALERT_PROVIDERS,
+  getAlertProvider,
+  isAlertProvider,
+  isValidAlertFrom,
+} from "@/lib/alertProviders";
 import {
   alertChannelLabel,
   fetchAlertChannelHealth,
@@ -25,6 +33,13 @@ interface FieldDef {
   /** Parse the textarea value as JSON instead of plain text. */
   json?: boolean;
 }
+
+type ProviderStatus = {
+  provider: string;
+  fromEmail: string;
+  configured: boolean;
+  updatedAt: string | null;
+};
 
 const MODULE_FIELDS: Record<string, FieldDef[]> = {
   /* ── Triggers ──────────────────────────── */
@@ -168,25 +183,25 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
       key: "email", label: "Email destinatario", type: "email",
       showWhen: { key: "channel", equals: "email" },
       placeholder: "tu@email.com",
-      description: "Debe ser válido. Vacío = usar el email configurado en Ajustes",
+      description: "Debe ser válido. Configura el destinatario en este nodo.",
     },
     {
       key: "chatId", label: "Telegram Chat ID", type: "text",
       showWhen: { key: "channel", equals: "telegram" },
       placeholder: "123456789",
-      description: "Vacío = usar el Chat ID de Ajustes o el secreto TELEGRAM_CHAT_ID",
+      description: "Configura el Chat ID en este nodo.",
     },
     {
       key: "webhookUrl", label: "Discord Webhook URL", type: "text",
       showWhen: { key: "channel", equals: "discord" },
       placeholder: "https://discord.com/api/webhooks/…",
-      description: "Recomendado configurarlo en Ajustes para no guardarlo dentro del workflow",
+      description: "Pégalo en este nodo; no se guarda en ajustes globales.",
     },
     {
       key: "phone", label: "WhatsApp", type: "text",
       showWhen: { key: "channel", equals: "whatsapp" },
       placeholder: "+5215512345678",
-      description: "Número con código de país. Vacío = usar Ajustes o el secreto WHATSAPP_TO",
+      description: "Número con código de país configurado en este nodo.",
     },
   ],
 
@@ -279,21 +294,69 @@ const NodeSettingsModal: React.FC<{
   );
   const [testingAlert, setTestingAlert] = useState(false);
   const [channelHealth, setChannelHealth] = useState<Record<string, unknown> | null>(null);
+  const [emailProvider, setEmailProvider] = useState("resend");
+  const [emailApiKey, setEmailApiKey] = useState("");
+  const [emailFrom, setEmailFrom] = useState("");
+  const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
+  const [savingProvider, setSavingProvider] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    fetchAlertChannelHealth(ownerWallet).then((health) => {
-      if (active) setChannelHealth(health);
-    });
-    return () => {
-      active = false;
-    };
-  }, [ownerWallet]);
+  const nodeId = String(params.nodeKey || "").trim();
+  const providerDef = getAlertProvider(emailProvider);
+  const isAlertNode = node.module.type === "send_alert";
 
   useEffect(() => {
     const cleanParams = mergeParams(node.params);
     setParams(cleanParams);
   }, [node.id, JSON.stringify(node.params)]);
+
+  useEffect(() => {
+    if (!isAlertNode || nodeId) return;
+    const key =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `alert-${Date.now()}`;
+    setParams((prev) => ({ ...prev, nodeKey: key }));
+  }, [isAlertNode, nodeId]);
+
+  useEffect(() => {
+    if (!isAlertNode) return;
+    setEmailProvider(isAlertProvider(params.provider) ? params.provider : "resend");
+    setEmailFrom(String(params.fromEmail || ""));
+  }, [isAlertNode, node.id, params.provider, params.fromEmail]);
+
+  useEffect(() => {
+    if (!isAlertNode || !ownerWallet || !nodeId) return;
+    let active = true;
+    setProviderStatus(null);
+    fetch(`/api/alert-provider?ownerWallet=${encodeURIComponent(ownerWallet)}&nodeId=${encodeURIComponent(nodeId)}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: ProviderStatus | null) => {
+        if (!active || !data) return;
+        setProviderStatus(data);
+        if (data.configured) {
+          setEmailProvider(isAlertProvider(data.provider) ? data.provider : "resend");
+          setEmailFrom(data.fromEmail || "");
+        }
+      })
+      .catch(() => { });
+    return () => {
+      active = false;
+    };
+  }, [isAlertNode, ownerWallet, nodeId]);
+
+  useEffect(() => {
+    if (!ownerWallet || !nodeId) {
+      setChannelHealth(null);
+      return;
+    }
+    let active = true;
+    fetchAlertChannelHealth(ownerWallet, nodeId).then((health) => {
+      if (active) setChannelHealth(health);
+    });
+    return () => {
+      active = false;
+    };
+  }, [ownerWallet, nodeId]);
 
   const fields = MODULE_FIELDS[node.module.type] ?? [];
   const visibleFields = fields.filter((field) => {
@@ -308,19 +371,77 @@ const NodeSettingsModal: React.FC<{
     setParams((prev) => ({ ...prev, [key]: value }));
   };
 
+  const handleSaveProvider = async () => {
+    if (!ownerWallet) {
+      toast.error("Conecta tu wallet para guardar el proveedor de email.");
+      return;
+    }
+    if (!nodeId) {
+      toast.error("Guarda el nodo antes de configurar el proveedor de email.");
+      return;
+    }
+    if (!isAlertProvider(emailProvider)) {
+      toast.error("Selecciona un proveedor de email.");
+      return;
+    }
+    if (!isValidAlertFrom(emailFrom)) {
+      toast.error("Introduce un remitente válido.");
+      return;
+    }
+    const key = emailApiKey.trim();
+    const keepsExistingKey =
+      providerStatus?.configured && emailProvider === providerStatus.provider;
+    if (key.length < 8 && !keepsExistingKey) {
+      toast.error("Introduce una API key válida para este proveedor.");
+      return;
+    }
+
+    setSavingProvider(true);
+    try {
+      const response = await fetch("/api/alert-provider", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ownerWallet,
+          nodeId,
+          provider: emailProvider,
+          apiKey: key,
+          fromEmail: emailFrom.trim(),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo guardar");
+      setProviderStatus(data);
+      setEmailApiKey("");
+      setParams((prev) => ({
+        ...prev,
+        nodeKey: nodeId,
+        provider: data.provider,
+        fromEmail: data.fromEmail,
+      }));
+      setChannelHealth(await fetchAlertChannelHealth(ownerWallet, nodeId));
+      toast.success(`${providerDef.label} guardado en este nodo. La alerta ya puede usar Email.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo guardar el proveedor.");
+    } finally {
+      setSavingProvider(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const finalParams = mergeParams(params);
-    console.log("Saving node with final params:", finalParams);
+    if (isAlertNode) {
+      finalParams.nodeKey = nodeId || finalParams.nodeKey;
+      finalParams.provider = isAlertProvider(emailProvider) ? emailProvider : "resend";
+      finalParams.fromEmail = emailFrom.trim();
+    }
     onSave({ ...node, params: finalParams });
   };
 
   const handleTestAlert = async () => {
-    if (
-      params.channel === "email" &&
-      !isValidAlertEmail(params.email || getSettings().alertEmail)
-    ) {
-      toast.error("Introduce un email válido en el nodo o en Ajustes.");
+    if (params.channel === "email" && !isValidAlertEmail(params.email)) {
+      toast.error("Introduce un email válido en el nodo.");
       return;
     }
     setTestingAlert(true);
@@ -336,6 +457,7 @@ const NodeSettingsModal: React.FC<{
         webhookUrl: params.webhookUrl,
         phone: params.phone,
         ownerWallet,
+        nodeId,
       });
       if (result.ok) {
         toast.success(result.message);
@@ -521,6 +643,105 @@ const NodeSettingsModal: React.FC<{
             </p>
           )}
 
+          {node.module.type === "send_alert" && params.channel === "email" && (
+            <section className="mt-5 space-y-3 rounded-xl border border-border/40 bg-muted/20 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Proveedor de email de este nodo
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    La API key se guarda cifrada y solo pertenece a esta alerta.
+                  </p>
+                </div>
+                {providerStatus?.configured && (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-1 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
+                    <ShieldCheck className="h-3 w-3" />
+                    Guardado
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="alert-provider" className="mb-1.5 block text-xs font-medium text-foreground">
+                  Servicio
+                </label>
+                <div className="relative w-full">
+                  <select
+                    id="alert-provider"
+                    value={emailProvider}
+                    onChange={(event) => setEmailProvider(event.target.value)}
+                    className="w-full cursor-pointer appearance-none rounded-lg border border-border/40 bg-background/70 px-3 py-3 pr-10 text-base focus:outline-none focus:ring-2 focus:ring-primary/50 sm:py-2.5 sm:text-sm"
+                  >
+                    {ALERT_PROVIDERS.map((provider) => (
+                      <option key={provider.id} value={provider.id}>
+                        {provider.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
+                </div>
+                <a
+                  href={providerDef.website}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                >
+                  Visitar sitio oficial de {providerDef.label}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+
+              <div>
+                <label htmlFor="alert-api-key" className="mb-1.5 block text-xs font-medium text-foreground">
+                  {providerDef.keyLabel}
+                </label>
+                <input
+                  id="alert-api-key"
+                  type="password"
+                  value={emailApiKey}
+                  onChange={(event) => setEmailApiKey(event.target.value)}
+                  placeholder={providerDef.keyPlaceholder}
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="w-full rounded-lg border border-border/40 bg-background/70 px-3 py-3 font-mono text-base focus:outline-none focus:ring-2 focus:ring-primary/50 sm:py-2.5 sm:text-sm"
+                />
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  {providerStatus?.configured
+                    ? emailProvider === providerStatus.provider
+                      ? "Ya hay una key guardada. Déjalo vacío para conservarla o introduce otra para reemplazarla."
+                      : "Este proveedor necesita su propia key. Pégala antes de guardar."
+                    : "Nunca se muestra ni se guarda en el navegador."}
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="alert-from-email" className="mb-1.5 block text-xs font-medium text-foreground">
+                  Remitente
+                </label>
+                <input
+                  id="alert-from-email"
+                  type="text"
+                  value={emailFrom}
+                  onChange={(event) => setEmailFrom(event.target.value)}
+                  placeholder="Solana Workflow <alerts@tu-dominio.com>"
+                  className="w-full rounded-lg border border-border/40 bg-background/70 px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary/50 sm:py-2.5 sm:text-sm"
+                />
+                <p className="mt-1 text-[10px] text-muted-foreground">{providerDef.fromHint}</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSaveProvider}
+                disabled={savingProvider}
+                className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
+              >
+                {savingProvider && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {savingProvider ? "Guardando…" : "Guardar proveedor de email en este nodo"}
+              </button>
+            </section>
+          )}
+
           {node.module.type === "send_alert" && (
             <>
               {params.channel && params.channel !== "app" && channelHealth && (
@@ -535,18 +756,9 @@ const NodeSettingsModal: React.FC<{
                     {Boolean(channelHealth[String(params.channel)])
                       ? `${alertChannelLabel(params.channel)} listo para enviar.`
                       : params.channel === "email"
-                        ? "Configura el proveedor de email en Ajustes antes de enviar alertas."
-                        : `Configura ${alertChannelLabel(params.channel)} en Ajustes antes de enviar alertas.`}
+                        ? "Configura el proveedor de email en este nodo antes de enviar alertas."
+                        : `Configura ${alertChannelLabel(params.channel)} en este nodo antes de enviar alertas.`}
                   </p>
-                  {!Boolean(channelHealth[String(params.channel)]) && (
-                    <button
-                      type="button"
-                      onClick={() => window.dispatchEvent(new Event("open-settings"))}
-                      className="mt-2 font-semibold underline underline-offset-2"
-                    >
-                      Abrir Ajustes
-                    </button>
-                  )}
                 </div>
               )}
               <button

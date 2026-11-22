@@ -11,6 +11,8 @@ export interface AlertPayload {
   webhookUrl?: string;
   phone?: string;
   ownerWallet?: string;
+  /** Stable identifier of the Alert node that owns this delivery. */
+  nodeId?: string;
   /** Trigger data used to resolve {{price}}, {{asset}}, etc. */
   variables?: Record<string, unknown>;
   /** Set to false when the price that fired the trigger is not useful context. */
@@ -74,7 +76,7 @@ function parseFromAddress(value: string): { email: string; name: string } {
 
 function emailProviderError(response: Response): string {
   const status = response.status ? ` (HTTP ${response.status})` : "";
-  return `El proveedor de email no aceptó el mensaje${status}. Revisa la configuración en Ajustes.`;
+  return `El proveedor de email no aceptó el mensaje${status}. Revisa la configuración en el nodo.`;
 }
 
 function supabaseAdmin() {
@@ -84,13 +86,17 @@ function supabaseAdmin() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-async function readEmailConfig(ownerWallet: string): Promise<EmailProviderConfig | null> {
-  if (!ownerWallet) return null;
+async function readEmailConfig(
+  ownerWallet: string,
+  nodeId: string,
+): Promise<EmailProviderConfig | null> {
+  if (!ownerWallet || !nodeId) return null;
   const sb = supabaseAdmin();
   if (!sb) return null;
   try {
     const { data, error } = await sb.rpc("get_alert_provider_config", {
       p_owner_wallet: ownerWallet,
+      p_node_id: nodeId,
     });
     if (error) {
       console.error("alert provider config:", error.message);
@@ -104,13 +110,17 @@ async function readEmailConfig(ownerWallet: string): Promise<EmailProviderConfig
   }
 }
 
-async function readEmailStatus(ownerWallet: string): Promise<EmailProviderStatus | null> {
-  if (!ownerWallet) return null;
+async function readEmailStatus(
+  ownerWallet: string,
+  nodeId: string,
+): Promise<EmailProviderStatus | null> {
+  if (!ownerWallet || !nodeId) return null;
   const sb = supabaseAdmin();
   if (!sb) return null;
   try {
     const { data, error } = await sb.rpc("get_alert_provider_status", {
       p_owner_wallet: ownerWallet,
+      p_node_id: nodeId,
     });
     if (error) {
       console.error("alert provider status:", error.message);
@@ -303,7 +313,7 @@ async function sendTelegram(
   if (!token) {
     return fail(
       "telegram",
-      "Falta configurar TELEGRAM_BOT_TOKEN en Supabase Secrets.",
+      "Falta configurar Telegram en el servidor.",
       503,
       "telegram",
     );
@@ -311,7 +321,7 @@ async function sendTelegram(
   if (!chatId) {
     return fail(
       "telegram",
-      "Falta el Chat ID de Telegram. Configúralo en el nodo o en Ajustes.",
+      "Falta el Chat ID de Telegram. Configúralo en el nodo.",
       400,
       "telegram",
     );
@@ -359,7 +369,7 @@ async function sendDiscord(
   if (!rawUrl) {
     return fail(
       "discord",
-      "Falta el webhook de Discord. Configúralo en el nodo o en Ajustes.",
+      "Falta el webhook de Discord. Configúralo en el nodo.",
       503,
       "discord",
     );
@@ -413,24 +423,18 @@ async function sendEmail(
   body: string,
   fetchImpl: typeof fetch,
 ): Promise<AlertResult> {
-  const saved = await readEmailConfig(text(payload.ownerWallet));
+  const saved = await readEmailConfig(text(payload.ownerWallet), text(payload.nodeId));
   const provider = emailProviderId(saved?.provider || "resend");
   const label = emailProviderLabel(provider);
-  const providerKeys: Record<string, string> = {
-    resend: text(saved?.api_key) || env("RESEND_API_KEY"),
-    sendgrid: text(saved?.api_key) || env("SENDGRID_API_KEY"),
-    postmark: text(saved?.api_key) || env("POSTMARK_SERVER_TOKEN"),
-  };
-  const apiKey = providerKeys[provider];
-  const fromRaw =
-    text(saved?.from_email) || env("ALERT_FROM_EMAIL") || env("RESEND_FROM_EMAIL");
+  const apiKey = text(saved?.api_key);
+  const fromRaw = text(saved?.from_email);
   const from = parseFromAddress(fromRaw);
-  const to = text(payload.email) || env("ALERT_EMAIL_TO");
+  const to = text(payload.email);
 
   if (!apiKey) {
     return fail(
       "email",
-      `Configura ${label} en Ajustes antes de enviar alertas.`,
+      `Configura ${label} en este nodo antes de enviar alertas.`,
       503,
       provider,
     );
@@ -438,18 +442,18 @@ async function sendEmail(
   if (!from.email) {
     return fail(
       "email",
-      "Configura el remitente de email en Ajustes antes de enviar alertas.",
+      "Configura el remitente de email en este nodo antes de enviar alertas.",
       503,
       provider,
     );
   }
   if (!EMAIL_RE.test(from.email)) {
-    return fail("email", "El remitente configurado en Ajustes no es válido.", 400, provider);
+    return fail("email", "El remitente configurado en este nodo no es válido.", 400, provider);
   }
   if (!to) {
     return fail(
       "email",
-      "Configura un email destinatario válido en el nodo o en Ajustes.",
+      "Configura un email destinatario válido en el nodo.",
       400,
       provider,
     );
@@ -528,7 +532,7 @@ async function sendWhatsApp(
   if (!rawPhone) {
     return fail(
       "whatsapp",
-      "Falta el número de WhatsApp. Configúralo en el nodo o en Ajustes.",
+      "Falta el número de WhatsApp. Configúralo en el nodo.",
       400,
       "whatsapp",
     );
@@ -644,7 +648,7 @@ async function sendWhatsApp(
 
   return fail(
     "whatsapp",
-    "Falta configurar WhatsApp en Supabase Secrets: WHATSAPP_ACCESS_TOKEN + WHATSAPP_PHONE_NUMBER_ID (Meta) o TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN + TWILIO_WHATSAPP_FROM (Twilio).",
+    "Falta configurar WhatsApp en el servidor (Meta o Twilio).",
     503,
     "whatsapp",
   );
@@ -688,41 +692,26 @@ export async function deliverAlert(
   }
 }
 
-export async function alertChannelHealth(ownerWallet?: string) {
+export async function alertChannelHealth(ownerWallet?: string, nodeId?: string) {
   const metaWhatsApp = Boolean(env("WHATSAPP_ACCESS_TOKEN") && env("WHATSAPP_PHONE_NUMBER_ID"));
   const twilioWhatsApp = Boolean(
     env("TWILIO_ACCOUNT_SID") && env("TWILIO_AUTH_TOKEN") && env("TWILIO_WHATSAPP_FROM"),
   );
 
-  const status = ownerWallet ? await readEmailStatus(ownerWallet) : null;
+  const status = ownerWallet && nodeId
+    ? await readEmailStatus(ownerWallet, nodeId)
+    : null;
   const savedFrom = parseFromAddress(text(status?.from_email));
   const savedReady = Boolean(
     status?.configured && EMAIL_RE.test(savedFrom.email),
   );
 
-  const envProvider = env("RESEND_API_KEY")
-    ? "resend"
-    : env("SENDGRID_API_KEY")
-      ? "sendgrid"
-      : env("POSTMARK_SERVER_TOKEN")
-        ? "postmark"
-        : null;
-  const envFromRaw = env("ALERT_FROM_EMAIL") || env("RESEND_FROM_EMAIL");
-  const envFrom = parseFromAddress(envFromRaw);
-  const envReady = Boolean(envProvider && EMAIL_RE.test(envFrom.email));
-
   return {
     app: true,
     telegram: Boolean(env("TELEGRAM_BOT_TOKEN")),
     discord: Boolean(env("DISCORD_WEBHOOK_URL")),
-    email: savedReady || envReady,
-    emailProvider: savedReady
-      ? emailProviderId(status?.provider)
-      : envReady
-        ? envProvider
-        : status
-          ? emailProviderId(status.provider)
-          : null,
+    email: savedReady,
+    emailProvider: status ? emailProviderId(status.provider) : null,
     emailConfiguredInApp: Boolean(status?.configured),
     whatsapp: metaWhatsApp || twilioWhatsApp,
     whatsappProvider: metaWhatsApp ? "meta" : twilioWhatsApp ? "twilio" : null,

@@ -347,6 +347,7 @@ Deno.serve(async (req) => {
               webhookUrl: step.params.webhookUrl,
               phone: step.params.phone,
               ownerWallet,
+              nodeId: step.params.nodeKey,
               variables,
               appendPriceContext: !financialAutomation,
             });

@@ -21,9 +21,16 @@ function walletFrom(value: unknown): string | null {
   return wallet.length >= 10 ? wallet : null;
 }
 
-async function readStatus(ownerWallet: string) {
+function nodeIdFrom(value: unknown): string | null {
+  const nodeId = String(value || "").trim();
+  if (!nodeId || nodeId.length > 120 || !/^[A-Za-z0-9_-]+$/.test(nodeId)) return null;
+  return nodeId;
+}
+
+async function readStatus(ownerWallet: string, nodeId: string) {
   const { data, error } = await adminClient().rpc("get_alert_provider_status", {
     p_owner_wallet: ownerWallet,
+    p_node_id: nodeId,
   });
   if (error) throw error;
   const row = (data as StatusRow[] | null)?.[0];
@@ -37,15 +44,19 @@ async function readStatus(ownerWallet: string) {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const ownerWallet = walletFrom(
-      req.method === "GET" ? req.query.ownerWallet : req.body?.ownerWallet,
-    );
+    const source = req.method === "GET" ? req.query : req.body || {};
+    const ownerWallet = walletFrom(source.ownerWallet);
     if (!ownerWallet) {
       return res.status(400).json({ error: "Falta la wallet del propietario." });
     }
 
+    const nodeId = nodeIdFrom(source.nodeId);
+    if (!nodeId) {
+      return res.status(400).json({ error: "Falta el identificador del nodo." });
+    }
+
     if (req.method === "GET") {
-      return res.status(200).json(await readStatus(ownerWallet));
+      return res.status(200).json(await readStatus(ownerWallet, nodeId));
     }
 
     if (req.method !== "POST") {
@@ -63,7 +74,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const key = String(apiKey || "").trim();
-    const status = await readStatus(ownerWallet);
+    const status = await readStatus(ownerWallet, nodeId);
     const keepsExistingKey = status.configured && provider === status.provider;
     if (key.length < 8 && !keepsExistingKey) {
       return res
@@ -73,13 +84,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { error } = await adminClient().rpc("save_alert_provider_config", {
       p_owner_wallet: ownerWallet,
+      p_node_id: nodeId,
       p_provider: provider,
       p_api_key: key,
       p_from_email: from,
     });
     if (error) throw error;
 
-    return res.status(200).json(await readStatus(ownerWallet));
+    return res.status(200).json(await readStatus(ownerWallet, nodeId));
   } catch (error) {
     console.error("alert-provider:", error instanceof Error ? error.message : error);
     return res

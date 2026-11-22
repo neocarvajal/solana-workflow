@@ -21,6 +21,8 @@ export interface AlertInput {
   webhookUrl?: string;
   phone?: string;
   ownerWallet?: string;
+  /** Stable identifier of the Alert node that owns this delivery. */
+  nodeId?: string;
   /** Data from the trigger, used to resolve {{price}}, {{asset}}, etc. */
   variables?: Record<string, unknown>;
 }
@@ -42,6 +44,7 @@ export function isValidAlertEmail(value: unknown): boolean {
 /** Which channels have their provider credentials configured in Supabase. */
 export async function fetchAlertChannelHealth(
   ownerWallet?: string,
+  nodeId?: string,
 ): Promise<Record<string, unknown> | null> {
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -50,14 +53,20 @@ export async function fetchAlertChannelHealth(
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!url || !key) return null;
 
-    const query = ownerWallet ? `?ownerWallet=${encodeURIComponent(ownerWallet)}` : "";
-    const response = await fetch(`${url}/functions/v1/send-alert${query}`, {
+    const params = new URLSearchParams();
+    if (ownerWallet) params.set("ownerWallet", ownerWallet);
+    if (nodeId) params.set("nodeId", nodeId);
+    const query = params.toString();
+    const response = await fetch(`${url}/functions/v1/send-alert${query ? `?${query}` : ""}`, {
       method: "GET",
       headers: { apikey: key, Authorization: `Bearer ${key}` },
     });
     if (!response.ok) return null;
     const data = await response.json();
-    return data && typeof data === "object" ? (data as Record<string, unknown>) : null;
+    const channels = data?.channels ?? data;
+    return channels && typeof channels === "object"
+      ? (channels as Record<string, unknown>)
+      : null;
   } catch {
     return null;
   }
@@ -199,11 +208,12 @@ function resolvePayload(input: AlertInput) {
       variables,
       { appendPriceContext: false },
     ),
-    email: String(input.email || "").trim() || settings.alertEmail.trim(),
-    chatId: String(input.chatId || "").trim() || settings.telegramChatId.trim(),
-    webhookUrl: String(input.webhookUrl || "").trim() || settings.discordWebhookUrl.trim(),
-    phone: String(input.phone || "").trim() || settings.whatsappPhone.trim(),
+    email: String(input.email || "").trim(),
+    chatId: String(input.chatId || "").trim(),
+    webhookUrl: String(input.webhookUrl || "").trim(),
+    phone: String(input.phone || "").trim(),
     ownerWallet: input.ownerWallet || settings.recipientWallet.trim(),
+    nodeId: String(input.nodeId || "").trim(),
   };
 }
 
@@ -239,7 +249,7 @@ export async function sendAlert(input: AlertInput): Promise<AlertResult> {
   }
 
   if (channel === "email" && !isValidAlertEmail(payload.email)) {
-    const message = "Configura un email destinatario válido en el nodo o en Ajustes.";
+    const message = "Configura un email destinatario válido en el nodo.";
     addNotification({
       title: "No se pudo enviar por Email",
       message: `${payload.message}\n\n${message}`,

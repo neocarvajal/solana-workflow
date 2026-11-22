@@ -17,7 +17,8 @@ Deno.serve(async (req) => {
     try {
       const url = new URL(req.url);
       const ownerWallet = url.searchParams.get("ownerWallet") || undefined;
-      return json({ ok: true, channels: await alertChannelHealth(ownerWallet) });
+      const nodeId = url.searchParams.get("nodeId") || undefined;
+      return json({ ok: true, channels: await alertChannelHealth(ownerWallet, nodeId) });
     } catch (error) {
       const message = error instanceof Error ? error.message : "No se pudo consultar el estado.";
       return json({ ok: false, error: message }, 500);
