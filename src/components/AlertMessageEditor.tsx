@@ -17,22 +17,42 @@ export const ALERT_MESSAGE_VARIABLES = [
 const TOKEN_SPLIT = /(\{\{\s*[\w.]+\s*\}\})/g;
 const TOKEN_ONLY = /^\{\{\s*[\w.]+\s*\}\}$/;
 
-function HighlightedMessage({ value }: { value: string }) {
+function HighlightedMessage({
+  value,
+  onTokenClick,
+}: {
+  value: string;
+  onTokenClick: (position: number) => void;
+}) {
   const parts = value.split(TOKEN_SPLIT);
+  let offset = 0;
+
   return (
     <>
-      {parts.map((part, index) =>
-        TOKEN_ONLY.test(part) ? (
+      {parts.map((part, index) => {
+        const start = offset;
+        offset += part.length;
+        if (!TOKEN_ONLY.test(part)) {
+          return <React.Fragment key={index}>{part}</React.Fragment>;
+        }
+        const name = part.replace(/^\{\{\s*|\s*\}\}$/g, "");
+        const label =
+          ALERT_MESSAGE_VARIABLES.find((item) => item.token === name)?.label ||
+          "Variable del mensaje";
+        return (
           <span
             key={index}
-            className="rounded bg-purple/20 font-semibold text-purple"
+            role="button"
+            tabIndex={-1}
+            title={`${label} · clic para colocar el cursor al final`}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onTokenClick(start + part.length)}
+            className="pointer-events-auto cursor-pointer rounded bg-purple/30 font-semibold text-purple transition-colors duration-150 hover:bg-purple/50 hover:text-[#c084fc]"
           >
             {part}
           </span>
-        ) : (
-          <React.Fragment key={index}>{part}</React.Fragment>
-        ),
-      )}
+        );
+      })}
       {"\n"}
     </>
   );
@@ -58,6 +78,13 @@ export default function AlertMessageEditor({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
+  const focusCaret = (position: number) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.focus();
+    textarea.setSelectionRange(position, position);
+  };
+
   const insertVariable = (token: string) => {
     const textarea = textareaRef.current;
     const tokenText = `{{${token}}}`;
@@ -66,12 +93,7 @@ export default function AlertMessageEditor({
     const next = `${value.slice(0, start)}${tokenText}${value.slice(end)}`;
     onChange(next);
 
-    requestAnimationFrame(() => {
-      if (!textarea) return;
-      textarea.focus();
-      const caret = start + tokenText.length;
-      textarea.setSelectionRange(caret, caret);
-    });
+    requestAnimationFrame(() => focusCaret(start + tokenText.length));
   };
 
   return (
@@ -82,7 +104,7 @@ export default function AlertMessageEditor({
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-3 py-3 font-mono text-base leading-6 sm:py-2.5 sm:text-sm"
         >
-          <HighlightedMessage value={value} />
+          <HighlightedMessage value={value} onTokenClick={focusCaret} />
         </div>
         <textarea
           ref={textareaRef}
@@ -115,7 +137,7 @@ export default function AlertMessageEditor({
               title={variable.label}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => insertVariable(variable.token)}
-              className="inline-flex items-center gap-0.5 rounded-full border border-purple/30 bg-purple/10 px-2 py-1 font-mono text-[11px] text-purple transition-colors hover:border-purple/60 hover:bg-purple/20 focus:outline-none focus:ring-2 focus:ring-purple/50"
+              className="inline-flex items-center gap-0.5 rounded-full border border-purple/30 bg-purple/15 px-2 py-1 font-mono text-[11px] text-purple transition-colors duration-150 hover:border-purple/60 hover:bg-purple/30 focus:outline-none focus:ring-2 focus:ring-purple/50"
             >
               <span className="opacity-60">{"{{"}</span>
               {variable.token}
