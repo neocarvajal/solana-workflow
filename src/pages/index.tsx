@@ -65,7 +65,7 @@ const Landing: React.FC = () => {
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      if (!data?.workflow) throw new Error("No workflow returned");
+      if (!data?.workflow) throw new Error("El servidor no devolvió un workflow");
 
       const wf = data.workflow as Workflow;
 
@@ -76,10 +76,10 @@ const Landing: React.FC = () => {
       setFlowNodes(nodes);
       setScenarioName(wf.name || "My Scenario");
 
-      toast.success("Workflow generated & loaded!");
+      toast.success("¡Workflow generado y cargado!");
       router.push("/dashboard");
     } catch (e: any) {
-      toast.error(e.message || "Failed to generate");
+      toast.error(e.message || "No se pudo generar el workflow");
     } finally {
       setLoading(false);
     }

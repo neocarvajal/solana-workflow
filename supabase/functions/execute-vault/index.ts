@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
       {
         error: "Vault execution is disabled",
         code: "VAULT_EXECUTION_DISABLED",
-        note: "Operational kill switch: vault execution is paused on the server.",
+        note: "Kill switch operativo: la ejecución de la bóveda está en pausa en el servidor.",
       },
       503,
     );
@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
       return json(
         {
           error: "unsupported_asset",
-          note: "Supported assets: SOL, USDC, JUP, BONK.",
+          note: "Activos compatibles: SOL, USDC, JUP, BONK.",
         },
         400,
       );

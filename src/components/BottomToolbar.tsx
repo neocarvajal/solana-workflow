@@ -247,13 +247,15 @@ const BottomToolbar: React.FC = () => {
 
   const handleSave = async () => {
     if (!connected || !publicKey) {
-      toast.error("Wallet required", { description: "Please connect your wallet." });
+      toast.error("Wallet no conectada", {
+        description: "Conecta tu wallet para continuar.",
+      });
       return;
     }
 
     const wf = getWorkflow();
     if (!wf) {
-      toast.error("Build or generate a workflow first");
+      toast.error("Crea o genera un workflow primero");
       return;
     }
 
@@ -333,14 +335,14 @@ const BottomToolbar: React.FC = () => {
   const runSimulation = async () => {
     const nodes = getFlowNodes();
     if (nodes.length === 0) {
-      toast.error("Add at least one node to simulate the workflow");
+      toast.error("Añade al menos un nodo para simular el workflow");
       return;
     }
 
     setIsRunning(true);
     setErrorNodeId(null);
     const triggerEngine = new TriggerEngine();
-    toast.info("Starting workflow simulation...");
+    toast.info("Iniciando simulación del workflow…");
 
     let simulatedTxSnapshot = null;
     let activeNodeId: string | null = null;
@@ -358,22 +360,22 @@ const BottomToolbar: React.FC = () => {
         const params = node.params || {};
 
         if (node.module.kind === "trigger") {
-          toast.info(`Validating trigger: ${node.module.name}...`);
+          toast.info(`Validando el trigger: ${node.module.name}…`);
           const evaluation = await triggerEngine.evaluateTrigger(node);
 
           if (!evaluation.triggered) {
             setErrorNodeId(node.id);
             setRunningNodeId(null);
             setAnimatingLineIndex(-1);
-            toast.error(`Condition not met: ${node.module.name}`);
+            toast.error(`No se cumplió la condición: ${node.module.name}`);
             return;
           }
 
           triggerVariables = evaluation.data;
-          toast.success("Trigger condition met!");
+          toast.success("¡Condición del trigger cumplida!");
 
         } else {
-          toast.info(`Executing step ${i}: ${node.module.name}...`);
+          toast.info(`Ejecutando paso ${i}: ${node.module.name}…`);
           await new Promise((r) => setTimeout(r, 1000));
 
           let desc = "Action executed successfully.";
@@ -388,31 +390,31 @@ const BottomToolbar: React.FC = () => {
 
               // Validate required parameters
               if (!amountParam) {
-                toast.error("Missing amount for transaction", {
-                  description: "Please configure the amount parameter in the node settings.",
+                toast.error("Falta el monto de la transferencia", {
+                  description: "Configura el monto en los ajustes del nodo.",
                 });
-                throw new Error("Missing amount parameter");
+                throw new Error("Falta el monto");
               }
               if (!assetParam) {
-                toast.error("Missing asset for transaction", {
-                  description: "Please configure the asset parameter in the node settings.",
+                toast.error("Falta el activo de la transferencia", {
+                  description: "Configura el activo en los ajustes del nodo.",
                 });
-                throw new Error("Missing asset parameter");
+                throw new Error("Falta el activo");
               }
 
               if (!toParam || toParam.trim() === "") {
-                toast.error("Missing recipient for transaction", {
-                  description: "Please configure the recipient wallet in the node settings.",
+                toast.error("Falta el destinatario de la transferencia", {
+                  description: "Configura la wallet destinataria en los ajustes del nodo.",
                 });
-                throw new Error("Missing recipient parameter");
+                throw new Error("Falta el destinatario");
               }
 
               const targetAmount = amountParam;
               const targetAsset = assetParam;
               const targetTo = toParam;
 
-              toast.info(`Preparing transfer of ${targetAmount} ${targetAsset}...`, {
-                description: "Please sign the transaction in your wallet",
+              toast.info(`Preparando transferencia de ${targetAmount} ${targetAsset}…`, {
+                description: "Firma la transacción en tu wallet",
               });
 
               const payload = {
@@ -444,22 +446,22 @@ const BottomToolbar: React.FC = () => {
               }
 
               if (!data?.serializedTx) {
-                throw new Error("Failed to simulate transaction");
+                throw new Error("No se pudo simular la transacción");
               }
 
               const transaction = Transaction.from(Buffer.from(data.serializedTx, "base64"));
 
               const signature = await sendTransaction(transaction, connection).catch((err) => {
                 if (err.name === "WalletSendTransactionError" || err.message?.includes("User rejected")) {
-                  throw new Error("Canceled By User");
+                  throw new Error("Cancelado por el usuario");
                 }
                 throw err;
               });
 
-              toast.info("Transaction broadcasted! Waiting for confirmation...");
+              toast.info("¡Transacción enviada! Esperando confirmación…");
               await confirmTransactionOverHttp(connection, signature);
 
-              desc = `Successfully sent ${targetAmount} ${targetAsset} to ${targetTo.slice(0, 6)}...`;
+              desc = `Se envió ${targetAmount} ${targetAsset} a ${targetTo.slice(0, 6)}... correctamente`;
               stepSignature = signature;
               lastExecutedTx = { index: i, signature };
               simulatedTxSnapshot = { signature, actionType: "send_transaction" };
@@ -500,10 +502,10 @@ const BottomToolbar: React.FC = () => {
               const { amount, from, to } = node.params;
   
               if (!amount || !from || !to) {
-                throw new Error("Missing swap parameters (amount, from, or to)");
+                throw new Error("Faltan parámetros del swap (monto, origen o destino)");
               }
 
-              toast.info("Preparing swap...");
+              toast.info("Preparando swap…");
 
               // 1. Llamar a tu Edge Function para obtener el "Order" (Jupiter v2)
               const { transaction, requestId } = await supabase.functions.invoke("simulate-swap", {
@@ -513,7 +515,7 @@ const BottomToolbar: React.FC = () => {
                 }
               }).then(res => res.data);
 
-              if (!transaction || !requestId) throw new Error("Failed to initialize swap order");
+              if (!transaction || !requestId) throw new Error("No se pudo inicializar la orden de swap");
 
               // 2. Deserializar la VersionedTransaction (v0)
               const swapTxBuffer = Buffer.from(transaction, "base64");
@@ -524,7 +526,7 @@ const BottomToolbar: React.FC = () => {
               const signedTx = await wallet.signTransaction(tx); 
 
               // 4. Ejecución gestionada por Jupiter (Managed Landing)
-              toast.info("Executing swap via Jupiter...");
+              toast.info("Ejecutando swap vía Jupiter…");
               
               const executeResult = await fetch("https://api.jup.ag/swap/v2/execute", {
                 method: "POST",
@@ -540,18 +542,18 @@ const BottomToolbar: React.FC = () => {
 
               if (executeResult.error) {
                 console.error("Jupiter Execute Error:", executeResult);
-                throw new Error(`Execution failed: ${executeResult.error}`);
+                throw new Error(`Falló la ejecución: ${executeResult.error}`);
               }
 
               // 5. Éxito
-              desc = `Swapped ${amount} ${from.slice(0, 4)}... to ${to.slice(0, 4)}...`;
+              desc = `Swap de ${amount} ${from.slice(0, 4)}... a ${to.slice(0, 4)}...`;
               if (executeResult.signature) {
                 stepSignature = executeResult.signature;
                 notifyTxSuccess("Swap completado correctamente", executeResult.signature, {
                   description: desc,
                 });
               } else {
-                toast.success("Swap completed successfully!", { description: desc });
+                toast.success("¡Swap completado correctamente!", { description: desc });
               }
               simulatedTxSnapshot = { signature: executeResult.signature, actionType: "swap" };
               setLastTxData(simulatedTxSnapshot);
@@ -562,15 +564,15 @@ const BottomToolbar: React.FC = () => {
                 description: desc,
               });
             } else {
-              toast.success(`Step ${i} completed: ${node.module.name}`, { description: desc });
+              toast.success(`Paso ${i} completado: ${node.module.name}`, { description: desc });
             }
           } catch (err: any) {
-            if (err.message === "Canceled By User") {
+            if (err.message === "Cancelado por el usuario") {
               throw err;
             }
             setErrorNodeId(node.id);
             console.error("Step execution error:", err);
-            throw new Error(`Step ${i} failed: ${err.message}`);
+            throw new Error(`El paso ${i} falló: ${err.message}`);
           }
         }
 
@@ -588,14 +590,14 @@ const BottomToolbar: React.FC = () => {
           description: "La simulación del canvas firma desde tu wallet y no mueve fondos de la bóveda.",
         });
       } else {
-        toast.success("Workflow simulation completed successfully! 🎉");
+        toast.success("¡Simulación del workflow completada correctamente! 🎉");
       }
       if (simulatedTxSnapshot) setIsModalOpen(true);
 
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || "Simulation failed");
-      if (activeNodeId && err?.message !== "Canceled By User") {
+      toast.error(err.message || "La simulación falló");
+      if (activeNodeId && err?.message !== "Cancelado por el usuario") {
         setErrorNodeId(activeNodeId);
       }
       setRunningNodeId(null);
@@ -638,13 +640,13 @@ const BottomToolbar: React.FC = () => {
     const currentWorkflow = nodesToWorkflow(getScenarioName(), getFlowNodes());
     const wf = currentWorkflow || getWorkflow();
     if (!wf) {
-      toast.error("Build or generate a workflow first");
+      toast.error("Crea o genera un workflow primero");
       return;
     }
 
     if (!connected || !publicKey) {
-      toast.error("Wallet not connected", {
-        description: "Please connect any Solana wallet using the top button."
+      toast.error("Wallet no conectada", {
+        description: "Conecta tu wallet con el botón superior."
       });
       return;
     }
@@ -720,10 +722,10 @@ const BottomToolbar: React.FC = () => {
     const { data: pin, error: pinErr, response } = await supabase.functions.invoke("pin-to-ipfs", { body });
     if (pinErr) {
       const errorBody = response ? await response.json().catch(() => ({})) : {};
-      throw new Error(errorBody.error?.message || pinErr.message || "IPFS Pinning failed");
+      throw new Error(errorBody.error?.message || pinErr.message || "Falló el guardado en IPFS");
     }
     const cid = pin?.cid;
-    if (!cid) throw new Error("IPFS did not return a CID");
+    if (!cid) throw new Error("IPFS no devolvió un CID");
 
     // 3. Publicación On-Chain
     const prev = getOnchainMeta();
@@ -831,7 +833,7 @@ const BottomToolbar: React.FC = () => {
     );
   } catch (e: any) {
     console.error("--- PUBLISH ERROR ---", e);
-    toast.error(e.message || "Publish failed");
+    toast.error(e.message || "La publicación falló");
   } finally {
     setPublishing(false);
   }

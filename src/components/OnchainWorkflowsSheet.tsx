@@ -46,7 +46,7 @@ const OnchainWorkflowsSheet: React.FC<OnchainWorkflowsSheetProps> = ({ hideTrigg
 
   const load = useCallback(async () => {
     if (!publicKey) {
-      toast.error("Connect your wallet first");
+      toast.error("Conecta tu wallet primero");
       return;
     }
 
@@ -155,7 +155,7 @@ const OnchainWorkflowsSheet: React.FC<OnchainWorkflowsSheetProps> = ({ hideTrigg
 
   const loadOne = async (e: OnchainEntry) => {
     if (!publicKey) {
-      toast.error("Connect your wallet first");
+      toast.error("Conecta tu wallet primero");
       return;
     }
 
@@ -215,7 +215,9 @@ const OnchainWorkflowsSheet: React.FC<OnchainWorkflowsSheetProps> = ({ hideTrigg
       setOpen(false);
       router.push({ pathname: "/dashboard", query: { id: record.id } });
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Could not fetch from IPFS");
+      toast.error(
+        err instanceof Error ? err.message : "No se pudo obtener el workflow desde IPFS",
+      );
     } finally {
       setLoadingCid(null);
     }

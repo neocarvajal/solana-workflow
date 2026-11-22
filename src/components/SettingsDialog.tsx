@@ -25,7 +25,7 @@ const SettingsDialog: React.FC<{ listenForOpenEvent?: boolean }> = ({ listenForO
 
   const handleSave = () => {
     saveSettings({ recipientWallet: recipient });
-    toast.success("Settings saved");
+    toast.success("Configuración guardada");
     setOpen(false);
   };
 

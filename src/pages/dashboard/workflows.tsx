@@ -147,7 +147,7 @@ const WorkflowDashboard: React.FC = () => {
     e.stopPropagation();
     
     if (!walletAddress) {
-      toast.error("Please connect your wallet");
+      toast.error("Conecta tu wallet");
       return;
     }
 
@@ -182,11 +182,11 @@ const WorkflowDashboard: React.FC = () => {
           // Sync state and UI only after successful execution
           setWorkflows(readSavedWorkflows(walletAddress));
           
-          return 'Workflow deleted successfully';
+          return 'Workflow eliminado correctamente';
         },
         error: (err) => {
           console.error("Error deleting workflow:", err);
-          return 'Failed to delete workflow from IPFS network';
+          return 'No se pudo eliminar el workflow de la red IPFS';
         }
       }
     );
@@ -227,11 +227,11 @@ const WorkflowDashboard: React.FC = () => {
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
                   <Folder className="h-8 w-8 text-muted-foreground" />
                 </div>
-                <h3 className="mb-2 text-lg font-semibold sm:text-xl">Connect Your Wallet</h3>
+                <h3 className="mb-2 text-lg font-semibold sm:text-xl">Conecta tu wallet</h3>
                 <p className="mb-6 max-w-md text-sm text-muted-foreground">
-                  Please connect your Solana wallet to view and manage your saved workflows.
+                  Conecta tu wallet de Solana para ver y gestionar tus workflows guardados.
                 </p>
-                <p className="text-sm font-medium text-primary">Use the "Connect Wallet" button above.</p>
+                <p className="text-sm font-medium text-primary">Usa el botón "Connect Wallet" de arriba.</p>
               </div>
             ) : restoring && workflows.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/40 bg-muted/20 px-4 py-16 text-center">

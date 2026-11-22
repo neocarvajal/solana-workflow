@@ -282,15 +282,25 @@ Deno.serve(async (req) => {
                   });
                   blockStep(stepIndex);
                 } else if (!response.ok || !result.ok) {
+                  const vaultError = String(result.error || "");
+                  const vaultNoteMap: Record<string, string> = {
+                    "Operational kill switch: vault execution is paused on the server.":
+                      "Kill switch operativo: la ejecución de la bóveda está en pausa en el servidor.",
+                    "Supported assets: SOL, USDC, JUP, BONK.":
+                      "Activos compatibles: SOL, USDC, JUP, BONK.",
+                  };
+                  const rawNote = typeof result.note === "string" ? result.note : "";
+                  const mappedNote =
+                    vaultError === "asset_mint_mismatch"
+                      ? "La bóveda autoriza otro activo. Ábrela, selecciona el activo del workflow, guarda los límites y vuelve a activar el cron."
+                      : vaultNoteMap[rawNote] || rawNote || undefined;
                   logs.push({
                     step: "send_transaction",
                     executed: false,
                     reason: "vault_execution_failed",
                     status: response.status,
-                    error: result.error || "execute-vault failed",
-                    note: result.error === "asset_mint_mismatch"
-                      ? "La bóveda autoriza otro activo. Ábrela, selecciona el activo del workflow, guarda los límites y vuelve a activar el cron."
-                      : result.note || undefined,
+                    error: vaultError || "execute-vault failed",
+                    note: mappedNote,
                     executionMode,
                     payload,
                   });
@@ -330,7 +340,7 @@ Deno.serve(async (req) => {
                 step: "send_transaction",
                 simulated: true,
                 payload,
-                note: "Transaction simulated — wallet signing pending integration.",
+                note: "Transacción simulada — la firma de la wallet aún no está integrada.",
               });
             }
           } else if (step.type === "swap") {
@@ -358,7 +368,7 @@ Deno.serve(async (req) => {
                 step: "swap",
                 simulated: true,
                 payload,
-                note: "Swap simulated — wallet signing pending integration.",
+                note: "Swap simulado — la firma de la wallet aún no está integrada.",
               });
             }
           } else if (step.type === "send_alert") {
@@ -380,7 +390,7 @@ Deno.serve(async (req) => {
             const alert = await deliverAlert({
               channel: step.params.channel || "app",
               title: step.params.title,
-              message: step.params.message || "Trigger fired!",
+              message: step.params.message || "¡Disparador activado!",
               email: step.params.email,
               chatId: step.params.chatId,
               webhookUrl: step.params.webhookUrl,
@@ -410,7 +420,7 @@ Deno.serve(async (req) => {
                 { appendPriceContext: false, appendTransactionContext: false },
               ).slice(0, 200);
               const message = resolveAlertMessage(
-                String(step.params.message || "Trigger fired!"),
+                String(step.params.message || "¡Disparador activado!"),
                 variables,
                 { appendPriceContext: !financialAutomation },
               ).slice(0, 4000);
@@ -455,7 +465,7 @@ Deno.serve(async (req) => {
             const data = await getDexPair(step.params.pairAddress);
             logs.push({ step: "dexscreener_lookup", pair: data?.pairs?.[0]?.baseToken });
           } else if (step.type === "ai_decision") {
-            logs.push({ step: "ai_decision", prompt: step.params.prompt, note: "Stub — wire to AI gateway." });
+            logs.push({ step: "ai_decision", prompt: step.params.prompt, note: "Pendiente: conectar con el gateway de IA." });
           } else {
             logs.push({ step: step.type, skipped: true });
           }

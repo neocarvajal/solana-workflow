@@ -188,7 +188,7 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
       placeholder: "Alerta de precio",
       description: "Asunto del email o título de la notificación (opcional)",
     },
-    { key: "message", label: "Mensaje", type: "textarea", placeholder: "Current {{asset}} price: {{price}}", description: "Inserta variables con los botones morados o escríbelas entre {{ }}. Se resaltan en morado. El precio y el enlace de la transacción se añaden al final si no los usas." },
+    { key: "message", label: "Mensaje", type: "textarea", placeholder: "Precio actual de {{asset}}: {{price}}", description: "Inserta variables con los botones morados o escríbelas entre {{ }}. Se resaltan en morado. El precio y el enlace de la transacción se añaden al final si no los usas." },
     {
       key: "email", label: "Email destinatario", type: "email",
       showWhen: { key: "channel", equals: "email" },

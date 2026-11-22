@@ -28,11 +28,11 @@ const AiBuilder: React.FC<Props> = ({ onWorkflow }) => {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      if (!data?.workflow) throw new Error("No workflow returned");
-      toast.success("Workflow generated");
+      if (!data?.workflow) throw new Error("El servidor no devolvió un workflow");
+      toast.success("Workflow generado");
       onWorkflow(data.workflow as Workflow);
     } catch (e: any) {
-      toast.error(e.message || "Failed to generate");
+      toast.error(e.message || "No se pudo generar el workflow");
     } finally {
       setLoading(false);
     }

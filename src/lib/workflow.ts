@@ -68,7 +68,7 @@ export const STEP_MODULES: ModuleDef[] = [
     defaultParams: {
       channel: "app",
       title: "Alerta de Solana Workflow",
-      message: "Trigger fired!",
+      message: "¡Disparador activado!",
       email: "",
       chatId: "",
       webhookUrl: "",

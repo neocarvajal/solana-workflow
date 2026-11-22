@@ -157,7 +157,7 @@ export async function publishWorkflowMemo(
 ): Promise<{ signature: string }> {
   const { publicKey, sendTransaction } = walletTools;
 
-  if (!publicKey) throw new Error("Wallet not connected");
+  if (!publicKey) throw new Error("Wallet no conectada");
 
   const memo = JSON.stringify({ v: 1, app: "solflows", ...payload });
   const ix = new TransactionInstruction({
