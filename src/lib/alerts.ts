@@ -152,7 +152,7 @@ function formatAlertValue(key: string, value: unknown, variables: Record<string,
 export function resolveAlertMessage(
   template: string,
   variables?: Record<string, unknown>,
-  options?: { appendPriceContext?: boolean },
+  options?: { appendPriceContext?: boolean; appendTransactionContext?: boolean },
 ): string {
   const input = String(template || "");
   const source = asRecord(variables);
@@ -198,7 +198,12 @@ export function resolveAlertMessage(
   // the explorer URL. Include the link even if the template doesn't name it.
   const rawTxUrl = flat.txUrl ?? flat.explorerUrl ?? flat.transactionUrl;
   const txUrl = typeof rawTxUrl === "string" ? rawTxUrl.trim() : "";
-  if (txUrl && input.trim() && !resolved.includes(txUrl)) {
+  if (
+    options?.appendTransactionContext !== false &&
+    txUrl &&
+    input.trim() &&
+    !resolved.includes(txUrl)
+  ) {
     resolved = `${resolved}\n\nVer transacción: ${txUrl}`;
   }
 
@@ -214,7 +219,7 @@ function resolvePayload(input: AlertInput) {
     title: resolveAlertMessage(
       String(input.title || "").trim() || "Alerta de Solana Workflow",
       variables,
-      { appendPriceContext: false },
+      { appendPriceContext: false, appendTransactionContext: false },
     ),
     email: String(input.email || "").trim(),
     chatId: String(input.chatId || "").trim(),

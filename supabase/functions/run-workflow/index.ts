@@ -390,7 +390,7 @@ Deno.serve(async (req) => {
               const title = resolveAlertMessage(
                 String(step.params.title || "").trim() || "Alerta de Solana Workflow",
                 variables,
-                { appendPriceContext: false },
+                { appendPriceContext: false, appendTransactionContext: false },
               ).slice(0, 200);
               const message = resolveAlertMessage(
                 String(step.params.message || "Trigger fired!"),

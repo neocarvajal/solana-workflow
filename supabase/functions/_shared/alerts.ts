@@ -252,7 +252,7 @@ function formatAlertValue(key: string, value: unknown, variables: Record<string,
 export function resolveAlertMessage(
   template: string,
   variables?: Record<string, unknown>,
-  options?: { appendPriceContext?: boolean },
+  options?: { appendPriceContext?: boolean; appendTransactionContext?: boolean },
 ): string {
   const input = String(template || "");
   const source = asRecord(variables);
@@ -298,7 +298,12 @@ export function resolveAlertMessage(
   // the explorer URL. Include the link even if the template doesn't name it.
   const rawTxUrl = flat.txUrl ?? flat.explorerUrl ?? flat.transactionUrl;
   const txUrl = typeof rawTxUrl === "string" ? rawTxUrl.trim() : "";
-  if (txUrl && input.trim() && !resolved.includes(txUrl)) {
+  if (
+    options?.appendTransactionContext !== false &&
+    txUrl &&
+    input.trim() &&
+    !resolved.includes(txUrl)
+  ) {
     resolved = `${resolved}\n\nVer transacción: ${txUrl}`;
   }
 
@@ -764,6 +769,7 @@ export async function deliverAlert(
 
   const title = resolveAlertMessage(text(payload?.title), variables, {
     appendPriceContext: false,
+    appendTransactionContext: false,
   }).slice(0, MAX_TITLE_LENGTH);
   // Telegram sendMessage only has a text body. Older workflows still carry a
   // title, so ignore it for this channel instead of prepending it to the text.
