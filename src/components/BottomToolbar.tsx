@@ -840,9 +840,9 @@ const BottomToolbar: React.FC = () => {
 
   return (
     <>
-      <div className="relative z-30 w-full shrink-0 border-t border-border bg-background px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 sm:h-12 sm:px-4 sm:py-0">
-        <div className="flex flex-wrap items-center gap-2 sm:h-full sm:flex-nowrap sm:justify-between sm:gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap sm:justify-start">
+      <div className="relative z-30 w-full shrink-0 border-t border-border bg-background px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 lg:h-12 lg:px-4 lg:py-0">
+        <div className="flex flex-wrap items-center gap-2 lg:h-full lg:flex-nowrap lg:justify-between lg:gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 lg:flex-nowrap lg:justify-start">
             <button
               onClick={handleSave}
               className="flex min-h-10 shrink-0 items-center gap-1 rounded-md px-2 py-2 text-sm text-foreground transition-colors hover:bg-muted"
@@ -902,10 +902,10 @@ const BottomToolbar: React.FC = () => {
                 <Upload className="h-4 w-4" />
               )}
               <span className="whitespace-nowrap">
-                <span className="sm:hidden">
+                <span className="lg:hidden">
                   {publishMode === "update" ? "Actualizar" : "Publicar"}
                 </span>
-                <span className="hidden sm:inline">
+                <span className="hidden lg:inline">
                   {publishMode === "update" ? "Actualizar workflow on-chain" : "Publicar on-chain"}
                 </span>
               </span>
@@ -913,7 +913,7 @@ const BottomToolbar: React.FC = () => {
 
             {/* Switch, vault and theme share one compact row on mobile so the
                 canvas keeps as much height as possible. */}
-            <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:shrink-0">
+            <div className="flex w-full min-w-0 items-center gap-2 lg:w-auto lg:shrink-0">
               <div
                 className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-muted/50 px-2"
                 onClick={(event) => event.stopPropagation()}
@@ -937,7 +937,7 @@ const BottomToolbar: React.FC = () => {
               <button
                 onClick={() => window.dispatchEvent(new Event("open-vault"))}
                 disabled={!vaultReady}
-                className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-full border border-border px-2.5 py-1.5 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent sm:flex-none"
+                className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-full border border-border px-2.5 py-1.5 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent lg:flex-none"
                 title={vaultDisabledTitle}
                 aria-label="Abrir bóveda"
               >
@@ -949,14 +949,14 @@ const BottomToolbar: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex w-full min-w-0 items-stretch gap-2 sm:w-auto sm:justify-end">
-          <div className="flex min-w-0 flex-1 items-center gap-1 rounded-full bg-muted/50 sm:flex-none">
+          <div className="flex w-full min-w-0 items-stretch gap-2 lg:w-auto lg:justify-end">
+          <div className="flex min-w-0 flex-1 items-center gap-1 rounded-full bg-muted/50 lg:flex-none">
             <div className="flex min-w-0 items-center gap-1 px-2 py-0 text-muted-foreground">
               <Clock className="h-4 w-4 shrink-0" />
               <select
                 value={executionFrequency}
                 onChange={(event) => persistExecutionFrequency(event.target.value)}
-                className="h-10 w-full min-w-0 border-none bg-transparent text-base focus:outline-none sm:w-auto sm:text-sm"
+                className="h-10 w-full min-w-0 border-none bg-transparent text-base focus:outline-none lg:w-auto lg:text-sm"
                 aria-label="Frecuencia de ejecución"
                 title="Frecuencia con la que se ejecutará el workflow publicado on-chain"
               >
@@ -974,13 +974,13 @@ const BottomToolbar: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex min-w-0 flex-1 items-center gap-1 rounded-full bg-muted/50 sm:flex-none">
+          <div className="flex min-w-0 flex-1 items-center gap-1 rounded-full bg-muted/50 lg:flex-none">
             <div className="flex min-w-0 items-center gap-1 px-2 py-0 text-muted-foreground">
               <ShieldCheck className="h-4 w-4 shrink-0" />
               <select
                 value={executionMode}
                 onChange={(event) => persistExecutionMode(event.target.value)}
-                className="h-10 w-full min-w-0 border-none bg-transparent text-base focus:outline-none sm:w-auto sm:text-sm"
+                className="h-10 w-full min-w-0 border-none bg-transparent text-base focus:outline-none lg:w-auto lg:text-sm"
                 aria-label="Modo de ejecución"
                 title="Define si el cron solo avisa o si puede mover fondos desde una bóveda autorizada"
               >
@@ -994,7 +994,7 @@ const BottomToolbar: React.FC = () => {
           </div>
 
           {/* On mobile the zoom controls float over the canvas instead. */}
-          <div className="hidden items-center justify-end gap-2 sm:flex">
+          <div className="hidden items-center justify-end gap-2 lg:flex">
             <button
               onClick={() => setCanvasScale(scale - 0.1)}
               className="flex h-10 w-10 items-center justify-center rounded-md text-foreground transition-colors hover:bg-muted"

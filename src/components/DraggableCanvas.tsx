@@ -473,7 +473,7 @@ const DraggableCanvas: React.FC = () => {
 
       {/* Mobile zoom controls float at the bottom-right of the canvas so the
           bottom toolbar stays compact. */}
-      <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1 rounded-full border border-border/60 bg-background/90 p-1 shadow-lg backdrop-blur-sm sm:hidden">
+      <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1 rounded-full border border-border/60 bg-background/90 p-1 shadow-lg backdrop-blur-sm lg:hidden">
         <button
           type="button"
           onClick={() => setCanvasScale(scale - 0.1)}

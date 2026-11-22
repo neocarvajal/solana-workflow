@@ -757,7 +757,9 @@ export async function deliverAlert(
   const title = resolveAlertMessage(text(payload?.title), variables, {
     appendPriceContext: false,
   }).slice(0, MAX_TITLE_LENGTH);
-  const body = composeText(title, message);
+  // Telegram sendMessage only has a text body. Older workflows still carry a
+  // title, so ignore it for this channel instead of prepending it to the text.
+  const body = channel === "telegram" ? message : composeText(title, message);
 
   switch (channel) {
     case "app":

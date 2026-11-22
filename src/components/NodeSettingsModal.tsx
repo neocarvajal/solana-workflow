@@ -181,6 +181,9 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
     },
     {
       key: "title", label: "Título", type: "text",
+      // Telegram's sendMessage only accepts a text body, so a title makes no
+      // sense there. Keep it for channels that render a separate heading.
+      showWhen: { key: "channel", equals: ["app", "email", "discord", "whatsapp"] },
       placeholder: "Alerta de precio",
       description: "Asunto del email o título de la notificación (opcional)",
     },
@@ -498,6 +501,9 @@ const NodeSettingsModal: React.FC<{
       finalParams.nodeKey = nodeId || finalParams.nodeKey;
       finalParams.provider = isAlertProvider(emailProvider) ? emailProvider : "resend";
       finalParams.fromEmail = emailFrom.trim();
+      if (params.channel === "telegram") {
+        finalParams.title = "";
+      }
     }
     onSave({ ...node, params: finalParams });
   };
@@ -515,7 +521,7 @@ const NodeSettingsModal: React.FC<{
     try {
       const result = await sendAlert({
         channel: params.channel,
-        title: params.title || "Prueba de alerta",
+        title: params.channel === "telegram" ? undefined : params.title || "Prueba de alerta",
         message:
           params.message ||
           "Esta es una alerta de prueba enviada desde Solana Workflow.",

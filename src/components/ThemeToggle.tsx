@@ -42,9 +42,9 @@ const ThemeToggle = ({
       onClick={toggleTheme}
       className={
         inline
-          ? "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/60 bg-muted/50 text-foreground transition-colors hover:bg-muted sm:hidden"
-          : `fixed bottom-[calc(10.5rem+env(safe-area-inset-bottom))] right-4 z-50 h-11 w-11 items-center justify-center rounded-full bg-muted shadow-lg transition-all duration-300 hover:bg-muted/80 hover:shadow-xl sm:bottom-20 sm:right-8 ${
-              hideOnMobile ? "hidden sm:flex" : "flex"
+          ? "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/60 bg-muted/50 text-foreground transition-colors hover:bg-muted lg:hidden"
+          : `fixed bottom-[calc(10.5rem+env(safe-area-inset-bottom))] right-4 z-50 h-11 w-11 items-center justify-center rounded-full bg-muted shadow-lg transition-all duration-300 hover:bg-muted/80 hover:shadow-xl lg:bottom-20 lg:right-8 ${
+              hideOnMobile ? "hidden lg:flex" : "flex"
             }`
       }
       aria-label={
