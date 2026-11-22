@@ -47,7 +47,7 @@ function HighlightedMessage({
             title={`${label} · clic para colocar el cursor al final`}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onTokenClick(start + part.length)}
-            className="pointer-events-auto cursor-pointer rounded bg-purple/30 font-semibold text-purple transition-colors duration-150 hover:bg-purple/50 hover:text-[#c084fc]"
+            className="pointer-events-auto cursor-pointer rounded bg-solana-purple/30 font-semibold text-solana-purple ring-1 ring-inset ring-solana-purple/40 transition-colors duration-150 hover:bg-solana-purple/50 hover:text-[#c084fc] hover:ring-solana-purple/70"
           >
             {part}
           </span>
@@ -125,7 +125,7 @@ export default function AlertMessageEditor({
 
       <div className="border-t border-border/40 bg-background/40 px-3 py-2.5">
         <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-          <Braces className="h-3.5 w-3.5 text-purple" />
+          <Braces className="h-3.5 w-3.5 text-solana-purple" />
           Variables del mensaje
           <span className="font-normal">· toca una para insertarla</span>
         </div>
@@ -137,7 +137,7 @@ export default function AlertMessageEditor({
               title={variable.label}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => insertVariable(variable.token)}
-              className="inline-flex items-center gap-0.5 rounded-full border border-purple/30 bg-purple/15 px-2 py-1 font-mono text-[11px] text-purple transition-colors duration-150 hover:border-purple/60 hover:bg-purple/30 focus:outline-none focus:ring-2 focus:ring-purple/50"
+              className="inline-flex items-center gap-0.5 rounded-full border border-solana-purple/30 bg-solana-purple/15 px-2 py-1 font-mono text-[11px] text-solana-purple transition-colors duration-150 hover:border-solana-purple/60 hover:bg-solana-purple/30 focus:outline-none focus:ring-2 focus:ring-solana-purple/50"
             >
               <span className="opacity-60">{"{{"}</span>
               {variable.token}
@@ -146,7 +146,7 @@ export default function AlertMessageEditor({
           ))}
         </div>
         <p className="mt-2 text-[10px] text-muted-foreground">
-          También puedes escribir <span className="font-mono text-purple">{"{{variable}}"}</span>: se resalta en morado al instante.
+          También puedes escribir <span className="font-mono text-solana-purple">{"{{variable}}"}</span>: se resalta en morado al instante.
         </p>
       </div>
     </div>
