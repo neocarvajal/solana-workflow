@@ -187,7 +187,7 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
       placeholder: "Alerta de precio",
       description: "Asunto del email o título de la notificación (opcional)",
     },
-    { key: "message", label: "Mensaje", type: "textarea", placeholder: "Current {{asset}} price: {{price}}", description: "Contenido de la alerta. Variables: {{price}}, {{asset}}, {{condition}}, {{value}}, {{timestamp}}. Si no usas {{price}}, se añade el precio del trigger al final." },
+    { key: "message", label: "Mensaje", type: "textarea", placeholder: "Current {{asset}} price: {{price}}", description: "Contenido de la alerta. Variables: {{price}}, {{asset}}, {{condition}}, {{value}}, {{timestamp}}, {{txUrl}} (enlace del explorer si el paso anterior fue una transferencia ejecutada), {{explorerUrl}} y {{txSignature}}. El precio del trigger y el enlace se añaden al final si no los usas." },
     {
       key: "email", label: "Email destinatario", type: "email",
       showWhen: { key: "channel", equals: "email" },

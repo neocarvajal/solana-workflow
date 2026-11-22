@@ -294,6 +294,14 @@ export function resolveAlertMessage(
     }
   }
 
+  // When an Alert follows a successful wallet transfer, run-workflow passes
+  // the explorer URL. Include the link even if the template doesn't name it.
+  const rawTxUrl = flat.txUrl ?? flat.explorerUrl ?? flat.transactionUrl;
+  const txUrl = typeof rawTxUrl === "string" ? rawTxUrl.trim() : "";
+  if (txUrl && input.trim() && !resolved.includes(txUrl)) {
+    resolved = `${resolved}\n\nVer transacción: ${txUrl}`;
+  }
+
   return resolved.trim();
 }
 

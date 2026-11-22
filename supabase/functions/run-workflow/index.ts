@@ -32,6 +32,13 @@ async function getDexPair(addr: string) {
   return await r.json();
 }
 
+/** Same explorer URL format used by the client (src/lib/solana.ts). */
+function solanaExplorerTxUrl(signature: string, cluster?: string): string {
+  const activeCluster = (cluster || "devnet").trim();
+  const clusterQuery = activeCluster === "mainnet-beta" ? "" : `?cluster=${activeCluster}`;
+  return `https://explorer.solana.com/tx/${signature}${clusterQuery}`;
+}
+
 type Step = { type: string; params: Record<string, any> };
 type Workflow = {
   name: string;
@@ -73,6 +80,9 @@ Deno.serve(async (req) => {
     let triggered = false;
     let triggerData: any = {};
     let vaultTransferExecuted = false;
+    const cluster = Deno.env.get("SOLANA_CLUSTER") || "devnet";
+    /** Last successful wallet transfer, so the next Alert can link the tx. */
+    let lastExecutedTx: { index: number; signature: string } | null = null;
 
     const t = workflow.trigger;
     if (t.type === "price_monitor") {
@@ -129,13 +139,12 @@ Deno.serve(async (req) => {
     if (!triggered) {
       logs.push({ result: "condition_not_met" });
     } else {
-      for (const step of workflow.steps) {
+      for (const [stepIndex, step] of workflow.steps.entries()) {
         try {
           if (step.type === "send_transaction") {
             const requestedAsset = String(step.params.asset || "SOL").toUpperCase();
             const payload = { to: step.params.to, amount: step.params.amount, asset: requestedAsset };
             if (financialAutomation) {
-              const cluster = Deno.env.get("SOLANA_CLUSTER") || "devnet";
               const asset = normalizeVaultAsset(requestedAsset);
               const requestedDestination = step.params.to
                 ? String(step.params.to)
@@ -271,6 +280,9 @@ Deno.serve(async (req) => {
                   });
                 } else {
                   vaultTransferExecuted = true;
+                  if (typeof result.signature === "string" && result.signature.trim()) {
+                    lastExecutedTx = { index: stepIndex, signature: result.signature.trim() };
+                  }
                   logs.push({
                     step: "send_transaction",
                     executed: true,
@@ -333,8 +345,18 @@ Deno.serve(async (req) => {
               });
             }
           } else if (step.type === "send_alert") {
+            // Only an immediately preceding successful wallet transfer has a
+            // real signature to link. Skipped/failed transfers expose nothing.
+            const txContext: Record<string, unknown> = {};
+            if (lastExecutedTx && stepIndex === lastExecutedTx.index + 1) {
+              const txUrl = solanaExplorerTxUrl(lastExecutedTx.signature, cluster);
+              txContext.txUrl = txUrl;
+              txContext.explorerUrl = txUrl;
+              txContext.txSignature = lastExecutedTx.signature;
+            }
             const variables = {
               ...triggerData,
+              ...txContext,
               trigger: triggerData,
               workflow: workflow.name,
             };
@@ -453,9 +475,7 @@ Deno.serve(async (req) => {
       const shortDestination = destination
         ? `${destination.slice(0, 4)}…${destination.slice(-4)}`
         : "la dirección configurada";
-      const cluster = Deno.env.get("SOLANA_CLUSTER") || "devnet";
-      const clusterQuery = cluster === "mainnet-beta" ? "" : `?cluster=${cluster}`;
-      const explorerUrl = `https://explorer.solana.com/tx/${txSignature}${clusterQuery}`;
+      const explorerUrl = solanaExplorerTxUrl(txSignature, cluster);
 
       const { error: transferNotificationError } = await sb
         .from("user_notifications")

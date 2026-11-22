@@ -345,6 +345,7 @@ const BottomToolbar: React.FC = () => {
     let simulatedTxSnapshot = null;
     let activeNodeId: string | null = null;
     let triggerVariables: Record<string, unknown> = {};
+    let lastExecutedTx: { index: number; signature: string } | null = null;
 
     try {
       setLastTxData(null);
@@ -460,9 +461,17 @@ const BottomToolbar: React.FC = () => {
 
               desc = `Successfully sent ${targetAmount} ${targetAsset} to ${targetTo.slice(0, 6)}...`;
               stepSignature = signature;
+              lastExecutedTx = { index: i, signature };
               simulatedTxSnapshot = { signature, actionType: "send_transaction" };
               setLastTxData(simulatedTxSnapshot);
             } else if (node.module.type === "send_alert") {
+              const txContext: Record<string, unknown> = {};
+              if (lastExecutedTx && i === lastExecutedTx.index + 1) {
+                const txUrl = solexplorerUrl(lastExecutedTx.signature, getCluster());
+                txContext.txUrl = txUrl;
+                txContext.explorerUrl = txUrl;
+                txContext.txSignature = lastExecutedTx.signature;
+              }
               const alertResult = await sendAlert({
                 channel: node.params.channel || "app",
                 title: node.params.title,
@@ -475,6 +484,7 @@ const BottomToolbar: React.FC = () => {
                 nodeId: node.params.nodeKey,
                 variables: {
                   ...triggerVariables,
+                  ...txContext,
                   trigger: triggerVariables,
                   workflow: getScenarioName(),
                 },
