@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   X, Trash2, Loader2, Send, AlertTriangle, Landmark,
-  ChevronDown, ExternalLink, ShieldCheck,
+  ChevronDown, ExternalLink, ShieldCheck, CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -306,10 +306,18 @@ const NodeSettingsModal: React.FC<{
   const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null);
   const [telegramToken, setTelegramToken] = useState("");
   const [savingTelegram, setSavingTelegram] = useState(false);
+  const [savePhase, setSavePhase] = useState<"idle" | "saved">("idle");
+  const saveCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const nodeId = String(params.nodeKey || "").trim();
   const providerDef = getAlertProvider(emailProvider);
   const isAlertNode = node.module.type === "send_alert";
+
+  useEffect(() => {
+    return () => {
+      if (saveCloseTimer.current) clearTimeout(saveCloseTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     const cleanParams = mergeParams(node.params);
@@ -497,6 +505,7 @@ const NodeSettingsModal: React.FC<{
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (savePhase === "saved") return;
     const finalParams = mergeParams(params);
     if (isAlertNode) {
       finalParams.nodeKey = nodeId || finalParams.nodeKey;
@@ -506,7 +515,15 @@ const NodeSettingsModal: React.FC<{
         finalParams.title = "";
       }
     }
-    onSave({ ...node, params: finalParams });
+
+    // Keep the dialog open just long enough to acknowledge the save, then let
+    // the canvas close it and pulse the edited node.
+    setSavePhase("saved");
+    toast.success(`Cambios guardados en ${node.module.name}.`);
+    saveCloseTimer.current = setTimeout(() => {
+      saveCloseTimer.current = null;
+      onSave({ ...node, params: finalParams });
+    }, 780);
   };
 
   const handleTestAlert = async () => {
@@ -551,7 +568,7 @@ const NodeSettingsModal: React.FC<{
       onClick={onClose}
     >
       <div
-        className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl sm:max-h-[85vh]"
+        className="relative flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl sm:max-h-[85vh]"
         onClick={(e) => e.stopPropagation()}
         style={{ animation: "fadeIn 0.2s ease-out" }}
         role="dialog"
@@ -968,6 +985,34 @@ const NodeSettingsModal: React.FC<{
             </button>
           </div>
         </form>
+
+        {savePhase === "saved" && (
+          <div
+            className="absolute inset-0 z-30 flex animate-fade-in flex-col items-center justify-center gap-2 bg-card/95 px-6 text-center backdrop-blur-sm"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="relative mb-1 flex h-16 w-16 items-center justify-center">
+              <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/20" />
+              <span
+                className="relative flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg"
+                style={{ animation: "savePop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)" }}
+              >
+                <CheckCircle2 className="h-8 w-8" />
+              </span>
+            </div>
+            <p className="text-base font-semibold text-foreground">Cambios guardados</p>
+            <p className="text-xs text-muted-foreground">
+              {node.module.name} · actualizando el workflow…
+            </p>
+            <div className="mt-2 h-1 w-32 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-gradient-purple-cyan"
+                style={{ animation: "saveProgress 0.78s linear forwards" }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

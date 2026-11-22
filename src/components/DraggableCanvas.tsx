@@ -10,6 +10,7 @@ import {
   getCanvasScale, setCanvasScale, subscribeScale,
   subscribeRunningNode, subscribeAnimatingLine,
   subscribeErrorNode, getErrorNodeId, setErrorNodeId,
+  subscribeSavedNode, getSavedNodeId, flashSavedNode,
   getExecutionMode, subscribeExecutionMode,
   getWorkflowId, subscribeWorkflowId,
 } from "@/lib/workflowStore";
@@ -35,6 +36,7 @@ const DraggableCanvas: React.FC = () => {
   const [search, setSearch] = useState("");
   const [runningNodeId, setRunningNodeId] = useState<string | null>(null);
   const [errorNodeId, setErrorNodeIdState] = useState<string | null>(getErrorNodeId());
+  const [savedNodeId, setSavedNodeIdState] = useState<string | null>(getSavedNodeId());
   const [animatingLineIndex, setAnimatingLineIndex] = useState<number>(-1);
   const [executionMode, setExecutionMode] = useState(getExecutionMode);
   const [vaultConfigured, setVaultConfigured] = useState<boolean | null>(null);
@@ -60,6 +62,7 @@ const DraggableCanvas: React.FC = () => {
     const unsubScale = subscribeScale((s) => setScale(s));
     const unsubRunning = subscribeRunningNode((id) => setRunningNodeId(id));
     const unsubError = subscribeErrorNode((id) => setErrorNodeIdState(id));
+    const unsubSaved = subscribeSavedNode((id) => setSavedNodeIdState(id));
     const unsubAnimating = subscribeAnimatingLine((idx) => setAnimatingLineIndex(idx));
     const unsubExecutionMode = subscribeExecutionMode(setExecutionMode);
     return () => {
@@ -67,6 +70,7 @@ const DraggableCanvas: React.FC = () => {
       unsubScale();
       unsubRunning();
       unsubError();
+      unsubSaved();
       unsubAnimating();
       unsubExecutionMode();
     };
@@ -446,6 +450,7 @@ const DraggableCanvas: React.FC = () => {
               scale={scale}
               isActive={runningNodeId === node.id && errorNodeId !== node.id}
               hasError={errorNodeId === node.id}
+              justSaved={savedNodeId === node.id}
               vaultRequired={vaultRequiredFor(node)}
               onDrag={onNodeDrag}
               onDoubleClick={onNodeDoubleClick}
@@ -503,6 +508,7 @@ const DraggableCanvas: React.FC = () => {
             const list = getFlowNodes().map((n) => (n.id === updatedNode.id ? updatedNode : n));
             setFlowNodes(list);
             if (getErrorNodeId() === updatedNode.id) setErrorNodeId(null);
+            flashSavedNode(updatedNode.id);
             closeSettings();
           }}
           onDelete={(id) => {

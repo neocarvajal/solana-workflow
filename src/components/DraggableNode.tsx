@@ -9,6 +9,7 @@ interface Props {
   scale: number;
   isActive: boolean;
   hasError: boolean;
+  justSaved?: boolean;
   vaultRequired?: boolean;
   onDrag: (id: string, x: number, y: number) => void;
   onDoubleClick: (node: FlowNode) => void;
@@ -24,6 +25,7 @@ const DraggableNode: React.FC<Props> = ({
   scale,
   isActive,
   hasError,
+  justSaved = false,
   vaultRequired = false,
   onDrag,
   onDoubleClick,
@@ -121,7 +123,7 @@ const DraggableNode: React.FC<Props> = ({
       <div className="flex flex-col items-center">
         <div className="relative">
           <div
-            className={`node-circle ${isActive ? "node-active" : ""} ${hasError ? "node-error" : ""}`}
+            className={`node-circle ${isActive ? "node-active" : ""} ${hasError ? "node-error" : ""} ${justSaved ? "node-saved" : ""}`}
             style={{
               width: NODE_RADIUS * 2,
               height: NODE_RADIUS * 2,

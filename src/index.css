@@ -377,11 +377,60 @@
   border-color: #ef4444 !important;
 }
 
+/* One-shot confirmation after saving a node's settings */
+@keyframes node-save-flash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(20, 241, 149, 0.85);
+    transform: scale(1);
+    border-color: #14f195 !important;
+  }
+  35% {
+    box-shadow: 0 0 26px 10px rgba(20, 241, 149, 0.7), 0 0 0 4px rgba(20, 241, 149, 0.45);
+    transform: scale(1.12);
+    border-color: #14f195 !important;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(20, 241, 149, 0);
+    transform: scale(1);
+  }
+}
+
+.node-circle.node-saved {
+  animation: node-save-flash 1.2s ease-out;
+  border-color: #14f195 !important;
+}
+
+/* Confirmation shown inside the settings dialog before it closes */
+@keyframes savePop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) rotate(-12deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes saveProgress {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .node-circle.node-error {
     animation: none;
     box-shadow: 0 0 24px 8px rgba(239, 68, 68, 0.75);
     border-color: #ef4444 !important;
+  }
+  .node-circle.node-saved {
+    animation: none;
+    box-shadow: 0 0 20px 6px rgba(20, 241, 149, 0.6);
+    border-color: #14f195 !important;
   }
 }
 

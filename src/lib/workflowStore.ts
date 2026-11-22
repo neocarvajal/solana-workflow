@@ -371,6 +371,32 @@ export function subscribeErrorNode(l: ErrorNodeListener) {
   return () => errorNodeListeners.delete(l);
 }
 
+/* ── Just-saved confirmation ─────────────────── */
+type SavedNodeListener = (nodeId: string | null) => void;
+let savedNodeId: string | null = null;
+const savedNodeListeners = new Set<SavedNodeListener>();
+let savedNodeTimer: ReturnType<typeof setTimeout> | undefined;
+
+export function getSavedNodeId() { return savedNodeId; }
+export function setSavedNodeId(id: string | null) {
+  savedNodeId = id;
+  savedNodeListeners.forEach((l) => l(savedNodeId));
+}
+export function subscribeSavedNode(l: SavedNodeListener) {
+  savedNodeListeners.add(l);
+  return () => savedNodeListeners.delete(l);
+}
+
+/** One-shot green pulse on the node whose settings were just saved. */
+export function flashSavedNode(id: string) {
+  if (savedNodeTimer) clearTimeout(savedNodeTimer);
+  setSavedNodeId(id);
+  savedNodeTimer = setTimeout(() => {
+    setSavedNodeId(null);
+    savedNodeTimer = undefined;
+  }, 1400);
+}
+
 type AnimatingLineListener = (index: number) => void;
 let animatingLineIndex: number = -1;
 const animatingLineListeners = new Set<AnimatingLineListener>();
