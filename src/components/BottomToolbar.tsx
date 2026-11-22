@@ -840,11 +840,8 @@ const BottomToolbar: React.FC = () => {
   return (
     <>
       <div className="relative z-30 w-full shrink-0 border-t border-border bg-background px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 sm:h-12 sm:px-4 sm:py-0">
-        <div className="flex flex-wrap items-center gap-2 sm:grid sm:h-full sm:grid-cols-[1fr_auto_1fr] sm:gap-3">
-          {/* Empty left column balances the selectors on the right so the main
-              action group stays optically centred on desktop. */}
-          <div className="hidden sm:block" aria-hidden="true" />
-          <div className="flex min-w-0 flex-wrap items-center justify-center gap-2 sm:flex-nowrap sm:justify-center">
+        <div className="flex flex-wrap items-center gap-2 sm:h-full sm:flex-nowrap sm:justify-between sm:gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap sm:justify-start">
             <button
               onClick={handleSave}
               className="flex min-h-10 shrink-0 items-center gap-1 rounded-md px-2 py-2 text-sm text-foreground transition-colors hover:bg-muted"
@@ -994,7 +991,6 @@ const BottomToolbar: React.FC = () => {
               </select>
             </div>
           </div>
-          </div>
 
           {/* On mobile the zoom controls float over the canvas instead. */}
           <div className="hidden items-center justify-end gap-2 sm:flex">
@@ -1015,6 +1011,7 @@ const BottomToolbar: React.FC = () => {
             >
               <ZoomIn className="h-4 w-4" />
             </button>
+          </div>
           </div>
         </div>
       </div>
