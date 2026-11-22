@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Trash2, Loader2, Send, AlertTriangle, Landmark } from "lucide-react";
 import { toast } from "sonner";
+import { useWallet } from "@solana/wallet-adapter-react";
 import type { FlowNode } from "@/lib/workflow";
 import { getSettings } from "@/lib/workflowStore";
 import {
@@ -253,6 +254,8 @@ const NodeSettingsModal: React.FC<{
   vaultRequired?: boolean;
 }> = ({ node, onSave, onClose, onDelete, vaultRequired = false }) => {
   const vaultReady = useVaultReady();
+  const { publicKey } = useWallet();
+  const ownerWallet = publicKey?.toBase58() || "";
 
   const mergeParams = (nodeParams: any) => {
     const defaults = node.module.defaultParams || {};
@@ -279,13 +282,13 @@ const NodeSettingsModal: React.FC<{
 
   useEffect(() => {
     let active = true;
-    fetchAlertChannelHealth().then((health) => {
+    fetchAlertChannelHealth(ownerWallet).then((health) => {
       if (active) setChannelHealth(health);
     });
     return () => {
       active = false;
     };
-  }, []);
+  }, [ownerWallet]);
 
   useEffect(() => {
     const cleanParams = mergeParams(node.params);
@@ -332,6 +335,7 @@ const NodeSettingsModal: React.FC<{
         chatId: params.chatId,
         webhookUrl: params.webhookUrl,
         phone: params.phone,
+        ownerWallet,
       });
       if (result.ok) {
         toast.success(result.message);
@@ -520,19 +524,30 @@ const NodeSettingsModal: React.FC<{
           {node.module.type === "send_alert" && (
             <>
               {params.channel && params.channel !== "app" && channelHealth && (
-                <p
+                <div
                   className={`mt-4 rounded-lg border px-3 py-2 text-xs ${
                     Boolean(channelHealth[String(params.channel)])
                       ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                       : "border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200"
                   }`}
                 >
-                  {Boolean(channelHealth[String(params.channel)])
-                    ? `Proveedor de ${alertChannelLabel(params.channel)} configurado y listo para enviar.`
-                    : params.channel === "email"
-                      ? "Email sin configurar: añade RESEND_API_KEY y ALERT_FROM_EMAIL en Supabase Secrets ( Dashboard → Edge Functions → Secrets )."
-                      : `Proveedor de ${alertChannelLabel(params.channel)} sin configurar en Supabase Secrets.`}
-                </p>
+                  <p>
+                    {Boolean(channelHealth[String(params.channel)])
+                      ? `${alertChannelLabel(params.channel)} listo para enviar.`
+                      : params.channel === "email"
+                        ? "Configura el proveedor de email en Ajustes antes de enviar alertas."
+                        : `Configura ${alertChannelLabel(params.channel)} en Ajustes antes de enviar alertas.`}
+                  </p>
+                  {!Boolean(channelHealth[String(params.channel)]) && (
+                    <button
+                      type="button"
+                      onClick={() => window.dispatchEvent(new Event("open-settings"))}
+                      className="mt-2 font-semibold underline underline-offset-2"
+                    >
+                      Abrir Ajustes
+                    </button>
+                  )}
+                </div>
               )}
               <button
                 type="button"

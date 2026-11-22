@@ -40,13 +40,24 @@ export function isValidAlertEmail(value: unknown): boolean {
 }
 
 /** Which channels have their provider credentials configured in Supabase. */
-export async function fetchAlertChannelHealth(): Promise<Record<string, unknown> | null> {
+export async function fetchAlertChannelHealth(
+  ownerWallet?: string,
+): Promise<Record<string, unknown> | null> {
   try {
-    const { data, error } = await supabase.functions.invoke("send-alert", {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key =
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return null;
+
+    const query = ownerWallet ? `?ownerWallet=${encodeURIComponent(ownerWallet)}` : "";
+    const response = await fetch(`${url}/functions/v1/send-alert${query}`, {
       method: "GET",
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
     });
-    if (error || !data || typeof data !== "object") return null;
-    return data as Record<string, unknown>;
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data && typeof data === "object" ? (data as Record<string, unknown>) : null;
   } catch {
     return null;
   }
@@ -192,7 +203,7 @@ function resolvePayload(input: AlertInput) {
     chatId: String(input.chatId || "").trim() || settings.telegramChatId.trim(),
     webhookUrl: String(input.webhookUrl || "").trim() || settings.discordWebhookUrl.trim(),
     phone: String(input.phone || "").trim() || settings.whatsappPhone.trim(),
-    ownerWallet: input.ownerWallet || "",
+    ownerWallet: input.ownerWallet || settings.recipientWallet.trim(),
   };
 }
 

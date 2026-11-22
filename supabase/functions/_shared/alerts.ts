@@ -1,3 +1,5 @@
+import { createClient } from "npm:@supabase/supabase-js@2";
+
 export type AlertChannel = "app" | "telegram" | "discord" | "email" | "whatsapp";
 
 export interface AlertPayload {
@@ -31,6 +33,95 @@ const DISCORD_HOSTS = new Set(["discord.com", "discordapp.com", "ptb.discord.com
 
 const env = (name: string) => (Deno.env.get(name) || "").trim();
 const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+
+const EMAIL_PROVIDER_LABELS: Record<string, string> = {
+  resend: "Resend",
+  sendgrid: "SendGrid",
+  postmark: "Postmark",
+};
+const EMAIL_PROVIDER_IDS = new Set(Object.keys(EMAIL_PROVIDER_LABELS));
+
+type EmailProviderConfig = {
+  provider: string;
+  api_key: string;
+  from_email: string;
+};
+
+type EmailProviderStatus = {
+  provider: string;
+  from_email: string;
+  configured: boolean;
+  updated_at?: string;
+};
+
+function emailProviderId(value: unknown): string {
+  const id = text(value).toLowerCase();
+  return EMAIL_PROVIDER_IDS.has(id) ? id : "resend";
+}
+
+function emailProviderLabel(value: unknown): string {
+  return EMAIL_PROVIDER_LABELS[emailProviderId(value)];
+}
+
+function parseFromAddress(value: string): { email: string; name: string } {
+  const match = value.match(/^(.*?)<([^>]+)>$/);
+  if (!match) return { email: value.trim(), name: "" };
+  return {
+    email: match[2].trim(),
+    name: match[1].trim().replace(/^"|"$/g, ""),
+  };
+}
+
+function emailProviderError(response: Response): string {
+  const status = response.status ? ` (HTTP ${response.status})` : "";
+  return `El proveedor de email no aceptó el mensaje${status}. Revisa la configuración en Ajustes.`;
+}
+
+function supabaseAdmin() {
+  const url = env("SUPABASE_URL") || env("NEXT_PUBLIC_SUPABASE_URL");
+  const key = env("SUPABASE_SERVICE_ROLE_KEY") || env("SUPABASE_SECRET_KEY");
+  if (!url || !key) return null;
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+async function readEmailConfig(ownerWallet: string): Promise<EmailProviderConfig | null> {
+  if (!ownerWallet) return null;
+  const sb = supabaseAdmin();
+  if (!sb) return null;
+  try {
+    const { data, error } = await sb.rpc("get_alert_provider_config", {
+      p_owner_wallet: ownerWallet,
+    });
+    if (error) {
+      console.error("alert provider config:", error.message);
+      return null;
+    }
+    const row = (data as EmailProviderConfig[] | null)?.[0];
+    return row?.api_key ? row : null;
+  } catch (error) {
+    console.error("alert provider config:", error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
+async function readEmailStatus(ownerWallet: string): Promise<EmailProviderStatus | null> {
+  if (!ownerWallet) return null;
+  const sb = supabaseAdmin();
+  if (!sb) return null;
+  try {
+    const { data, error } = await sb.rpc("get_alert_provider_status", {
+      p_owner_wallet: ownerWallet,
+    });
+    if (error) {
+      console.error("alert provider status:", error.message);
+      return null;
+    }
+    return (data as EmailProviderStatus[] | null)?.[0] ?? null;
+  } catch (error) {
+    console.error("alert provider status:", error instanceof Error ? error.message : error);
+    return null;
+  }
+}
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
@@ -322,66 +413,110 @@ async function sendEmail(
   body: string,
   fetchImpl: typeof fetch,
 ): Promise<AlertResult> {
-  const apiKey = env("RESEND_API_KEY");
-  const from = env("ALERT_FROM_EMAIL") || env("RESEND_FROM_EMAIL");
+  const saved = await readEmailConfig(text(payload.ownerWallet));
+  const provider = emailProviderId(saved?.provider || "resend");
+  const label = emailProviderLabel(provider);
+  const providerKeys: Record<string, string> = {
+    resend: text(saved?.api_key) || env("RESEND_API_KEY"),
+    sendgrid: text(saved?.api_key) || env("SENDGRID_API_KEY"),
+    postmark: text(saved?.api_key) || env("POSTMARK_SERVER_TOKEN"),
+  };
+  const apiKey = providerKeys[provider];
+  const fromRaw =
+    text(saved?.from_email) || env("ALERT_FROM_EMAIL") || env("RESEND_FROM_EMAIL");
+  const from = parseFromAddress(fromRaw);
   const to = text(payload.email) || env("ALERT_EMAIL_TO");
 
   if (!apiKey) {
     return fail(
       "email",
-      "Falta configurar RESEND_API_KEY en Supabase Secrets.",
+      `Configura ${label} en Ajustes antes de enviar alertas.`,
       503,
-      "resend",
+      provider,
     );
   }
-  if (!from) {
+  if (!from.email) {
     return fail(
       "email",
-      "Falta configurar ALERT_FROM_EMAIL en Supabase Secrets.",
+      "Configura el remitente de email en Ajustes antes de enviar alertas.",
       503,
-      "resend",
+      provider,
     );
+  }
+  if (!EMAIL_RE.test(from.email)) {
+    return fail("email", "El remitente configurado en Ajustes no es válido.", 400, provider);
   }
   if (!to) {
     return fail(
       "email",
-      "Falta el email destinatario. Configúralo en el nodo o en Ajustes.",
+      "Configura un email destinatario válido en el nodo o en Ajustes.",
       400,
-      "resend",
+      provider,
     );
   }
   if (!EMAIL_RE.test(to)) {
-    return fail("email", "El email destinatario no es válido.", 400, "resend");
+    return fail("email", "El email destinatario no es válido.", 400, provider);
   }
 
   const subject = (title || "Alerta de Solana Workflow").slice(0, MAX_TITLE_LENGTH);
   const html = `<!doctype html><html><body style="margin:0;padding:24px;background:#0b0b12;color:#f5f5f5;font-family:system-ui,-apple-system,'Segoe UI',sans-serif"><div style="max-width:560px;margin:0 auto;background:#15151f;border:1px solid #2a2a3a;border-radius:16px;padding:24px"><h1 style="margin:0 0 16px;font-size:20px;color:#ffffff">${escapeHtml(subject)}</h1><p style="margin:0;white-space:pre-wrap;line-height:1.6;color:#d4d4e0">${escapeHtml(body)}</p><p style="margin:24px 0 0;font-size:12px;color:#8b8b9e">Enviado por Solana Workflow</p></div></body></html>`;
 
-  const response = await fetchImpl("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      subject,
-      text: body,
-      html,
-    }),
-  });
+  let response: Response;
 
-  if (!response.ok) {
-    return fail(
-      "email",
-      `El proveedor de email rechazó el mensaje: ${await providerError(response, "Error de Resend")}`,
-      502,
-      "resend",
-    );
+  if (provider === "sendgrid") {
+    response = await fetchImpl("https://api.sendgrid.com/v3/mail/send", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: to }] }],
+        from: { email: from.email, ...(from.name ? { name: from.name } : {}) },
+        subject,
+        content: [
+          { type: "text/plain", value: body },
+          { type: "text/html", value: html },
+        ],
+      }),
+    });
+  } else if (provider === "postmark") {
+    response = await fetchImpl("https://api.postmarkapp.com/email", {
+      method: "POST",
+      headers: {
+        "X-Postmark-Server-Token": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        From: fromRaw,
+        To: to,
+        Subject: subject,
+        TextBody: body,
+        HtmlBody: html,
+      }),
+    });
+  } else {
+    response = await fetchImpl("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: fromRaw,
+        to: [to],
+        subject,
+        text: body,
+        html,
+      }),
+    });
   }
 
-  return success("email", "resend", `Alerta enviada por email a ${to}.`, response.status);
+  if (!response.ok) {
+    return fail("email", emailProviderError(response), 502, provider);
+  }
+
+  return success("email", provider, `Alerta enviada por email a ${to}.`, response.status);
 }
 
 async function sendWhatsApp(
@@ -553,17 +688,42 @@ export async function deliverAlert(
   }
 }
 
-export function alertChannelHealth() {
+export async function alertChannelHealth(ownerWallet?: string) {
   const metaWhatsApp = Boolean(env("WHATSAPP_ACCESS_TOKEN") && env("WHATSAPP_PHONE_NUMBER_ID"));
   const twilioWhatsApp = Boolean(
     env("TWILIO_ACCOUNT_SID") && env("TWILIO_AUTH_TOKEN") && env("TWILIO_WHATSAPP_FROM"),
   );
 
+  const status = ownerWallet ? await readEmailStatus(ownerWallet) : null;
+  const savedFrom = parseFromAddress(text(status?.from_email));
+  const savedReady = Boolean(
+    status?.configured && EMAIL_RE.test(savedFrom.email),
+  );
+
+  const envProvider = env("RESEND_API_KEY")
+    ? "resend"
+    : env("SENDGRID_API_KEY")
+      ? "sendgrid"
+      : env("POSTMARK_SERVER_TOKEN")
+        ? "postmark"
+        : null;
+  const envFromRaw = env("ALERT_FROM_EMAIL") || env("RESEND_FROM_EMAIL");
+  const envFrom = parseFromAddress(envFromRaw);
+  const envReady = Boolean(envProvider && EMAIL_RE.test(envFrom.email));
+
   return {
     app: true,
     telegram: Boolean(env("TELEGRAM_BOT_TOKEN")),
     discord: Boolean(env("DISCORD_WEBHOOK_URL")),
-    email: Boolean(env("RESEND_API_KEY") && (env("ALERT_FROM_EMAIL") || env("RESEND_FROM_EMAIL"))),
+    email: savedReady || envReady,
+    emailProvider: savedReady
+      ? emailProviderId(status?.provider)
+      : envReady
+        ? envProvider
+        : status
+          ? emailProviderId(status.provider)
+          : null,
+    emailConfiguredInApp: Boolean(status?.configured),
     whatsapp: metaWhatsApp || twilioWhatsApp,
     whatsappProvider: metaWhatsApp ? "meta" : twilioWhatsApp ? "twilio" : null,
     whatsappTemplate: Boolean(env("WHATSAPP_TEMPLATE_NAME")),
