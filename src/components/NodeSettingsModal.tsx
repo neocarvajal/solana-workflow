@@ -872,7 +872,7 @@ const NodeSettingsModal: React.FC<{
                   className="w-full rounded-lg border border-border/40 bg-background/70 px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary/50 sm:py-2.5 sm:text-sm"
                 />
                 <p className="mt-1 text-[10px] text-muted-foreground">
-                  Escribe al bot y usa su Chat ID, o el usuario de tu canal.
+                  Envía /start a tu bot y usa tu ID de usuario (por ejemplo desde @userinfobot), no el ID del bot. Para un canal usa @su_usuario.
                 </p>
               </div>
 

@@ -406,9 +406,34 @@ async function sendTelegram(
   }
 
   if (!response.ok || data?.ok === false) {
+    const description = text(data?.description) || `HTTP ${response.status}`;
+    if (/can't send messages to the bot/i.test(description)) {
+      return fail(
+        "telegram",
+        "Ese Chat ID pertenece a un bot. Usa tu ID de usuario o @tu_canal.",
+        400,
+        "telegram",
+      );
+    }
+    if (/chat not found/i.test(description)) {
+      return fail(
+        "telegram",
+        "No encontré ese chat. Envía /start a tu bot y vuelve a guardar el Chat ID.",
+        400,
+        "telegram",
+      );
+    }
+    if (/blocked by the user/i.test(description)) {
+      return fail(
+        "telegram",
+        "El bot está bloqueado por ese usuario. Desbloquéalo y vuelve a intentar.",
+        400,
+        "telegram",
+      );
+    }
     return fail(
       "telegram",
-      `Telegram rechazó el mensaje: ${data?.description || `HTTP ${response.status}`}`,
+      `Telegram rechazó el mensaje: ${description}`,
       502,
       "telegram",
     );
