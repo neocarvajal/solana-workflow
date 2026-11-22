@@ -19,6 +19,7 @@ import {
   sendAlert,
 } from "@/lib/alerts";
 import { useVaultReady } from "@/lib/useVaultReady";
+import AlertMessageEditor from "./AlertMessageEditor";
 
 /* ── Per-module field definitions ────────────────────────────── */
 interface FieldDef {
@@ -187,7 +188,7 @@ const MODULE_FIELDS: Record<string, FieldDef[]> = {
       placeholder: "Alerta de precio",
       description: "Asunto del email o título de la notificación (opcional)",
     },
-    { key: "message", label: "Mensaje", type: "textarea", placeholder: "Current {{asset}} price: {{price}}", description: "Contenido de la alerta. Variables: {{price}}, {{asset}}, {{condition}}, {{value}}, {{timestamp}}, {{txUrl}} (enlace del explorer si el paso anterior fue una transferencia ejecutada), {{explorerUrl}} y {{txSignature}}. El precio del trigger y el enlace se añaden al final si no los usas." },
+    { key: "message", label: "Mensaje", type: "textarea", placeholder: "Current {{asset}} price: {{price}}", description: "Inserta variables con los botones morados o escríbelas entre {{ }}. Se resaltan en morado. El precio y el enlace de la transacción se añaden al final si no los usas." },
     {
       key: "email", label: "Email destinatario", type: "email",
       showWhen: { key: "channel", equals: "email" },
@@ -648,6 +649,13 @@ const NodeSettingsModal: React.FC<{
                         </option>
                       ))}
                     </select>
+                  ) : field.type === "textarea" && isAlertNode && field.key === "message" ? (
+                    <AlertMessageEditor
+                      id={`field-${field.key}`}
+                      value={String(params[field.key] ?? "")}
+                      onChange={(next) => handleChange(field.key, next)}
+                      placeholder={field.placeholder}
+                    />
                   ) : field.type === "textarea" ? (
                     <textarea
                       id={`field-${field.key}`}
